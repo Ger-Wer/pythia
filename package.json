@@ -1,0 +1,22 @@
+{
+  "name": "pythia",
+  "version": "1.0.0",
+  "description": "Autonomous Polymarket prediction intelligence system",
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "dev": "bun --watch run src/main.ts",
+    "day0": "bash scripts/day0_check.sh",
+    "check-edge": "cd python && python3 edge_calculator.py",
+    "analyze": "cd python && python3 analyze.py"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "openai": "^4.80.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "bun-types": "^1.3.11",
+    "typescript": "^5.5.0"
+  }
+}

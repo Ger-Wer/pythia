@@ -1,0 +1,31 @@
+# Environment
+.env
+*.env.local
+
+# Data
+data/*.db
+data/*.sqlite
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Dexter clone
+dexter/
+
+# Python
+python/__pycache__/
+python/venv/
+*.pyc
+
+# Bun / Node
+node_modules/
+bun.lockb
+
+# Output
+*.png
+*.jpg
+
+# OS
+.DS_Store
+Thumbs.db
