@@ -169,9 +169,9 @@ async function processMarket(
     if (synthesisEdge > 15 || nakedEdge > 15) {
       await sendTelegramAlert(
         [
-          '*Pythia edge alert*',
-          `Market: ${escapeMarkdown(market.question)}`,
-          `Market price: ${marketPrice.toFixed(1)}%`,
+          '*Pythia: сильное расхождение с рынком*',
+          `Маркет: ${escapeMarkdown(market.question)}`,
+          `Рыночная цена: ${marketPrice.toFixed(1)}%`,
           synthesis ? `Dexter\\+R1: ${synthesis.probability}%` : 'Dexter\\+R1: N/A',
           naked ? `Naked R1: ${naked.probability}%` : 'Naked R1: N/A',
         ].join('\n'),
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
 
   const markets = await selectMarkets();
   if (markets.length === 0) {
-    await sendTelegramAlert('*Pythia alert*\nNo markets selected for today. Exiting.');
+    await sendTelegramAlert('*Pythia: уведомление*\nНа сегодня не выбрано ни одного маркета. Завершаю работу.');
     process.exit(1);
   }
 
@@ -226,7 +226,7 @@ async function main(): Promise<void> {
     } catch (error) {
       if (error instanceof CostLimitError) {
         await sendTelegramAlert(
-          `*Pythia alert*\nCost limit hit after ${processed} markets: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`,
+          `*Pythia: уведомление*\nДостигнут лимит расходов после ${processed} маркетов: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`,
         );
         process.exit(1);
       }
@@ -239,11 +239,11 @@ async function main(): Promise<void> {
   log(`${processed} markets processed, total cost: $${costTracker.getSessionCost().toFixed(4)}`);
 
   if (errors > 0) {
-    await sendTelegramAlert(`*Pythia alert*\nRun completed with ${errors} market-level errors.`);
+    await sendTelegramAlert(`*Pythia: уведомление*\nПрогон завершён с ${errors} ошибками на уровне маркетов.`);
   }
 
   if (processed === 0) {
-    await sendTelegramAlert('*Pythia alert*\nAll markets failed during the forecast run.');
+    await sendTelegramAlert('*Pythia: уведомление*\nВо время прогона не удалось обработать ни один маркет.');
     process.exit(1);
   }
 }
@@ -251,6 +251,6 @@ async function main(): Promise<void> {
 main().catch(async (error) => {
   console.error('Pythia run failed:', error);
   const message = error instanceof Error ? error.message : String(error);
-  await sendTelegramAlert(`*Pythia fatal error*\n${escapeMarkdown(message)}`);
+  await sendTelegramAlert(`*Pythia: критическая ошибка*\n${escapeMarkdown(message)}`);
   process.exit(1);
 });

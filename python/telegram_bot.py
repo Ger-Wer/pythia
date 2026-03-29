@@ -21,7 +21,7 @@ LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 def send_message(text: str):
     if not BOT_TOKEN or not CHAT_ID:
-        print(f"Telegram not configured. Message: {text}")
+        print(f"Telegram не настроен. Сообщение: {text}")
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     requests.post(
@@ -37,7 +37,7 @@ def send_message(text: str):
 
 def send_photo(path: str, caption: str = ""):
     if not BOT_TOKEN or not CHAT_ID:
-        print(f"Telegram not configured. Photo: {path}")
+        print(f"Telegram не настроен. Изображение: {path}")
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     with open(path, "rb") as handle:
@@ -60,7 +60,7 @@ def weekly_report():
     ).fetchone()
     if not table_exists:
         conn.close()
-        send_message("Pythia weekly report: predictions table does not exist yet.")
+        send_message("Pythia: таблица predictions ещё не создана, еженедельный отчёт пока недоступен.")
         return
 
     total = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
@@ -97,24 +97,24 @@ def weekly_report():
 
     conn.close()
 
-    msg = f"""📊 *Pythia Weekly Report*
+    msg = f"""📊 *Еженедельный отчёт Pythia*
 _{datetime.now().strftime('%Y-%m-%d')}_
 
-*This week:*
-• New predictions: {new_this_week}
-• Resolved: {resolved_this_week}
+*За неделю:*
+• Новых прогнозов: {new_this_week}
+• Разрешившихся маркетов: {resolved_this_week}
 
-*Cumulative:*
-• Total predictions: {total}
-• Resolved: {resolved}
-• Pending: {total - resolved}
+*С начала наблюдений:*
+• Всего прогнозов: {total}
+• Разрешилось: {resolved}
+• В ожидании: {total - resolved}
 
-*Brier Scores (↓ lower = better):*
+*Brier score (↓ меньше = лучше):*
 • Dexter: {f'{brier_data[0]:.4f}' if brier_data[0] is not None else 'N/A'}
 • Naked R1: {f'{brier_data[1]:.4f}' if brier_data[1] is not None else 'N/A'}
-• Market Price: {f'{brier_data[2]:.4f}' if brier_data[2] is not None else 'N/A'}
+• Рыночная цена: {f'{brier_data[2]:.4f}' if brier_data[2] is not None else 'N/A'}
 
-*API spend this month:* ${month_cost:.2f}
+*Расход API в этом месяце:* ${month_cost:.2f}
 """
 
     send_message(msg)
@@ -124,7 +124,7 @@ _{datetime.now().strftime('%Y-%m-%d')}_
         f"calibration_{datetime.now().strftime('%Y%m%d')}.png",
     )
     if os.path.exists(cal_path):
-        send_photo(cal_path, "Calibration curve")
+        send_photo(cal_path, "Калибровочная кривая")
 
 
 if __name__ == "__main__":

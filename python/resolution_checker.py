@@ -169,7 +169,7 @@ def main() -> None:
         "SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'"
     ).fetchone()
     if not table_exists:
-        print("predictions table does not exist yet")
+        print("Таблица predictions ещё не создана")
         conn.close()
         return
 
@@ -200,9 +200,9 @@ def main() -> None:
 
     conn.commit()
 
-    print(f"{len(resolved_today)} markets resolved today")
+    print(f"Сегодня разрешилось маркетов: {len(resolved_today)}")
     if cancelled_today:
-        print(f"{len(cancelled_today)} markets marked as cancelled/N/A")
+        print(f"Маркетов, помеченных как cancelled/N/A: {len(cancelled_today)}")
 
     if resolved_today:
         correct: list[str] = []
@@ -233,10 +233,10 @@ def main() -> None:
         market_avg = f"{cumulative[2]:.4f}" if cumulative[2] is not None else "N/A"
 
         message = (
-            f"📊 {len(resolved_today)} markets resolved:\n"
-            f"✅ Correct (|p - outcome| < 0.3): {', '.join(correct[:5]) or 'None'}\n"
-            f"❌ Wrong (|p - outcome| > 0.7): {', '.join(wrong[:5]) or 'None'}\n"
-            f"Cumulative Brier: dexter={dexter_avg}, "
+            f"📊 Разрешилось маркетов: {len(resolved_today)}\n"
+            f"✅ Точные прогнозы (|p - outcome| < 0.3): {', '.join(correct[:5]) or 'нет'}\n"
+            f"❌ Сильные промахи (|p - outcome| > 0.7): {', '.join(wrong[:5]) or 'нет'}\n"
+            f"Накопленный Brier: dexter={dexter_avg}, "
             f"naked={naked_avg}, "
             f"market={market_avg}"
         )
