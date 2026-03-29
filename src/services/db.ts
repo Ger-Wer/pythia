@@ -1,9 +1,9 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import BetterSqlite3 from 'better-sqlite3';
+import { Database as BunDatabase } from 'bun:sqlite';
 import { CONFIG } from '../config';
 
-export type Database = BetterSqlite3.Database;
+export type Database = BunDatabase;
 
 export interface PredictionRow {
   market_id: string;
@@ -65,15 +65,18 @@ export function initDb(): Database {
   const dbDir = path.dirname(CONFIG.paths.db);
   mkdirSync(dbDir, { recursive: true });
 
-  const db = new BetterSqlite3(CONFIG.paths.db);
-  db.pragma('journal_mode = WAL');
-  db.exec(SCHEMA_SQL);
+  const db = new BunDatabase(CONFIG.paths.db, {
+    create: true,
+    strict: true,
+  });
+  db.run('PRAGMA journal_mode = WAL;');
+  db.run(SCHEMA_SQL);
 
   return db;
 }
 
 export function insertPrediction(db: Database, data: PredictionRow): void {
-  const stmt = db.prepare(`
+  const stmt = db.query(`
     INSERT OR REPLACE INTO predictions (
       market_id,
       question,
@@ -122,7 +125,7 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
 }
 
 export function getUnresolved(db: Database): PredictionRow[] {
-  const stmt = db.prepare(`
+  const stmt = db.query(`
     SELECT
       market_id,
       question,
@@ -153,7 +156,7 @@ export function updateOutcome(
   outcome: number,
   resolvedAt: string,
 ): void {
-  const stmt = db.prepare(`
+  const stmt = db.query(`
     UPDATE predictions
     SET
       outcome = @outcome,
@@ -196,10 +199,10 @@ function startOfNextUtcMonth(date: Date): Date {
 }
 
 function getCostInRange(db: Database, start: Date, end: Date): number {
-  const stmt = db.prepare(`
+  const stmt = db.query(`
     SELECT COALESCE(SUM(api_cost_usd), 0) AS total
     FROM predictions
-    WHERE forecast_timestamp >= ? AND forecast_timestamp < ?
+    WHERE forecast_timestamp >= ?1 AND forecast_timestamp < ?2
   `);
 
   const row = stmt.get(start.toISOString(), end.toISOString()) as { total?: number } | undefined;
