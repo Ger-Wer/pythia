@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
     BUN_INSTALL=/root/.bun \
     PATH=/root/.bun/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -18,7 +19,7 @@ RUN apt-get update \
        unzip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"
 
 ARG TARGETARCH
 RUN set -eux; \
@@ -39,8 +40,9 @@ COPY python/requirements.txt /app/python/requirements.txt
 RUN python -m venv /app/python/venv \
     && /app/python/venv/bin/pip install --no-cache-dir -r /app/python/requirements.txt
 
-RUN git clone --depth 1 https://github.com/virattt/dexter.git /app/dexter \
+RUN git clone https://github.com/virattt/dexter.git /app/dexter \
     && cd /app/dexter \
+    && git checkout --detach e126374a0fd28f50144fe068d8a8c4b4541ed38c \
     && bun install
 
 COPY src /app/src
