@@ -10,6 +10,7 @@ import { initDb, insertPrediction } from './services/db';
 import type { Database } from './services/db';
 import {
   dexterResearch,
+  resetSearchWarningCache,
   searchNews,
 } from './services/dexter_runner';
 import { selectMarkets } from './services/market_selector';
@@ -109,13 +110,13 @@ async function processMarket(
   db: Database,
   market: PolymarketMarket,
   costTracker: CostTracker,
+  forecastTimestamp: string,
 ): Promise<{
   saved: boolean;
   hadError: boolean;
 }> {
   const perMarketCostStart = costTracker.getSessionCost();
   const marketPrice = marketPriceFromYesOutcome(market);
-  const forecastTimestamp = new Date().toISOString();
 
   try {
     const newsResults = await searchNews(market.question, 3);
@@ -196,6 +197,7 @@ async function main(): Promise<void> {
   const db = initDb();
   const costTracker = new CostTracker(db);
   const startedAt = new Date().toISOString();
+  resetSearchWarningCache();
 
   log(`=== Pythia forecast run started at ${startedAt} ===`);
 
@@ -216,7 +218,7 @@ async function main(): Promise<void> {
     log(`Processing market ${market.id}: ${formatMarketLog(market)}`);
 
     try {
-      const result = await processMarket(db, market, costTracker);
+      const result = await processMarket(db, market, costTracker, startedAt);
       if (result.saved) {
         processed += 1;
       }

@@ -3,7 +3,11 @@ import type { PolymarketMarket } from '../tools/polymarket';
 
 const marketSelectorModule = import('./market_selector');
 
-function makeMarket(id: string, ageHours: number): PolymarketMarket {
+function makeMarket(
+  id: string,
+  ageHours: number,
+  overrides: Partial<PolymarketMarket> = {},
+): PolymarketMarket {
   const now = Date.now();
 
   return {
@@ -19,48 +23,134 @@ function makeMarket(id: string, ageHours: number): PolymarketMarket {
     closed: false,
     resolutionSource: 'test',
     description: 'test market',
+    slug: `market-${id}`,
+    conditionId: `condition-${id}`,
+    groupItemTitle: '',
+    ...overrides,
   };
 }
 
-test('buildSelectionPlan uses the relaxed live-market filters', async () => {
+test('buildSelectionPlan enforces staged expansion and diversity constraints', async () => {
   const { buildSelectionPlan } = await marketSelectorModule;
 
   expect(buildSelectionPlan()).toEqual({
     newMarketHours: 72,
-    primary: {
-      minVolume: 1_000,
-      maxVolume: 100_000,
-      maxDaysToResolution: 21,
-      limit: 500,
-    },
-    expanded: {
-      minVolume: 500,
-      maxVolume: 250_000,
-      maxDaysToResolution: 30,
-      limit: 500,
-    },
+    minimumUniqueEvents: 10,
+    maxPerEvent: 1,
+    maxPerCategory: 3,
+    stages: [
+      {
+        label: 'primary',
+        minVolume: 1_000,
+        maxVolume: 100_000,
+        maxDaysToResolution: 21,
+        limit: 500,
+      },
+      {
+        label: 'fallback',
+        minVolume: 500,
+        maxVolume: 250_000,
+        maxDaysToResolution: 30,
+        limit: 500,
+      },
+      {
+        label: 'fallback-diverse',
+        minVolume: 500,
+        maxVolume: 250_000,
+        maxDaysToResolution: 60,
+        limit: 1_000,
+      },
+    ],
   });
 });
 
-test('mergeCandidatePools keeps primary quality but expands when needed', async () => {
-  const { mergeCandidatePools } = await marketSelectorModule;
+test('extractEventKey uses candidate heuristics only for candidate-style markets', async () => {
+  const { extractEventKey } = await marketSelectorModule;
 
-  const primaryNew = makeMarket('primary-new', 12);
-  const primaryEstablished = makeMarket('primary-established', 90);
-  const expandedNew = makeMarket('expanded-new', 8);
-  const expandedDuplicate = makeMarket('primary-new', 6);
-  const expandedEstablished = makeMarket('expanded-established', 120);
+  const mastersCandidate = makeMarket('masters-bubba', 12, {
+    question: 'Will Bubba Watson win the 2026 Masters tournament?',
+    slug: 'will-bubba-watson-win-the-2026-masters-tournament',
+    groupItemTitle: 'Bubba Watson',
+  });
+  const ceasefire = makeMarket('ceasefire', 12, {
+    question: 'Will there be a Russia-Ukraine ceasefire by March 31, 2026?',
+    slug: 'russia-ukraine-ceasefire-by-march-31-2026',
+  });
 
-  const selected = mergeCandidatePools(
-    [primaryEstablished, primaryNew],
-    [expandedEstablished, expandedDuplicate, expandedNew],
-    4,
-  );
+  expect(extractEventKey(mastersCandidate)).toBe('win the 2026 masters tournament');
+  expect(extractEventKey(ceasefire)).toBe('will there be a russia-ukraine ceasefire by march 31, 2026');
+});
+
+test('deduplicateByEvent keeps the most informative sub-market in each event group', async () => {
+  const { deduplicateByEvent } = await marketSelectorModule;
+
+  const lowSignal = makeMarket('masters-bubba', 12, {
+    question: 'Will Bubba Watson win the 2026 Masters tournament?',
+    outcomePrices: [0.02, 0.98],
+    slug: 'will-bubba-watson-win-the-2026-masters-tournament',
+    groupItemTitle: 'Bubba Watson',
+  });
+  const highSignal = makeMarket('masters-rory', 12, {
+    question: 'Will Rory McIlroy win the 2026 Masters tournament?',
+    outcomePrices: [0.24, 0.76],
+    slug: 'will-rory-mcilroy-win-the-2026-masters-tournament',
+    groupItemTitle: 'Rory McIlroy',
+  });
+  const independent = makeMarket('ceasefire', 12, {
+    question: 'Will there be a Russia-Ukraine ceasefire by March 31, 2026?',
+    outcomePrices: [0.55, 0.45],
+    slug: 'russia-ukraine-ceasefire-by-march-31-2026',
+    category: 'world',
+  });
+
+  const selected = deduplicateByEvent([lowSignal, highSignal, independent]);
 
   expect(selected.map((market: PolymarketMarket) => market.id)).toEqual([
-    'primary-new',
-    'primary-established',
-    'expanded-new',
-    'expanded-established',
+    'masters-rory',
+    'ceasefire',
+  ]);
+});
+
+test('applyDiversityConstraints enforces one market per event and three per category', async () => {
+  const { applyDiversityConstraints } = await marketSelectorModule;
+
+  const politicsA = makeMarket('election-a', 12, {
+    question: 'Will Alice be elected president?',
+    category: 'politics',
+    outcomePrices: [0.61, 0.39],
+  });
+  const politicsB = makeMarket('election-b', 12, {
+    question: 'Will Bob be elected president?',
+    category: 'politics',
+    outcomePrices: [0.41, 0.59],
+  });
+  const politicsC = makeMarket('election-c', 12, {
+    question: 'Will Carol be elected president?',
+    category: 'politics',
+    outcomePrices: [0.31, 0.69],
+  });
+  const politicsD = makeMarket('election-d', 12, {
+    question: 'Will Dave be elected president?',
+    category: 'politics',
+    outcomePrices: [0.21, 0.79],
+  });
+  const sports = makeMarket('sports-a', 12, {
+    question: 'Will Team A win the finals?',
+    category: 'sports',
+  });
+
+  const selected = applyDiversityConstraints([
+    politicsA,
+    politicsB,
+    politicsC,
+    politicsD,
+    sports,
+  ]);
+
+  expect(selected.map((market: PolymarketMarket) => market.id)).toEqual([
+    'election-a',
+    'election-b',
+    'election-c',
+    'sports-a',
   ]);
 });

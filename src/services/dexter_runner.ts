@@ -43,9 +43,23 @@ const researchSchema = z.object({
   key_facts: z.array(z.string()).min(1).max(5),
   sources: z.array(z.string()).min(1),
 });
+const emittedSearchWarnings = new Set<string>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function warnSearchOnce(key: string, message: string): void {
+  if (emittedSearchWarnings.has(key)) {
+    return;
+  }
+
+  emittedSearchWarnings.add(key);
+  console.warn(message);
+}
+
+export function resetSearchWarningCache(): void {
+  emittedSearchWarnings.clear();
 }
 
 async function fetchWithRetry<T>(request: () => Promise<T>): Promise<T> {
@@ -167,13 +181,27 @@ export async function searchNews(query: string, limit: number): Promise<NewsResu
       return exaResults;
     }
   } catch (error) {
-    console.warn('Exa search failed, falling back to Tavily if configured:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (/Exa HTTP 401/i.test(message)) {
+      warnSearchOnce('exa-401', 'Research warning: Exa API returned 401. Falling back to Tavily if configured.');
+    } else {
+      warnSearchOnce('exa-failed', 'Research warning: Exa search failed. Falling back to Tavily if configured.');
+    }
   }
 
   try {
-    return await searchTavily(query, limit);
+    const tavilyResults = await searchTavily(query, limit);
+    if (tavilyResults.length === 0 && !CONFIG.exa.tavilyApiKey) {
+      warnSearchOnce('research-off', 'Research warning: no working search provider configured. Continuing in degraded mode.');
+    }
+    return tavilyResults;
   } catch (error) {
-    console.warn('Tavily search failed:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (/401|403/i.test(message)) {
+      warnSearchOnce('tavily-auth', 'Research warning: Tavily authentication failed. Continuing in degraded mode.');
+    } else {
+      warnSearchOnce('tavily-failed', 'Research warning: Tavily search failed. Continuing in degraded mode.');
+    }
     return [];
   }
 }

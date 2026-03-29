@@ -15,6 +15,13 @@ export interface PolymarketMarket {
   closed: boolean;
   resolutionSource: string;
   description: string;
+  slug?: string;
+  conditionId?: string;
+  groupSlug?: string;
+  eventSlug?: string;
+  parentId?: string;
+  parentMarketId?: string;
+  groupItemTitle?: string;
 }
 
 export interface ActiveMarketsParams {
@@ -39,6 +46,13 @@ interface GammaMarketRaw {
   description?: string | null;
   closedTime?: string | null;
   updatedAt?: string | null;
+  slug?: string | null;
+  conditionId?: string | null;
+  groupSlug?: string | null;
+  eventSlug?: string | null;
+  parentId?: string | number | null;
+  parentMarketId?: string | number | null;
+  groupItemTitle?: string | null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -114,6 +128,13 @@ function normalizeMarket(raw: GammaMarketRaw): PolymarketMarket | null {
     closed: Boolean(raw.closed),
     resolutionSource: typeof raw.resolutionSource === 'string' ? raw.resolutionSource : '',
     description: typeof raw.description === 'string' ? raw.description : '',
+    slug: typeof raw.slug === 'string' ? raw.slug : undefined,
+    conditionId: typeof raw.conditionId === 'string' ? raw.conditionId : undefined,
+    groupSlug: typeof raw.groupSlug === 'string' ? raw.groupSlug : undefined,
+    eventSlug: typeof raw.eventSlug === 'string' ? raw.eventSlug : undefined,
+    parentId: raw.parentId !== undefined && raw.parentId !== null ? String(raw.parentId) : undefined,
+    parentMarketId: raw.parentMarketId !== undefined && raw.parentMarketId !== null ? String(raw.parentMarketId) : undefined,
+    groupItemTitle: typeof raw.groupItemTitle === 'string' ? raw.groupItemTitle : undefined,
   };
 }
 
@@ -209,10 +230,6 @@ export async function fetchActiveMarkets(params: ActiveMarketsParams): Promise<P
 
   if (markets.length < 5 && markets.length > 0) {
     console.warn(`Gamma API warning: only ${markets.length} markets matched current filters.`);
-  }
-
-  if (markets.length === 0) {
-    console.error('Gamma API error: no active binary markets matched the current filters.');
   }
 
   return markets;
