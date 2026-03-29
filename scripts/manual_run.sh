@@ -6,8 +6,41 @@ cd "$ROOT_DIR"
 
 SERVICE="pythia-scheduler"
 ENTRYPOINT="/app/scripts/entrypoint.sh"
-DB_PATH="${DB_PATH:-/app/data/pythia.db}"
 COMMAND="${1:-help}"
+
+usage() {
+  cat <<'EOF'
+Pythia Manual Runner
+
+Usage: bash scripts/manual_run.sh <command>
+
+Commands:
+  forecast  - run forecast manually
+  resolve   - run resolution checker
+  weekly    - generate weekly report
+  edge      - calculate edge and Brier scores
+  db        - open SQLite shell
+  logs      - tail scheduler logs
+  shell     - open shell in the container
+  status    - show compose and database status
+  help      - show this message
+EOF
+}
+
+resolve_db_path() {
+  if [ -f .env ]; then
+    awk -F= '
+      /^[[:space:]]*DB_PATH=/ {
+        sub(/^[[:space:]]*DB_PATH=[[:space:]]*/, "", $0)
+        print
+        exit
+      }
+    ' .env
+  fi
+}
+
+DB_PATH="$(resolve_db_path)"
+DB_PATH="${DB_PATH:-/app/data/pythia.db}"
 
 case "$COMMAND" in
   forecast)
@@ -51,43 +84,13 @@ case "$COMMAND" in
     ;;
 
   help)
-    cat <<'EOF'
-Pythia Manual Runner
-
-Usage: bash scripts/manual_run.sh <command>
-
-Commands:
-  forecast  - run forecast manually
-  resolve   - run resolution checker
-  weekly    - generate weekly report
-  edge      - calculate edge and Brier scores
-  db        - open SQLite shell
-  logs      - tail scheduler logs
-  shell     - open shell in the container
-  status    - show compose and database status
-  help      - show this message
-EOF
+    usage
     ;;
 
   *)
     echo "Unknown command: $COMMAND" >&2
     echo "" >&2
-    cat <<'EOF' >&2
-Pythia Manual Runner
-
-Usage: bash scripts/manual_run.sh <command>
-
-Commands:
-  forecast  - run forecast manually
-  resolve   - run resolution checker
-  weekly    - generate weekly report
-  edge      - calculate edge and Brier scores
-  db        - open SQLite shell
-  logs      - tail scheduler logs
-  shell     - open shell in the container
-  status    - show compose and database status
-  help      - show this message
-EOF
+    usage >&2
     exit 1
     ;;
 esac
