@@ -93,23 +93,29 @@ function ensurePredictionMigrations(db: Database): void {
     .query('PRAGMA table_info(predictions)')
     .all() as Array<{ name: string }>;
   const columnNames = new Set(columns.map((column) => column.name));
+  let shouldBackfillValidity = false;
 
   for (const migration of REQUIRED_MIGRATIONS) {
     if (!columnNames.has(migration.column)) {
       db.run(migration.sql);
+      if (migration.column === 'is_valid') {
+        shouldBackfillValidity = true;
+      }
     }
   }
 
-  db.run(
-    `
-      UPDATE predictions
-      SET is_valid = CASE
-        WHEN forecast_timestamp < ?1 THEN 0
-        ELSE COALESCE(is_valid, 1)
-      END
-    `,
-    [INVALID_DATA_CUTOFF],
-  );
+  if (shouldBackfillValidity) {
+    db.run(
+      `
+        UPDATE predictions
+        SET is_valid = CASE
+          WHEN forecast_timestamp < ?1 THEN 0
+          ELSE COALESCE(is_valid, 1)
+        END
+      `,
+      [INVALID_DATA_CUTOFF],
+    );
+  }
 }
 
 function ensurePredictionIndexes(db: Database): void {
