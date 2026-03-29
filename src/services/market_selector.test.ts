@@ -78,7 +78,7 @@ test('extractEventKey uses candidate heuristics only for candidate-style markets
   });
 
   expect(extractEventKey(mastersCandidate)).toBe('win the 2026 masters tournament');
-  expect(extractEventKey(ceasefire)).toBe('will there be a russia-ukraine ceasefire by march 31, 2026');
+  expect(extractEventKey(ceasefire)).toBe('will there be a russia ukraine ceasefire by march 31, 2026');
 });
 
 test('deduplicateByEvent keeps the most informative sub-market in each event group', async () => {
