@@ -20,17 +20,22 @@ Polymarket Gamma API
 
 Работайте на хосте `amper` под пользователем `pythia`.
 
+Сначала создайте и заполните `.env` реальными значениями. Для запуска нужен либо прямой DeepSeek-доступ (`DEEPSEEK_API_KEY` и при необходимости `DEEPSEEK_BASE_URL`), либо OpenRouter-совместимые креды (`OPENROUTER_API_KEY` и `OPENROUTER_BASE_URL`). Для нормального качества research также задайте `EXA_API_KEY` или `TAVILY_API_KEY`.
+
 ```bash
 cd /home/pythia/pythia
 cp .env.example .env
+```
+
+После этого выполняйте команды в таком порядке:
+
+```bash
 bash scripts/day0_check.sh
 docker compose build
 bash scripts/manual_run.sh forecast
 bash scripts/manual_run.sh status
 docker compose up -d
 ```
-
-Перед первым `forecast` обязательно заполните `.env` реальными ключами и параметрами: как минимум `DEEPSEEK_API_KEY`, а для нормального качества research - `EXA_API_KEY` или `TAVILY_API_KEY`.
 
 Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`.
 
