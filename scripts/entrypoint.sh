@@ -29,7 +29,7 @@ case "${1:-}" in
     ;;
 
   scheduler)
-    exec supercronic -json /app/supercronic.crontab
+    exec supercronic -json -no-reap /app/supercronic.crontab
     ;;
 
   shell)
