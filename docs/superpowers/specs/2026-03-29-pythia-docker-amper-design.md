@@ -1,132 +1,148 @@
-# Pythia Docker Deployment Design on `amper`
+# Дизайн Docker-деплоя Pythia на `amper`
 
-Date: 2026-03-29
-Status: Approved for planning
-Scope: Deployment architecture and operational model only. Core Pythia forecasting logic remains unchanged unless a deployment requirement forces a narrow compatibility change.
+Дата: 2026-03-29
+Статус: одобрено для перехода к планированию
+Область: только deployment-архитектура и операционная модель. Основная логика прогнозирования Pythia сохраняется без изменений, если только требования контейнерного запуска не потребуют узкой совместимой правки.
 
-## Goal
+## Цель
 
-Move Pythia from the original Hetzner bare-metal deployment plan to a Docker-first deployment model on the existing Oracle server `amper`, while keeping Pythia operationally isolated from `SproutSignal`.
+Перевести Pythia с исходного плана bare-metal деплоя на Hetzner на Docker-first deployment-модель на существующем Oracle-сервере `amper`, сохранив при этом максимально возможную операционную изоляцию от `SproutSignal`.
 
-This design replaces `setup.sh + host cron` as the primary deployment path. The Docker path becomes the single active deployment model in documentation and operations.
+Этот дизайн заменяет `setup.sh + host cron` как основной способ деплоя. Docker-путь становится единственным активным deployment-сценарием в документации и повседневной эксплуатации.
 
-## Constraints
+## Язык документации
 
-- Pythia and SproutSignal run on the same host, so they cannot be completely isolated at the kernel or Docker daemon level.
-- Within that limit, Pythia must be isolated operationally:
-  - separate Linux user
-  - separate repository path
-  - separate Docker Compose project
-  - separate network
-  - separate data and logs
-  - no inbound ports
-  - no shared volumes or runtime paths
-- Pythia remains cron-style batch software:
-  - daily forecast run
-  - daily resolution checker
-  - weekly analysis and Telegram reporting
-- The business logic in `src/**` and `python/**` should remain stable and reusable.
+Активная документация проекта Pythia ведётся на русском языке.
 
-## Current Host Context
+Это правило относится к:
 
-- Host: `amper`
-- Existing project on host: `SproutSignal`
-- Host has enough spare CPU, RAM, and disk for Pythia.
-- Pythia does not need public HTTP ingress.
-- Pythia only needs outbound HTTPS to DeepSeek, Polymarket, Exa or Tavily, and Telegram.
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEPLOYMENT.md`
+- новым operational runbook-файлам
+- новым decision/spec-документам
 
-## Evaluated Approaches
+Допускаются английские технические термины, имена команд, названия файлов, имена переменных окружения и названия внешних продуктов, если их перевод ухудшает точность.
 
-### Approach A: Separate VPS
+## Ограничения
 
-Deploy Pythia on its own server as originally planned.
+- Pythia и SproutSignal работают на одном хосте, поэтому полная изоляция на уровне kernel или Docker daemon невозможна.
+- В пределах этого ограничения Pythia должна быть изолирована операционно:
+  - отдельный Linux user
+  - отдельный путь к репозиторию
+  - отдельный Docker Compose project
+  - отдельная network
+  - отдельные data и logs
+  - отсутствие входящих портов
+  - отсутствие общих volumes и runtime-путей
+- Pythia остаётся batch-системой с cron-логикой:
+  - ежедневный forecast run
+  - ежедневная проверка resolved markets
+  - еженедельная аналитика и Telegram-reporting
+- Бизнес-логика в `src/**` и `python/**` должна по возможности остаться стабильной и переиспользуемой.
 
-Pros:
-- strongest isolation boundary
-- no shared host risk with SproutSignal
+## Текущий контекст хоста
 
-Cons:
-- extra monthly cost
-- extra host to manage
-- unnecessary for current Pythia resource needs
+- Хост: `amper`
+- Уже работающий проект на хосте: `SproutSignal`
+- По CPU, RAM и диску у хоста есть достаточный запас для Pythia.
+- Pythia не требует публичного HTTP ingress.
+- Pythia нужны только исходящие HTTPS-запросы к DeepSeek, Polymarket, Exa или Tavily и Telegram.
 
-### Approach B: Shared host, host-native runtime
+## Рассмотренные варианты
 
-Install Bun, Python, and cron directly on `amper`.
+### Вариант A: отдельный VPS
 
-Pros:
-- simple to start
-- low container overhead
+Развернуть Pythia на отдельном сервере, как планировалось изначально.
 
-Cons:
-- weaker operational isolation
-- higher risk of path, user, cron, and runtime collisions
-- harder to keep dependencies reproducible
+Плюсы:
+- самая сильная граница изоляции
+- отсутствие shared-host риска со SproutSignal
 
-### Approach C: Shared host, Docker-first deployment
+Минусы:
+- дополнительные ежемесячные расходы
+- ещё один хост в обслуживании
+- избыточно для текущих resource-требований Pythia
 
-Run Pythia on `amper` inside its own Docker Compose stack under a dedicated user.
+### Вариант B: shared host, нативный runtime на хосте
 
-Pros:
-- strong operational isolation on the existing host
-- reproducible runtime
-- easy rebuild and update cycle
-- avoids exposing ports
-- avoids dependency drift on the host
+Установить Bun, Python и cron напрямую на `amper`.
 
-Cons:
-- still shares host kernel and Docker daemon with SproutSignal
-- container image must handle Bun, Python, and Dexter dependencies correctly on both `amd64` and `arm64`
+Плюсы:
+- простой старт
+- нет container-overhead
 
-## Chosen Approach
+Минусы:
+- более слабая операционная изоляция
+- выше риск пересечений по путям, пользователям, cron и runtime
+- сложнее обеспечить воспроизводимость зависимостей
 
-Approach C is the approved design.
+### Вариант C: shared host, Docker-first deployment
 
-Pythia will run on `amper` under a dedicated Linux user `pythia`, in `/home/pythia/pythia`, with its own Docker Compose project and an internal scheduler based on `supercronic`.
+Запустить Pythia на `amper` в собственном Docker Compose stack под выделенным пользователем.
 
-## Deployment Architecture
+Плюсы:
+- сильная операционная изоляция на существующем хосте
+- воспроизводимый runtime
+- простой цикл rebuild/update
+- не требуется открывать порты наружу
+- нет зависимости от runtime-пакетов хоста
 
-### Host-Level Isolation
+Минусы:
+- всё ещё общий kernel и общий Docker daemon со SproutSignal
+- container image должен корректно собирать Bun, Python и Dexter-зависимости и на `amd64`, и на `arm64`
+
+## Выбранный вариант
+
+Утверждён вариант C.
+
+Pythia будет развёрнута на `amper` под отдельным Linux user `pythia`, в каталоге `/home/pythia/pythia`, со своим Docker Compose project и внутренним scheduler на базе `supercronic`.
+
+## Архитектура деплоя
+
+### Изоляция на уровне хоста
 
 - Linux user: `pythia`
-- Repository path: `/home/pythia/pythia`
-- All commands are executed from that directory and under that user.
-- Pythia must never be operated from `/home/ubuntu/SproutSignal`.
+- путь к репозиторию: `/home/pythia/pythia`
+- все команды выполняются только из этого каталога и только от этого пользователя
+- Pythia нельзя эксплуатировать из `/home/ubuntu/SproutSignal`
 
-### Compose Project
+### Compose project
 
-- Compose project name: `pythia`
-- Primary long-running service: `pythia-scheduler`
-- One dedicated bridge network: `pythia_internal`
-- No published ports
-- No shared networks with SproutSignal
+- имя Compose project: `pythia`
+- основной long-running service: `pythia-scheduler`
+- отдельная bridge-network: `pythia_internal`
+- без опубликованных портов
+- без общих networks со SproutSignal
 
-### Runtime Model
+### Runtime-модель
 
-- A single application image contains:
+- Один application image содержит:
   - Bun runtime
   - Python 3.11 runtime
   - SQLite tools
-  - application code
-  - Dexter clone
+  - код приложения
+  - клон Dexter
   - `supercronic`
-- The scheduler container runs continuously and executes batch jobs on schedule.
-- Manual operations reuse the same image to avoid host/runtime drift.
+- Scheduler-контейнер работает постоянно и запускает batch-задачи по расписанию.
+- Ручные операции используют тот же image, чтобы не было расхождения между host-runtime и production-runtime.
 
-## Container Build Design
+## Дизайн сборки контейнера
 
-### Base Image
+### Базовый image
 
-Use `python:3.11-slim` as the Docker base image instead of `ubuntu:22.04`.
+В качестве базового Docker image используется `python:3.11-slim`, а не `ubuntu:22.04`.
 
-Rationale:
-- guarantees Python 3.11 in a multi-arch image
-- simplifies package management
-- reduces image size and moving parts
+Причины:
 
-### Required System Packages
+- гарантированный Python 3.11 в multi-arch image
+- более простой package management
+- меньший размер image
+- меньше движущихся частей при сборке
 
-The image should install the minimum packages needed for Pythia and its build chain:
+### Необходимые системные пакеты
+
+Image должен устанавливать минимальный набор пакетов, необходимых Pythia и её build-chain:
 
 - `curl`
 - `git`
@@ -138,89 +154,93 @@ The image should install the minimum packages needed for Pythia and its build ch
 - `build-essential`
 - `pkg-config`
 
-Rationale:
-- Bun installer needs `unzip`
-- health checks use `pgrep` from `procps`
-- `better-sqlite3` may need native compilation, especially on ARM
+Причины:
 
-### Bun Installation
+- установщик Bun требует `unzip`
+- healthcheck использует `pgrep` из `procps`
+- `better-sqlite3` может потребовать нативную сборку, особенно на ARM
 
-- Install Bun inside the image
-- Ensure the Bun binary is on `PATH`
-- Keep Bun entirely inside the container runtime; do not require host Bun
+### Установка Bun
+
+- Bun устанавливается внутри image
+- бинарник Bun должен быть доступен через `PATH`
+- host Bun для активного runtime не требуется
 
 ### Supercronic
 
-- Install `supercronic` inside the image
-- Use the architecture-aware binary chosen by Docker build architecture
-- `supercronic` becomes the scheduler process for the long-running container
+- `supercronic` устанавливается внутрь image
+- используется architecture-aware binary, выбранный во время Docker build
+- `supercronic` становится scheduler-процессом в long-running контейнере
 
 ### Dexter
 
-- Clone Dexter into the image at build time
-- Install Dexter dependencies at build time
-- Keep Dexter updates tied to image rebuilds
+- Dexter клонируется внутрь image на этапе build
+- Dexter dependencies устанавливаются на этапе build
+- обновление Dexter привязано к пересборке image
 
-## Compose Service Design
+## Дизайн Compose service
 
 ### Service: `pythia-scheduler`
 
-Responsibilities:
-- run `supercronic`
-- execute scheduled forecast, resolution, and weekly tasks
-- emit logs to stdout and to bind-mounted log files as needed
+Задачи сервиса:
 
-Key properties:
+- запускать `supercronic`
+- выполнять forecast, resolution и weekly-задачи по расписанию
+- писать логи в stdout и в bind-mounted log-файлы там, где это требуется
+
+Ключевые свойства:
+
 - `restart: unless-stopped`
 - `env_file: .env`
 - `TZ=UTC`
 - bind mounts:
   - `./data:/app/data`
   - `./logs:/app/logs`
-- no `.env` bind mount
-- no published ports
-- attached only to `pythia_internal`
+- без bind-mount для `.env`
+- без опубликованных портов
+- подключён только к `pythia_internal`
 
-### Resource Boundaries
+### Ресурсные ограничения
 
-Prefer Docker Compose service-level runtime limits for actual enforcement:
+Для реального enforcement используются service-level runtime limits Docker Compose:
 
 - `mem_limit: 2g`
 - `cpus: 1.0`
 - `pids_limit: 256`
 
-Rationale:
-- protects SproutSignal from accidental starvation
-- matches Pythia's low expected resource usage
+Причины:
 
-### Logging
+- защита SproutSignal от случайного resource starvation
+- соответствие низкому ожидаемому resource-профилю Pythia
 
-- Docker JSON logging driver with rotation
-- application logs continue to write into `/app/logs`
-- log retention should be bounded
+### Логирование
 
-### Health Check
+- Docker JSON logging driver с ротацией
+- application logs продолжают писаться в `/app/logs`
+- хранение логов должно быть ограничено
 
-- scheduler health check should verify `supercronic` is alive
-- use a simple `pgrep`-based check
+### Healthcheck
 
-## Scheduling Model
+- healthcheck scheduler-контейнера должен проверять, что `supercronic` жив
+- используется простой `pgrep`-based check
 
-`supercronic.crontab` becomes the only active scheduler definition.
+## Модель расписания
 
-Planned jobs:
+`supercronic.crontab` становится единственным активным определением расписания.
+
+Планируемые задачи:
 
 - `06:00 UTC` -> forecast run
 - `18:00 UTC` -> resolution checker
 - `Sunday 20:00 UTC` -> analysis + weekly Telegram report
 
-There is no host cron for Pythia in the active deployment model.
+Host cron для Pythia в активной deployment-модели отсутствует.
 
-## Entrypoint and Manual Operations
+## Entrypoint и ручные операции
 
 ### `scripts/entrypoint.sh`
 
-Single operational entrypoint for:
+Единый operational entrypoint для режимов:
 
 - `forecast`
 - `resolve`
@@ -228,73 +248,75 @@ Single operational entrypoint for:
 - `scheduler`
 - `shell`
 
-Responsibilities:
-- export container-default paths
-- route subcommands to the correct Bun or Python entrypoints
-- append task output to date-based log files
+Ответственность:
+
+- экспортировать container-default paths
+- направлять subcommands в нужные Bun или Python entrypoints
+- добавлять output задач в log-файлы с датой
 
 ### `scripts/manual_run.sh`
 
-Host helper for operators. It wraps `docker compose run` or `docker compose logs` for:
+Host helper для оператора. Он оборачивает `docker compose run` или `docker compose logs` для таких сценариев:
 
-- manual forecast
-- manual resolution run
+- ручной forecast
+- ручной resolution run
 - weekly report
 - edge calculation
 - DB shell
 - logs
-- container shell
+- shell внутри контейнера
 - status summary
 
-This helper becomes the primary operational interface for routine maintenance.
+Этот helper становится основным интерфейсом для рутинной эксплуатации.
 
-## Data and Secret Handling
+## Данные и секреты
 
-### Persistent Data
+### Постоянные данные
 
-Persistent directories:
+Постоянные каталоги:
 
 - `/home/pythia/pythia/data`
 - `/home/pythia/pythia/logs`
 
-Container paths:
+Пути внутри контейнера:
 
 - `/app/data`
 - `/app/logs`
 
-SQLite database path default becomes:
+Значение по умолчанию для SQLite database path:
 
 - `DB_PATH=/app/data/pythia.db`
 
-Log directory default becomes:
+Значение по умолчанию для log directory:
 
 - `LOG_DIR=/app/logs`
 
-### Secrets
+### Секреты
 
-- `.env` lives only at `/home/pythia/pythia/.env`
-- secrets are injected with `env_file`
-- `.env` is not bind-mounted into the container as a normal file
+- `.env` хранится только в `/home/pythia/pythia/.env`
+- секреты передаются через `env_file`
+- `.env` не bind-mountится в контейнер как обычный файл
 
-Rationale:
-- keeps runtime simple
-- reduces accidental file-level secret exposure inside the container
+Причины:
 
-## Documentation Changes
+- более простой runtime
+- меньше риск случайного file-level exposure секрета внутри контейнера
+
+## Изменения в документации
 
 ### README
 
-Rewrite the active quick start around Docker-first deployment on `amper`:
+Активный quick start переписывается под Docker-first deployment на `amper`:
 
-- create user `pythia`
-- clone repo into `/home/pythia/pythia`
-- copy `.env.example` to `.env`
-- run `scripts/day0_check.sh`
-- `docker compose build`
-- `bash scripts/manual_run.sh forecast`
-- `docker compose up -d`
+- создать user `pythia`
+- клонировать repo в `/home/pythia/pythia`
+- скопировать `.env.example` в `.env`
+- выполнить `scripts/day0_check.sh`
+- выполнить `docker compose build`
+- выполнить `bash scripts/manual_run.sh forecast`
+- выполнить `docker compose up -d`
 
-Add an operations section covering:
+Также добавляется раздел `Operations` с командами:
 
 - `bash scripts/manual_run.sh status`
 - `bash scripts/manual_run.sh logs`
@@ -303,42 +325,43 @@ Add an operations section covering:
 
 ### `docs/ARCHITECTURE.md`
 
-Add a deployment section describing:
+Добавляется deployment-раздел с описанием:
 
 - shared host `amper`
-- dedicated `pythia` user
-- isolated Compose project and network
-- no inbound ports
-- bind-mounted data and logs
-- operational isolation from SproutSignal with shared-host caveat
+- отдельный user `pythia`
+- изолированный Compose project и network
+- отсутствие входящих портов
+- bind-mounted data и logs
+- операционная изоляция от SproutSignal с оговоркой про shared host
 
 ### `docs/DEPLOYMENT.md`
 
-Create a Docker deployment runbook covering:
+Создаётся Docker deployment runbook, который покрывает:
 
-- host preparation
-- user setup
-- clone and configuration
-- first build
+- подготовку хоста
+- настройку пользователя
+- clone и конфигурацию
+- первую сборку
 - smoke test
-- scheduler startup
-- update process
-- operational safety and isolation rules
+- запуск scheduler
+- процесс обновления
+- operational safety и правила изоляции
 
-### Legacy Deployment References
+### Legacy deployment references
 
-The old Hetzner bare-metal path is removed from active documentation.
+Старый Hetzner bare-metal путь удаляется из активной документации.
 
-That means:
-- no active README instructions using `scripts/setup.sh`
-- no active README instructions using host `crontab`
-- no ambiguous dual deployment story
+Это означает:
 
-If legacy files remain in the repository temporarily, they must be clearly de-emphasized until removed.
+- в активном `README.md` больше нет инструкций через `scripts/setup.sh`
+- в активном `README.md` больше нет инструкций через host `crontab`
+- в проекте не остаётся двусмысленной истории с двумя равноправными deployment-путями
 
-## Files In Scope for Implementation
+Если legacy-файлы временно остаются в репозитории, они должны быть явно деактивированы или удалены на этапе реализации.
 
-### New files
+## Файлы в объёме реализации
+
+### Новые файлы
 
 - `Dockerfile`
 - `docker-compose.yml`
@@ -348,42 +371,43 @@ If legacy files remain in the repository temporarily, they must be clearly de-em
 - `scripts/manual_run.sh`
 - `docs/DEPLOYMENT.md`
 
-### Updated files
+### Обновляемые файлы
 
 - `README.md`
 - `docs/ARCHITECTURE.md`
 - `.env.example`
 
-### Out of scope unless required for container compatibility
+### Вне объёма, если только не потребуется для container-compatibility
 
 - `src/**`
 - `python/**`
 
-## Operational Safety Rules
+## Правила операционной безопасности
 
-- All Pythia work runs as `pythia`
-- All Pythia commands are executed from `/home/pythia/pythia`
-- No shared Docker network with SproutSignal
-- No shared bind mounts with SproutSignal
-- No exposed HTTP ports
-- No host Bun or host Python dependency for the active runtime
+- Вся работа с Pythia выполняется под пользователем `pythia`
+- Все команды Pythia запускаются из `/home/pythia/pythia`
+- У Pythia нет общей Docker network со SproutSignal
+- У Pythia нет общих bind mounts со SproutSignal
+- Pythia не публикует HTTP-порты
+- Активный runtime не должен зависеть от host Bun или host Python
 
-## Success Criteria
+## Критерии готовности deployment-слоя
 
-The Docker deployment layer is considered ready for implementation when it supports the following operator flow:
+Docker deployment layer считается готовым к реализации, если он поддерживает такой операторский поток:
 
-1. Clone Pythia into `/home/pythia/pythia`
-2. Create `.env`
-3. Build the image with `docker compose build`
-4. Run a manual forecast with `bash scripts/manual_run.sh forecast`
-5. Confirm records are written to SQLite in `data/`
-6. Start the scheduler with `docker compose up -d`
-7. Observe daily and weekly tasks through container logs and log files
+1. Клонировать Pythia в `/home/pythia/pythia`
+2. Создать `.env`
+3. Собрать image через `docker compose build`
+4. Выполнить ручной forecast через `bash scripts/manual_run.sh forecast`
+5. Подтвердить, что записи появляются в SQLite в каталоге `data/`
+6. Запустить scheduler через `docker compose up -d`
+7. Наблюдать ежедневные и еженедельные задачи через container logs и log-файлы
 
-## Non-Goals
+## Что не входит в этот дизайн
 
-- No web UI
-- No inbound Telegram webhook service
-- No host-based cron for Pythia
-- No shared runtime with SproutSignal
-- No change to forecasting product scope
+- web UI
+- входящий Telegram webhook service
+- host-based cron для Pythia
+- shared runtime со SproutSignal
+- изменение продуктового scope прогнозной системы
+
