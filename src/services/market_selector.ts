@@ -19,6 +19,77 @@ interface MarketSelectionPlan {
   stages: MarketSelectionStage[];
 }
 
+const CATEGORY_KEYWORDS = [
+  {
+    key: 'soccer',
+    keywords: [
+      'bundesliga',
+      'serie a',
+      'premier league',
+      'ligue 1',
+      'fifa',
+      'world cup',
+      'champions league',
+      'la liga',
+      'uefa',
+      'fa cup',
+      'carabao cup',
+    ],
+  },
+  {
+    key: 'golf',
+    keywords: ['masters tournament', 'pga', 'golf', 'ryder cup', 'open championship'],
+  },
+  {
+    key: 'basketball',
+    keywords: ['nba', 'wnba', 'western conference finals', 'eastern conference finals', 'rookie of the year', 'mvp'],
+  },
+  {
+    key: 'hockey',
+    keywords: ['nhl', 'stanley cup'],
+  },
+  {
+    key: 'baseball',
+    keywords: ['mlb', 'world series', 'cy young'],
+  },
+  {
+    key: 'football',
+    keywords: ['nfl', 'super bowl'],
+  },
+  {
+    key: 'motorsport',
+    keywords: ['formula 1', 'f1', 'nascar', 'indycar'],
+  },
+  {
+    key: 'combat',
+    keywords: ['ufc', 'boxing'],
+  },
+  {
+    key: 'politics',
+    keywords: ['election', 'presidential', 'primary', 'senate', 'governor', 'congress', 'parliament', 'mayor', 'vote'],
+  },
+  {
+    key: 'geopolitics',
+    keywords: ['ceasefire', 'ukraine', 'russia', 'israel', 'gaza', 'taiwan', 'china'],
+  },
+  {
+    key: 'crypto',
+    keywords: ['bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'crypto'],
+  },
+  {
+    key: 'macro',
+    keywords: ['fed ', 'interest rate', 'inflation', 'cpi', 'recession', 'gdp', 'tariff'],
+  },
+  {
+    key: 'tech',
+    keywords: ['apple', 'tesla', 'openai', 'tiktok', 'meta', 'google', 'nvidia', 'ai '],
+  },
+  {
+    key: 'entertainment',
+    keywords: ['oscar', 'emmy', 'grammy', 'movie', 'album'],
+  },
+] as const;
+
 const CANDIDATE_PATTERNS = [
   /^will\s+.+?\s+(win\b.*)$/i,
   /^will\s+.+?\s+(be elected\b.*)$/i,
@@ -84,7 +155,30 @@ function candidateCoreFromText(value: string): string | null {
   return null;
 }
 
-function sortByPriority(
+function informativenessScore(market: PolymarketMarket): number {
+  return 50 - Math.abs(marketPriceFromYesOutcome(market) - 50);
+}
+
+export function deriveCategoryKey(market: PolymarketMarket): string {
+  const explicitCategory = normalizeText(market.category || '');
+  if (explicitCategory) {
+    return explicitCategory;
+  }
+
+  const haystack = normalizeText(
+    [market.question, market.slug ?? '', market.description ?? ''].join(' '),
+  );
+
+  for (const category of CATEGORY_KEYWORDS) {
+    if (category.keywords.some((keyword) => haystack.includes(keyword))) {
+      return category.key;
+    }
+  }
+
+  return 'other';
+}
+
+export function prioritizeMarkets(
   markets: PolymarketMarket[],
   newMarketHours: number,
 ): PolymarketMarket[] {
@@ -96,9 +190,14 @@ function sortByPriority(
       return aNew - bNew;
     }
 
-    const marketEdge = marketPriceFromYesOutcome(b) - marketPriceFromYesOutcome(a);
-    if (marketEdge !== 0) {
-      return marketEdge;
+    const informativenessDelta = informativenessScore(b) - informativenessScore(a);
+    if (informativenessDelta !== 0) {
+      return informativenessDelta;
+    }
+
+    const volumeDelta = b.volume - a.volume;
+    if (volumeDelta !== 0) {
+      return volumeDelta;
     }
 
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -147,6 +246,20 @@ export function buildSelectionPlan(): MarketSelectionPlan {
         minVolume: 500,
         maxVolume: 250_000,
         maxDaysToResolution: 60,
+        limit: 1_000,
+      },
+      {
+        label: 'fallback-long',
+        minVolume: 500,
+        maxVolume: 500_000,
+        maxDaysToResolution: 120,
+        limit: 1_000,
+      },
+      {
+        label: 'fallback-broad',
+        minVolume: 100,
+        maxVolume: 1_000_000,
+        maxDaysToResolution: 180,
         limit: 1_000,
       },
     ],
@@ -198,7 +311,7 @@ export function applyDiversityConstraints(
 
   for (const market of markets) {
     const eventKey = extractEventKey(market);
-    const categoryKey = normalizeText(market.category || 'uncategorized');
+    const categoryKey = deriveCategoryKey(market);
     const eventCount = eventCounts.get(eventKey) ?? 0;
     const categoryCount = categoryCounts.get(categoryKey) ?? 0;
 
@@ -229,7 +342,7 @@ export async function selectMarkets(): Promise<PolymarketMarket[]> {
 
     accumulated = dedupeMarketsById([...accumulated, ...stageMarkets]);
     const deduplicated = deduplicateByEvent(accumulated);
-    const prioritized = sortByPriority(deduplicated, plan.newMarketHours);
+    const prioritized = prioritizeMarkets(deduplicated, plan.newMarketHours);
     selected = applyDiversityConstraints(
       prioritized,
       plan.maxPerEvent,

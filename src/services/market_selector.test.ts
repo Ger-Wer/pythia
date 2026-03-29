@@ -60,6 +60,20 @@ test('buildSelectionPlan enforces staged expansion and diversity constraints', a
         maxDaysToResolution: 60,
         limit: 1_000,
       },
+      {
+        label: 'fallback-long',
+        minVolume: 500,
+        maxVolume: 500_000,
+        maxDaysToResolution: 120,
+        limit: 1_000,
+      },
+      {
+        label: 'fallback-broad',
+        minVolume: 100,
+        maxVolume: 1_000_000,
+        maxDaysToResolution: 180,
+        limit: 1_000,
+      },
     ],
   });
 });
@@ -79,6 +93,30 @@ test('extractEventKey uses candidate heuristics only for candidate-style markets
 
   expect(extractEventKey(mastersCandidate)).toBe('win the 2026 masters tournament');
   expect(extractEventKey(ceasefire)).toBe('will there be a russia ukraine ceasefire by march 31, 2026');
+});
+
+test('deriveCategoryKey infers useful fallback categories when Gamma category is empty', async () => {
+  const { deriveCategoryKey } = await marketSelectorModule;
+
+  const bundesliga = makeMarket('bundesliga', 12, {
+    question: 'Will Bayern Munich win the 2025-26 Bundesliga?',
+    slug: 'will-bayern-munich-win-the-202526-bundesliga',
+    category: '',
+  });
+  const ceasefire = makeMarket('ceasefire', 12, {
+    question: 'Will there be a Russia-Ukraine ceasefire by March 31, 2026?',
+    slug: 'russia-ukraine-ceasefire-by-march-31-2026',
+    category: '',
+  });
+  const bitcoin = makeMarket('bitcoin', 12, {
+    question: 'Will Bitcoin hit $200,000 by the end of 2026?',
+    slug: 'will-bitcoin-hit-200000-by-the-end-of-2026',
+    category: '',
+  });
+
+  expect(deriveCategoryKey(bundesliga)).toBe('soccer');
+  expect(deriveCategoryKey(ceasefire)).toBe('geopolitics');
+  expect(deriveCategoryKey(bitcoin)).toBe('crypto');
 });
 
 test('deduplicateByEvent keeps the most informative sub-market in each event group', async () => {
@@ -111,46 +149,78 @@ test('deduplicateByEvent keeps the most informative sub-market in each event gro
   ]);
 });
 
-test('applyDiversityConstraints enforces one market per event and three per category', async () => {
+test('applyDiversityConstraints enforces one market per event and three per derived category', async () => {
   const { applyDiversityConstraints } = await marketSelectorModule;
 
-  const politicsA = makeMarket('politics-a', 12, {
-    question: 'Will the Fed cut rates in June 2026?',
-    category: 'politics',
+  const soccerA = makeMarket('soccer-a', 12, {
+    question: 'Will Bayern Munich win the 2025-26 Bundesliga?',
+    slug: 'will-bayern-munich-win-the-202526-bundesliga',
+    category: '',
     outcomePrices: [0.61, 0.39],
   });
-  const politicsB = makeMarket('politics-b', 12, {
-    question: 'Will CPI fall below 3% by June 2026?',
-    category: 'politics',
+  const soccerB = makeMarket('soccer-b', 12, {
+    question: 'Will Inter win the 2025-26 Serie A league?',
+    slug: 'will-inter-win-the-202526-serie-a-league',
+    category: '',
     outcomePrices: [0.41, 0.59],
   });
-  const politicsC = makeMarket('politics-c', 12, {
-    question: 'Will Congress pass a TikTok ban by June 2026?',
-    category: 'politics',
+  const soccerC = makeMarket('soccer-c', 12, {
+    question: 'Will PSG win the 2025-26 French Ligue 1?',
+    slug: 'will-psg-win-the-202526-french-ligue-1',
+    category: '',
     outcomePrices: [0.31, 0.69],
   });
-  const politicsD = makeMarket('politics-d', 12, {
-    question: 'Will the US government shut down in 2026?',
-    category: 'politics',
+  const soccerD = makeMarket('soccer-d', 12, {
+    question: 'Will Sweden qualify for the 2026 FIFA World Cup?',
+    slug: 'will-sweden-qualify-for-the-2026-fifa-world-cup',
+    category: '',
     outcomePrices: [0.21, 0.79],
   });
-  const sports = makeMarket('sports-a', 12, {
-    question: 'Will Team A win the finals?',
-    category: 'sports',
+  const politics = makeMarket('politics-a', 12, {
+    question: 'Will Iván Cepeda Castro win the 2026 Colombian presidential election?',
+    slug: 'will-ivan-cepeda-castro-win-the-2026-colombian-presidential-election',
+    category: '',
   });
 
   const selected = applyDiversityConstraints([
-    politicsA,
-    politicsB,
-    politicsC,
-    politicsD,
-    sports,
+    soccerA,
+    soccerB,
+    soccerC,
+    soccerD,
+    politics,
   ]);
 
   expect(selected.map((market: PolymarketMarket) => market.id)).toEqual([
+    'soccer-a',
+    'soccer-b',
+    'soccer-c',
     'politics-a',
-    'politics-b',
-    'politics-c',
-    'sports-a',
+  ]);
+});
+
+test('prioritizeMarkets prefers newer and more informative prices over near-certain markets', async () => {
+  const { prioritizeMarkets } = await marketSelectorModule;
+
+  const nearCertain = makeMarket('certain', 96, {
+    question: 'Will Bayern Munich win the 2025-26 Bundesliga?',
+    category: '',
+    outcomePrices: [0.99, 0.01],
+  });
+  const informative = makeMarket('informative', 96, {
+    question: 'Will there be a Russia-Ukraine ceasefire by March 31, 2026?',
+    category: '',
+    outcomePrices: [0.54, 0.46],
+  });
+  const fresh = makeMarket('fresh', 12, {
+    question: 'Will Bitcoin hit $200,000 by the end of 2026?',
+    category: '',
+    outcomePrices: [0.42, 0.58],
+  });
+
+  const prioritized = prioritizeMarkets([nearCertain, informative, fresh], 72);
+  expect(prioritized.map((market: PolymarketMarket) => market.id)).toEqual([
+    'fresh',
+    'informative',
+    'certain',
   ]);
 });
