@@ -28,6 +28,11 @@ case "${1:-}" in
     } 2>&1 | tee -a "$LOG_DIR/weekly_${TODAY}.log"
     ;;
 
+  telegram)
+    cd /app
+    exec /app/python/venv/bin/python python/telegram_operator.py
+    ;;
+
   scheduler)
     exec supercronic -json -no-reap /app/supercronic.crontab
     ;;

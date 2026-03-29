@@ -14,7 +14,7 @@ Polymarket Gamma API
   -> Telegram-уведомления и отчеты
 ```
 
-В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`, а все рабочие действия идут через `docker compose` и `bash scripts/manual_run.sh`.
+В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Для повседневной работы используется Telegram-оператор, а хостовые команды `docker compose` и `bash scripts/manual_run.sh` оставлены для развёртывания и диагностики.
 
 ## Быстрый старт на `amper`
 
@@ -37,13 +37,39 @@ bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
-Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`.
+Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска переключайтесь на Telegram-бота.
 
-## Operations
+## Telegram-оператор
 
-`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе.
+Pythia поддерживает операторский Telegram-бот без веб-дашборда. Он работает в личном чате, принимает команды только от авторизованного пользователя и возвращает ответы на русском языке.
 
-`bash scripts/manual_run.sh logs` открывает журнал scheduler-контейнера.
+Доступные slash-команды:
+
+- `/help`
+- `/status`
+- `/forecast`
+- `/resolve`
+- `/weekly`
+- `/day0`
+- `/edge`
+- `/logs`
+- `/health`
+- `/last_predictions`
+
+Бот также понимает русские алиасы:
+
+- `помощь`
+- `статус`
+- `прогноз`
+- `логи`
+- `здоровье`
+- `последние`
+
+## Операции
+
+`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе. Это полезно для хостовой проверки, но не заменяет Telegram-оператора.
+
+`bash scripts/manual_run.sh logs` открывает журналы `pythia-scheduler` и `pythia-telegram`.
 
 `bash scripts/manual_run.sh edge` считает edge и Brier score на накопленных данных.
 
@@ -53,9 +79,9 @@ docker compose up -d
 - `resolution` - 18:00 UTC
 - `weekly report` - воскресенье, 20:00 UTC
 
-Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`.
+Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`. Для ручного запуска сценариев используйте Telegram-бота, а не прямой bare-metal доступ.
 
-## Decision Framework
+## Критерий решения
 
 Через 4 недели работы, когда накопится достаточно данных, запускайте:
 
@@ -69,6 +95,6 @@ bash scripts/manual_run.sh edge
 - `PIVOT` - менять фильтры, промпты или порог отбора.
 - `STOP` - если устойчивого преимущества нет.
 
-## Cost
+## Стоимость
 
 Отдельный VPS для Pythia не нужен: система работает прямо на `amper` в Docker-контейнере. Дополнительные расходы - только API и сервисы вроде Telegram, а не еще одна выделенная машина.

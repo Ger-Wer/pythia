@@ -104,6 +104,25 @@ docker compose up -d
 
 Сервис работает без published ports, без общих сетей с другими проектами и без shared volumes. Pythia держит свои bind-mounted `data` и `logs` внутри `/home/pythia/pythia`.
 
+## Проверка Telegram-оператора
+
+После `docker compose up -d --build` проверьте операторский контейнер:
+
+```bash
+docker compose ps
+docker compose logs --tail=50 pythia-telegram
+```
+
+В личном чате с ботом выполните базовые команды:
+
+```text
+/help
+/health
+/status
+```
+
+Если ответы не приходят, сначала проверьте, что `pythia-telegram` в `Up` или `healthy`, а затем смотрите его логи. Для повседневной работы используйте именно Telegram-оператора, а не старый host-only путь.
+
 ## Расписание
 
 Встроенный scheduler запускает задачи по UTC:

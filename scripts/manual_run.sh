@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-SERVICE="pythia-scheduler"
+SCHEDULER_SERVICE="pythia-scheduler"
+TELEGRAM_SERVICE="pythia-telegram"
+SERVICE="$SCHEDULER_SERVICE"
 ENTRYPOINT="/app/scripts/entrypoint.sh"
 COMMAND="${1:-help}"
 
@@ -20,9 +22,9 @@ Commands:
   weekly    - generate weekly report
   edge      - calculate edge and Brier scores
   db        - open SQLite shell
-  logs      - tail scheduler logs
+  logs      - tail scheduler and telegram logs
   shell     - open shell in the container
-  status    - show compose and database status
+  status    - show compose and database status for both services
   help      - show this message
 EOF
 }
@@ -64,7 +66,7 @@ case "$COMMAND" in
     ;;
 
   logs)
-    docker compose logs -f --tail=100 "$SERVICE"
+    docker compose logs -f --tail=100 "$SCHEDULER_SERVICE" "$TELEGRAM_SERVICE"
     ;;
 
   shell)
