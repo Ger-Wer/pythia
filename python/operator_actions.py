@@ -382,6 +382,8 @@ def _docker_socket_get(path: str, timeout: int = 5) -> str | None:
     headers, separator, body = raw.partition("\r\n\r\n")
     if not separator or " 200 " not in headers.splitlines()[0]:
         return None
+    if "transfer-encoding: chunked" in headers.lower():
+        return _decode_chunked_body(body)
     return body
 
 
@@ -390,3 +392,27 @@ def _container_name_from_item(item: dict[str, Any]) -> str:
     if isinstance(names, list) and names:
         return str(names[0]).lstrip("/")
     return "unknown"
+
+
+def _decode_chunked_body(body: str) -> str:
+    remainder = body
+    decoded_chunks: list[str] = []
+
+    while remainder:
+        size_line, separator, rest = remainder.partition("\r\n")
+        if not separator:
+            break
+
+        try:
+            size = int(size_line.split(";", 1)[0], 16)
+        except ValueError:
+            return body
+
+        if size == 0:
+            break
+
+        chunk = rest[:size]
+        decoded_chunks.append(chunk)
+        remainder = rest[size + 2 :]
+
+    return "".join(decoded_chunks)

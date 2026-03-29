@@ -2,6 +2,7 @@ import unittest
 
 from python.operator_actions import (
     TELEGRAM_MESSAGE_LIMIT,
+    _decode_chunked_body,
     build_help_message,
     format_health_summary,
     is_authorized_update,
@@ -70,6 +71,10 @@ class TelegramOperatorTests(unittest.TestCase):
         prepared = prepare_markdown_message(raw)
         self.assertLessEqual(len(prepared), TELEGRAM_MESSAGE_LIMIT)
         self.assertFalse(prepared.endswith("\\"))
+
+    def test_decode_chunked_body_decodes_http_chunks(self):
+        chunked = "4\r\nWiki\r\n5\r\npedia\r\n0\r\n\r\n"
+        self.assertEqual(_decode_chunked_body(chunked), "Wikipedia")
 
 
 if __name__ == "__main__":
