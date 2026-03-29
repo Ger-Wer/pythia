@@ -64,7 +64,7 @@ cd /home/pythia/pythia
 cp .env.example .env
 ```
 
-Заполните ключи LLM, Telegram и лимиты.
+Заполните реальные ключи LLM, Telegram и поискового слоя. Для нормального research нужен `EXA_API_KEY` или, как fallback, `TAVILY_API_KEY`; пустой `.env` не подходит для первого `forecast`.
 
 ## Проверка Day 0
 
@@ -102,7 +102,15 @@ bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
-Сервис работает без published ports, без общих сетей с другими проектами и без shared volumes.
+Сервис работает без published ports, без общих сетей с другими проектами и без shared volumes. Pythia держит свои bind-mounted `data` и `logs` внутри `/home/pythia/pythia`.
+
+## Расписание
+
+Встроенный scheduler запускает задачи по UTC:
+
+- `forecast` - 06:00
+- `resolution` - 18:00
+- `weekly report` - воскресенье, 20:00
 
 ## Обновление
 

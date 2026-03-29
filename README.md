@@ -7,7 +7,7 @@ Pythia - это автономная система прогноза для Poly
 ```text
 Polymarket Gamma API
   -> отбор рынков
-  -> исследование Dexter
+  -> mini-research / news-light слой
   -> базовый контрольный прогон Naked R1
   -> синтез вероятности
   -> SQLite + логи + Brier score
@@ -30,6 +30,8 @@ bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
+Перед первым `forecast` обязательно заполните `.env` реальными ключами и параметрами: как минимум `DEEPSEEK_API_KEY`, а для нормального качества research - `EXA_API_KEY` или `TAVILY_API_KEY`.
+
 Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`.
 
 ## Operations
@@ -39,6 +41,12 @@ docker compose up -d
 `bash scripts/manual_run.sh logs` открывает журнал scheduler-контейнера.
 
 `bash scripts/manual_run.sh edge` считает edge и Brier score на накопленных данных.
+
+Планировщик работает по расписанию `supercronic`:
+
+- `forecast` - 06:00 UTC
+- `resolution` - 18:00 UTC
+- `weekly report` - воскресенье, 20:00 UTC
 
 Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`.
 
