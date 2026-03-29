@@ -10,9 +10,10 @@ import { initDb, insertPrediction } from './services/db';
 import type { Database } from './services/db';
 import {
   dexterResearch,
+  multiSearch,
   resetSearchWarningCache,
-  searchNews,
 } from './services/dexter_runner';
+import type { DexterBrief } from './services/dexter_runner';
 import { selectMarkets } from './services/market_selector';
 import { nakedR1Predict } from './services/naked_r1';
 import {
@@ -106,6 +107,16 @@ function formatMarketLog(market: PolymarketMarket): string {
   return `${market.question} | volume=$${market.volume.toFixed(0)} | market=${marketPriceFromYesOutcome(market).toFixed(1)}% | age=${marketAgeHours(market).toFixed(1)}h`;
 }
 
+function buildResearchBriefText(brief: DexterBrief): string {
+  return [
+    `Сводка: ${brief.summary}`,
+    `Ключевые факты:\n- ${brief.key_facts.join('\n- ')}`,
+    `Аргументы за YES:\n- ${brief.for_yes.join('\n- ')}`,
+    `Аргументы против YES:\n- ${brief.against_yes.join('\n- ')}`,
+    `Что толпа может упускать: ${brief.crowd_might_miss}`,
+  ].join('\n\n');
+}
+
 async function processMarket(
   db: Database,
   market: PolymarketMarket,
@@ -119,7 +130,7 @@ async function processMarket(
   const marketPrice = marketPriceFromYesOutcome(market);
 
   try {
-    const newsResults = await searchNews(market.question, 3);
+    const newsResults = await multiSearch(market.question, market.category, 3);
     const newsSnippets = newsResults.map(
       (result) => `- ${result.title}: ${result.snippet || result.url}`,
     );
@@ -130,11 +141,11 @@ async function processMarket(
     }
 
     let synthesis: SynthesisResult | null = null;
-    const brief = await dexterResearch(market, costTracker);
+    const brief = await dexterResearch(market, costTracker, newsResults);
     if (brief) {
       synthesis = await runSynthesis(
         market,
-        `${brief.summary}\n\nKey facts:\n- ${brief.key_facts.join('\n- ')}`,
+        buildResearchBriefText(brief),
         costTracker,
       );
       if (synthesis) {
@@ -159,10 +170,13 @@ async function processMarket(
       dexter_confidence: synthesis?.confidence ?? null,
       dexter_reasoning: synthesis?.reasoning ?? null,
       dexter_key_risk: synthesis?.key_risk ?? null,
+      dexter_base_rate: synthesis?.base_rate ?? null,
       naked_p: naked?.probability ?? null,
       naked_reasoning: naked?.reasoning ?? null,
+      research_brief_json: brief ? JSON.stringify(brief) : null,
       forecast_timestamp: forecastTimestamp,
       api_cost_usd: costTracker.getSessionCost() - perMarketCostStart,
+      is_valid: 1,
     });
 
     const synthesisEdge = synthesis ? Math.abs(synthesis.probability - marketPrice) : 0;

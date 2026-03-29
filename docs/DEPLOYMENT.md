@@ -64,7 +64,7 @@ cd /home/pythia/pythia
 cp .env.example .env
 ```
 
-Заполните реальные ключи LLM, Telegram и поискового слоя. Для нормального research нужен `EXA_API_KEY` или, как fallback, `TAVILY_API_KEY`; пустой `.env` не подходит для первого `forecast`.
+Заполните реальные ключи LLM, Telegram и поискового слоя. Для нормального research лучше держать сразу оба ключа: `EXA_API_KEY` как primary и `TAVILY_API_KEY` как fallback. Если оба отсутствуют или оба недоступны, Pythia продолжит работать в degraded mode без внешних новостей.
 
 ## Проверка Day 0
 

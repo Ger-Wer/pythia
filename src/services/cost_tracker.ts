@@ -3,6 +3,10 @@ import type { Database } from './db';
 import { getTodayCost } from './db';
 
 const MODEL_PRICING = {
+  free: {
+    inputPerMillion: 0,
+    outputPerMillion: 0,
+  },
   research: {
     inputPerMillion: 0.27,
     outputPerMillion: 1.1,
@@ -15,12 +19,44 @@ const MODEL_PRICING = {
 
 function pricingForModel(model: string) {
   const normalized = model.toLowerCase();
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL || CONFIG.deepseek.baseUrl).toLowerCase();
+
+  if (
+    baseUrl.includes('groq.com')
+    || normalized.includes('llama')
+    || normalized.includes('mixtral')
+    || normalized.includes('gpt-oss')
+    || normalized.includes('groq')
+  ) {
+    return MODEL_PRICING.free;
+  }
 
   if (normalized.includes('reasoner') || normalized.includes('r1')) {
     return MODEL_PRICING.synthesis;
   }
 
-  return MODEL_PRICING.research;
+  if (normalized.includes('deepseek')) {
+    return MODEL_PRICING.research;
+  }
+
+  return MODEL_PRICING.free;
+}
+
+export function describeApiPricing(): string {
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL || CONFIG.deepseek.baseUrl).toLowerCase();
+  if (baseUrl.includes('groq.com')) {
+    return 'бесплатно (Groq)';
+  }
+
+  if (baseUrl.includes('openrouter.ai')) {
+    return 'через OpenRouter';
+  }
+
+  if (baseUrl.includes('deepseek.com')) {
+    return 'платно (DeepSeek)';
+  }
+
+  return 'неизвестный провайдер';
 }
 
 export class CostLimitError extends Error {

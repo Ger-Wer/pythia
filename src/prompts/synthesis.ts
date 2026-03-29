@@ -6,6 +6,7 @@ export interface SynthesisResult {
   vs_market: number;
   reasoning: string;
   key_risk: string;
+  base_rate: string;
 }
 
 export function buildSynthesisPrompt(params: {
@@ -18,38 +19,36 @@ export function buildSynthesisPrompt(params: {
   volume: number;
   researchBrief: string;
 }): string {
-  return `You are a calibrated superforecaster. Estimate the probability
-this prediction market resolves YES.
+  return `Ты — калиброванный суперпрогнозист. Оцени вероятность, что событие произойдёт.
 
-MARKET: ${params.question}
-RESOLUTION CRITERIA: ${params.resolutionSource}
-DEADLINE: ${params.endDate} (${params.daysRemaining} days from now)
-MARKET AGE: ${params.hoursSinceCreation} hours old
-CURRENT MARKET PRICE: ${params.marketPrice}% (crowd implied probability)
-LIQUIDITY: $${params.volume} total volume
+ВОПРОС: ${params.question}
+КРИТЕРИЙ РЕЗОЛВА: ${params.resolutionSource}
+ДЕДЛАЙН: через ${params.daysRemaining} дней (${params.endDate})
+ВОЗРАСТ РЫНКА: ${params.hoursSinceCreation} часов
+ОБЪЁМ ТОРГОВ: $${params.volume.toLocaleString()}
 
-RESEARCH BRIEF:
-${params.researchBrief || 'NO RESEARCH — market too new, use base rates and reasoning only.'}
+ЦЕНА РЫНКА: ${params.marketPrice}%
+Тысячи людей, рискуя деньгами, оценивают вероятность в ${params.marketPrice}%. Это сильный ориентир.
+Чтобы отклониться — нужны конкретные аргументы.
 
-REASONING PROTOCOL:
-1. State the relevant base rate for this type of event
-2. List 2 strongest arguments FOR (YES)
-3. List 2 strongest arguments AGAINST (YES)
-4. If market < 24h old: weight base rates more heavily than current news
-5. If your estimate differs from market price by >15%: explain why you believe the crowd is wrong
+ИССЛЕДОВАТЕЛЬСКАЯ СПРАВКА:
+${params.researchBrief || 'Свежих данных нет. Опирайся на общие знания и базовые частоты.'}
 
-CALIBRATION RULES:
-- Probabilities above 90% or below 10% require EXPLICIT justification
-- If uncertain, move 5% toward 50%
-- Market price is a strong prior — justify deviations explicitly
+ПОРЯДОК РАССУЖДЕНИЯ:
+1. БАЗОВАЯ ЧАСТОТА
+2. ДВА СИЛЬНЕЙШИХ АРГУМЕНТА ЗА
+3. ДВА СИЛЬНЕЙШИХ АРГУМЕНТА ПРОТИВ
+4. ЧТО МОЖЕТ УПУСКАТЬ ТОЛПА?
+5. КАЛИБРОВКА: если оценка выше 85% или ниже 15%, пересмотри её и сдвинь на 5% к 50%.
 
-OUTPUT (JSON only, no text outside the JSON block):
+ОТВЕТЬ СТРОГО JSON, БЕЗ ТЕКСТА ВНЕ JSON:
 {
-  "probability": <integer 0-100>,
-  "confidence": "<low|medium|high>",
-  "vs_market": <integer, your_prob minus market_price>,
-  "reasoning": "<2-3 sentences max>",
-  "key_risk": "<what would make this estimate wrong>"
+  "probability": число 0-100,
+  "confidence": "низкая" | "средняя" | "высокая",
+  "reasoning": "2-3 предложения на русском",
+  "vs_market": число,
+  "key_risk": "что может сделать оценку неверной",
+  "base_rate": "историческая частота подобных событий"
 }`;
 }
 
@@ -70,11 +69,26 @@ function extractJson(raw: string): string | null {
 
 const synthesisSchema = z.object({
   probability: z.coerce.number(),
-  confidence: z.enum(['low', 'medium', 'high']),
+  confidence: z.string().min(1),
   vs_market: z.coerce.number(),
   reasoning: z.string().min(1),
   key_risk: z.string().min(1),
+  base_rate: z.string().min(1).default('Не указано.'),
 });
+
+function normalizeConfidence(value: string): 'low' | 'medium' | 'high' {
+  const normalized = value.trim().toLowerCase();
+
+  if (['low', 'низкая', 'низкий'].includes(normalized)) {
+    return 'low';
+  }
+
+  if (['high', 'высокая', 'высокий'].includes(normalized)) {
+    return 'high';
+  }
+
+  return 'medium';
+}
 
 export function parseSynthesisResponse(raw: string): SynthesisResult | null {
   const jsonText = extractJson(raw);
@@ -88,10 +102,11 @@ export function parseSynthesisResponse(raw: string): SynthesisResult | null {
     const parsed = synthesisSchema.parse(JSON.parse(jsonText));
     return {
       probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
-      confidence: parsed.confidence,
+      confidence: normalizeConfidence(parsed.confidence),
       vs_market: Math.round(parsed.vs_market),
       reasoning: parsed.reasoning.trim(),
       key_risk: parsed.key_risk.trim(),
+      base_rate: parsed.base_rate.trim(),
     };
   } catch (error) {
     console.error('Failed to parse synthesis response:', error);

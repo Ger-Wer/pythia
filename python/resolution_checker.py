@@ -24,6 +24,20 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def prediction_columns(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
+    }
+
+
+def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
+    if "is_valid" not in prediction_columns(conn):
+        return ""
+    prefix = f"{alias}." if alias else ""
+    return f" AND {prefix}is_valid = 1"
+
+
 def send_telegram(text: str) -> None:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print(text)
@@ -106,6 +120,7 @@ def derive_outcome(market: dict[str, Any]) -> tuple[int | None, str]:
 
 
 def update_resolved_market(conn: sqlite3.Connection, market_id: str, outcome: int, resolved_at: str) -> None:
+    filter_suffix = valid_filter(conn)
     if outcome in (0, 1):
         conn.execute(
             """
@@ -123,7 +138,8 @@ def update_resolved_market(conn: sqlite3.Connection, market_id: str, outcome: in
               END,
               brier_market = (market_price / 100.0 - ?) * (market_price / 100.0 - ?)
             WHERE market_id = ?
-            """,
+            """
+            + filter_suffix,
             (outcome, resolved_at, outcome, outcome, outcome, outcome, outcome, outcome, market_id),
         )
     else:
@@ -137,17 +153,22 @@ def update_resolved_market(conn: sqlite3.Connection, market_id: str, outcome: in
               brier_naked = NULL,
               brier_market = NULL
             WHERE market_id = ?
-            """,
+            """
+            + filter_suffix,
             (resolved_at, market_id),
         )
 
 
 def summarize_market(conn: sqlite3.Connection, market_id: str) -> tuple[str, float] | None:
+    filter_suffix = valid_filter(conn)
     row = conn.execute(
         """
         SELECT question, dexter_p, naked_p, market_price, outcome
         FROM predictions
         WHERE market_id = ?
+        """
+        + filter_suffix
+        + """
         ORDER BY forecast_timestamp DESC
         LIMIT 1
         """,
@@ -176,7 +197,7 @@ def main() -> None:
     market_ids = [
         row[0]
         for row in conn.execute(
-            "SELECT DISTINCT market_id FROM predictions WHERE outcome IS NULL"
+            "SELECT DISTINCT market_id FROM predictions WHERE outcome IS NULL" + valid_filter(conn)
         ).fetchall()
     ]
 
@@ -226,6 +247,7 @@ def main() -> None:
             FROM predictions
             WHERE outcome IN (0, 1)
             """
+            + valid_filter(conn)
         ).fetchone()
 
         dexter_avg = f"{cumulative[0]:.4f}" if cumulative[0] is not None else "N/A"

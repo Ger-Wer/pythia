@@ -12,7 +12,7 @@ from python.operator_actions import (
     HEAVY_COMMANDS,
     build_help_message,
     is_authorized_update,
-    normalize_command,
+    parse_command_request,
     run_operator_command,
     trim_message,
 )
@@ -81,7 +81,7 @@ def handle_update(update: dict[str, Any]) -> None:
     if not is_authorized_update(update, ALLOWED_USER_ID):
         return
 
-    command_key = normalize_command(text)
+    command_key, command_arg = parse_command_request(text)
     if not command_key:
         send_message(chat_id, "Неизвестная команда. Напиши /help или помощь.")
         return
@@ -99,7 +99,7 @@ def handle_update(update: dict[str, Any]) -> None:
             CURRENT_JOB = command_key
             send_message(chat_id, f"Запускаю {command_key}. Это может занять несколько минут.")
 
-        result = run_operator_command(command_key)
+        result = run_operator_command(command_key, command_arg)
         send_message(chat_id, result)
     except Exception as exc:
         traceback.print_exc()

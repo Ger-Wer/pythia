@@ -47,20 +47,25 @@ export async function nakedR1Predict(
     1,
     Math.ceil((new Date(market.endDate).getTime() - Date.now()) / 86_400_000),
   );
-  const prompt = `You are a calibrated forecaster. Estimate probability this resolves YES.
+  const prompt = `Оцени вероятность, что событие произойдёт.
 
-MARKET: ${market.question}
-DEADLINE: ${market.endDate} (${daysRemaining} days)
-MARKET PRICE: ${marketPrice}% (crowd probability)
-VOLUME: $${market.volume}
+ВОПРОС: ${market.question}
+ДЕДЛАЙН: через ${daysRemaining} дней (${market.endDate})
+ЦЕНА РЫНКА: ${marketPrice}% (коллективная оценка)
 
-TOP NEWS:
-${newsSnippets.join('\n') || 'No recent news found.'}
+СВЕЖИЕ ДАННЫЕ:
+${newsSnippets.join('\n') || 'Свежих новостей не найдено.'}
 
-RULES:
-- Output JSON only: {"probability": <0-100>, "reasoning": "<2 sentences>"}
-- Probabilities above 90% or below 10% require explicit justification
-- If uncertain, move 5% toward 50%`;
+Рассуждения:
+1. Базовая частота подобных событий
+2. Один аргумент ЗА, один ПРОТИВ
+3. Есть ли причины думать, что толпа ошибается?
+
+Ответ JSON:
+{
+  "probability": число 0-100,
+  "reasoning": "1-2 предложения на русском"
+}`;
 
   const completion = await client.chat.completions.create({
     model: CONFIG.deepseek.modelSynthesis,

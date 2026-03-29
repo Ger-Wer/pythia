@@ -7,6 +7,9 @@ import { CostTracker } from './cost_tracker';
 export interface DexterBrief {
   summary: string;
   key_facts: string[];
+  for_yes: string[];
+  against_yes: string[];
+  crowd_might_miss: string;
   sources: string[];
   research_cost_usd: number;
 }
@@ -41,6 +44,9 @@ const tavilyResponseSchema = z.object({
 const researchSchema = z.object({
   summary: z.string().min(1),
   key_facts: z.array(z.string()).min(1).max(5),
+  for_yes: z.array(z.string()).min(1).max(3),
+  against_yes: z.array(z.string()).min(1).max(3),
+  crowd_might_miss: z.string().min(1),
   sources: z.array(z.string()).min(1),
 });
 const emittedSearchWarnings = new Set<string>();
@@ -93,6 +99,56 @@ function extractJson(raw: string): string | null {
   }
 
   return null;
+}
+
+function normalizeSearchFragment(value: string): string {
+  return value
+    .replace(/^Will\s+/i, '')
+    .replace(/\?+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractContext(question: string): string {
+  const normalized = normalizeSearchFragment(question);
+  const candidate = normalized
+    .split(/\b(win|lose|finish|hit|reach|pass|sign|qualify|be elected|be the next|make)\b/i)
+    .slice(-1)[0]
+    ?.trim();
+
+  if (candidate && candidate.length >= 8) {
+    return candidate;
+  }
+
+  return normalized;
+}
+
+export function buildSearchQueries(question: string, category?: string): string[] {
+  const normalizedQuestion = normalizeSearchFragment(question);
+  const context = extractContext(question);
+  const normalizedCategory = (category || '').trim();
+
+  return [
+    `${normalizedQuestion} latest news facts 2026`,
+    `${context}${normalizedCategory ? ` ${normalizedCategory}` : ''} prediction odds forecast 2026`,
+  ];
+}
+
+export function deduplicateNewsResults(results: NewsResult[]): NewsResult[] {
+  const seenUrls = new Set<string>();
+  const deduplicated: NewsResult[] = [];
+
+  for (const result of results) {
+    const normalizedUrl = result.url.trim();
+    if (!normalizedUrl || seenUrls.has(normalizedUrl)) {
+      continue;
+    }
+
+    seenUrls.add(normalizedUrl);
+    deduplicated.push(result);
+  }
+
+  return deduplicated;
 }
 
 async function searchExa(query: string, limit: number): Promise<NewsResult[]> {
@@ -206,14 +262,30 @@ export async function searchNews(query: string, limit: number): Promise<NewsResu
   }
 }
 
+export async function multiSearch(
+  question: string,
+  category: string,
+  limitPerQuery = 3,
+): Promise<NewsResult[]> {
+  const aggregated: NewsResult[] = [];
+
+  for (const query of buildSearchQueries(question, category)) {
+    const results = await searchNews(query, limitPerQuery);
+    aggregated.push(...results);
+  }
+
+  return deduplicateNewsResults(aggregated).slice(0, 8);
+}
+
 // TODO: Replace this Phase 1 mini-research fallback with a proper Dexter Agent integration
 // once a stable non-interactive programmatic path is validated for this repo/runtime pair.
 export async function dexterResearch(
   market: PolymarketMarket,
   costTracker: CostTracker,
+  searchResults?: NewsResult[],
 ): Promise<DexterBrief | null> {
-  const searchResults = await searchNews(market.question, 5);
-  if (searchResults.length === 0) {
+  const resolvedSearchResults = searchResults ?? await multiSearch(market.question, market.category, 3);
+  if (resolvedSearchResults.length === 0) {
     return null;
   }
 
@@ -224,26 +296,42 @@ export async function dexterResearch(
     maxRetries: 2,
   });
 
-  const prompt = `You are preparing a structured research brief for a prediction market.
+  const daysRemaining = Math.max(
+    1,
+    Math.ceil((new Date(market.endDate).getTime() - Date.now()) / 86_400_000),
+  );
 
-MARKET: ${market.question}
-DESCRIPTION: ${market.description || 'No market description provided.'}
-CURRENT IMPLIED PROBABILITY: ${(market.outcomePrices[0] * 100).toFixed(1)}%
-DEADLINE: ${market.endDate}
+  const prompt = `Ты — аналитик prediction-рынков. Подготовь краткую исследовательскую справку.
 
-SEARCH RESULTS:
-${searchResults
+ВОПРОС РЫНКА: ${market.question}
+ДЕДЛАЙН: ${market.endDate} (через ${daysRemaining} дней)
+ТЕКУЩАЯ ЦЕНА РЫНКА: ${(market.outcomePrices[0] * 100).toFixed(1)}%
+(это коллективная оценка вероятности тысячами людей, которые ставят реальные деньги)
+
+НАЙДЕННЫЕ ИСТОЧНИКИ:
+${resolvedSearchResults
   .map(
     (result, index) =>
       `${index + 1}. ${result.title}\nURL: ${result.url}\nSNIPPET: ${result.snippet || 'No snippet available.'}`,
   )
   .join('\n\n')}
 
-Output JSON only with this schema:
+ЗАДАЧА:
+1. Выдели 3-5 ключевых фактов, влияющих на исход
+2. Какие факты ЗА исход "Да", какие ПРОТИВ
+3. Что толпа может недооценивать или переоценивать?
+4. Ближайший исторический прецедент
+
+Пиши кратко, на русском. Максимум 200 слов.
+
+Ответь JSON:
 {
-  "summary": "<200-500 word summary>",
-  "key_facts": ["<3-5 findings>"],
-  "sources": ["<URLs used>"]
+  "summary": "краткая справка",
+  "key_facts": ["факт 1", "факт 2", "факт 3"],
+  "for_yes": ["аргумент за 1", "аргумент за 2"],
+  "against_yes": ["аргумент против 1", "аргумент против 2"],
+  "crowd_might_miss": "что толпа может упускать",
+  "sources": ["url1", "url2"]
 }`;
 
   const completion = await client.chat.completions.create({
@@ -276,6 +364,9 @@ Output JSON only with this schema:
     return {
       summary: parsed.summary.trim(),
       key_facts: parsed.key_facts.map((fact) => fact.trim()).filter(Boolean).slice(0, 5),
+      for_yes: parsed.for_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
+      against_yes: parsed.against_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
+      crowd_might_miss: parsed.crowd_might_miss.trim(),
       sources: parsed.sources.map((source) => source.trim()).filter(Boolean),
       research_cost_usd: researchCost,
     };

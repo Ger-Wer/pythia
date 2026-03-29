@@ -20,6 +20,19 @@ DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
 OUTPUT_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 
+def prediction_columns(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
+    }
+
+
+def valid_filter(conn: sqlite3.Connection) -> str:
+    if "is_valid" not in prediction_columns(conn):
+        return ""
+    return " AND is_valid = 1"
+
+
 def calibration_curve(db_path: str, output_path: str):
     conn = sqlite3.connect(db_path)
     table_exists = conn.execute(
@@ -30,6 +43,7 @@ def calibration_curve(db_path: str, output_path: str):
         print("Predictions table does not exist yet")
         return None
 
+    validity_suffix = valid_filter(conn)
     rows = conn.execute(
         """
         SELECT dexter_p, naked_p, market_price, outcome
@@ -37,6 +51,7 @@ def calibration_curve(db_path: str, output_path: str):
         WHERE outcome IS NOT NULL AND outcome IN (0, 1)
         AND dexter_p IS NOT NULL
         """
+        + validity_suffix
     ).fetchall()
     conn.close()
 

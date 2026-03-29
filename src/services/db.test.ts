@@ -1,3 +1,4 @@
+import { Database as BunDatabase } from 'bun:sqlite';
 import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -139,5 +140,90 @@ test('updateOutcome stores outcome timestamps and brier scores', async () => {
     expect(row?.brier_market).toBeCloseTo(0.36, 8);
   } finally {
     reopened.close();
+  }
+});
+
+test('initDb migrates legacy schema and backfills validity metadata', async () => {
+  const { initDb } = await dbModulePromise;
+
+  const legacyDb = new BunDatabase(dbPath, {
+    create: true,
+    strict: true,
+  });
+
+  try {
+    legacyDb.run(`
+      CREATE TABLE predictions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        market_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        category TEXT,
+        volume REAL,
+        created_at TEXT,
+        end_date TEXT,
+        market_price REAL NOT NULL,
+        dexter_p REAL,
+        dexter_confidence TEXT,
+        dexter_reasoning TEXT,
+        dexter_key_risk TEXT,
+        naked_p REAL,
+        naked_reasoning TEXT,
+        forecast_timestamp TEXT NOT NULL,
+        outcome INTEGER,
+        resolved_at TEXT,
+        brier_dexter REAL,
+        brier_naked REAL,
+        brier_market REAL,
+        api_cost_usd REAL DEFAULT 0,
+        UNIQUE(market_id, forecast_timestamp)
+      )
+    `);
+
+    legacyDb
+      .query(`
+        INSERT INTO predictions (
+          market_id,
+          question,
+          category,
+          volume,
+          created_at,
+          end_date,
+          market_price,
+          forecast_timestamp,
+          api_cost_usd
+        ) VALUES
+          ('legacy-old', 'Old run', 'tests', 100, '2026-03-29T13:00:00.000Z', '2026-04-01T00:00:00.000Z', 44, '2026-03-29T14:00:00.000Z', 0),
+          ('legacy-new', 'Fresh run', 'tests', 100, '2026-03-29T16:00:00.000Z', '2026-04-01T00:00:00.000Z', 55, '2026-03-29T18:00:00.000Z', 0)
+      `)
+      .run();
+  } finally {
+    legacyDb.close();
+  }
+
+  const migrated = initDb();
+  try {
+    const columns = migrated
+      .query('PRAGMA table_info(predictions)')
+      .all() as Array<{ name: string }>;
+    const columnNames = columns.map((column) => column.name);
+
+    expect(columnNames).toContain('is_valid');
+    expect(columnNames).toContain('dexter_base_rate');
+    expect(columnNames).toContain('research_brief_json');
+
+    const rows = migrated
+      .query(`
+        SELECT market_id, is_valid
+        FROM predictions
+        ORDER BY market_id ASC
+      `)
+      .all() as Array<{ market_id: string; is_valid: number }>;
+
+    expect(rows).toEqual([
+      { market_id: 'legacy-new', is_valid: 1 },
+      { market_id: 'legacy-old', is_valid: 0 },
+    ]);
+  } finally {
+    migrated.close();
   }
 });

@@ -17,11 +17,16 @@ export interface PredictionRow {
   dexter_confidence?: string | null;
   dexter_reasoning?: string | null;
   dexter_key_risk?: string | null;
+  dexter_base_rate?: string | null;
   naked_p?: number | null;
   naked_reasoning?: string | null;
+  research_brief_json?: string | null;
   forecast_timestamp: string;
   api_cost_usd: number;
+  is_valid?: number | null;
 }
+
+const INVALID_DATA_CUTOFF = '2026-03-29T17:37:00';
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS predictions (
@@ -38,11 +43,14 @@ CREATE TABLE IF NOT EXISTS predictions (
     dexter_confidence TEXT,
     dexter_reasoning TEXT,
     dexter_key_risk TEXT,
+    dexter_base_rate TEXT,
 
     naked_p REAL,
     naked_reasoning TEXT,
+    research_brief_json TEXT,
 
     forecast_timestamp TEXT NOT NULL,
+    is_valid INTEGER NOT NULL DEFAULT 1,
 
     outcome INTEGER,
     resolved_at TEXT,
@@ -59,7 +67,47 @@ CREATE TABLE IF NOT EXISTS predictions (
 CREATE INDEX IF NOT EXISTS idx_outcome ON predictions(outcome);
 CREATE INDEX IF NOT EXISTS idx_end_date ON predictions(end_date);
 CREATE INDEX IF NOT EXISTS idx_forecast_ts ON predictions(forecast_timestamp);
+CREATE INDEX IF NOT EXISTS idx_predictions_valid ON predictions(is_valid);
 `;
+
+const REQUIRED_MIGRATIONS = [
+  {
+    column: 'dexter_base_rate',
+    sql: 'ALTER TABLE predictions ADD COLUMN dexter_base_rate TEXT',
+  },
+  {
+    column: 'research_brief_json',
+    sql: 'ALTER TABLE predictions ADD COLUMN research_brief_json TEXT',
+  },
+  {
+    column: 'is_valid',
+    sql: 'ALTER TABLE predictions ADD COLUMN is_valid INTEGER NOT NULL DEFAULT 1',
+  },
+] as const;
+
+function ensurePredictionMigrations(db: Database): void {
+  const columns = db
+    .query('PRAGMA table_info(predictions)')
+    .all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  for (const migration of REQUIRED_MIGRATIONS) {
+    if (!columnNames.has(migration.column)) {
+      db.run(migration.sql);
+    }
+  }
+
+  db.run(
+    `
+      UPDATE predictions
+      SET is_valid = CASE
+        WHEN forecast_timestamp < ?1 THEN 0
+        ELSE COALESCE(is_valid, 1)
+      END
+    `,
+    [INVALID_DATA_CUTOFF],
+  );
+}
 
 function resolveDbPath(): string {
   return process.env.DB_PATH || CONFIG.paths.db;
@@ -76,6 +124,7 @@ export function initDb(): Database {
   });
   db.run('PRAGMA journal_mode = WAL;');
   db.run(SCHEMA_SQL);
+  ensurePredictionMigrations(db);
 
   return db;
 }
@@ -94,10 +143,13 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       dexter_confidence,
       dexter_reasoning,
       dexter_key_risk,
+      dexter_base_rate,
       naked_p,
       naked_reasoning,
+      research_brief_json,
       forecast_timestamp,
-      api_cost_usd
+      api_cost_usd,
+      is_valid
     ) VALUES (
       @market_id,
       @question,
@@ -110,10 +162,13 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       @dexter_confidence,
       @dexter_reasoning,
       @dexter_key_risk,
+      @dexter_base_rate,
       @naked_p,
       @naked_reasoning,
+      @research_brief_json,
       @forecast_timestamp,
-      @api_cost_usd
+      @api_cost_usd,
+      @is_valid
     )
   `);
 
@@ -124,8 +179,11 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
     dexter_confidence: data.dexter_confidence ?? null,
     dexter_reasoning: data.dexter_reasoning ?? null,
     dexter_key_risk: data.dexter_key_risk ?? null,
+    dexter_base_rate: data.dexter_base_rate ?? null,
     naked_p: data.naked_p ?? null,
     naked_reasoning: data.naked_reasoning ?? null,
+    research_brief_json: data.research_brief_json ?? null,
+    is_valid: data.is_valid ?? 1,
   });
 }
 

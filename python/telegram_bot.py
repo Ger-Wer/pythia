@@ -19,6 +19,20 @@ DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
 LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 
+def prediction_columns(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
+    }
+
+
+def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
+    if "is_valid" not in prediction_columns(conn):
+        return ""
+    prefix = f"{alias}." if alias else ""
+    return f" AND {prefix}is_valid = 1"
+
+
 def send_message(text: str):
     if not BOT_TOKEN or not CHAT_ID:
         print(f"Telegram не настроен. Сообщение: {text}")
@@ -63,18 +77,19 @@ def weekly_report():
         send_message("Pythia: таблица predictions ещё не создана, еженедельный отчёт пока недоступен.")
         return
 
-    total = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+    validity_suffix = valid_filter(conn)
+    total = conn.execute(f"SELECT COUNT(*) FROM predictions WHERE 1=1{validity_suffix}").fetchone()[0]
     resolved = conn.execute(
-        "SELECT COUNT(*) FROM predictions WHERE outcome IS NOT NULL AND outcome IN (0,1)"
+        f"SELECT COUNT(*) FROM predictions WHERE outcome IS NOT NULL AND outcome IN (0,1){validity_suffix}"
     ).fetchone()[0]
 
     week_ago = (datetime.now() - timedelta(days=7)).isoformat()
     new_this_week = conn.execute(
-        "SELECT COUNT(*) FROM predictions WHERE forecast_timestamp > ?",
+        f"SELECT COUNT(*) FROM predictions WHERE forecast_timestamp > ?{validity_suffix}",
         (week_ago,),
     ).fetchone()[0]
     resolved_this_week = conn.execute(
-        "SELECT COUNT(*) FROM predictions WHERE resolved_at > ? AND outcome IN (0,1)",
+        f"SELECT COUNT(*) FROM predictions WHERE resolved_at > ? AND outcome IN (0,1){validity_suffix}",
         (week_ago,),
     ).fetchone()[0]
 
@@ -87,11 +102,12 @@ def weekly_report():
         FROM predictions
         WHERE outcome IS NOT NULL AND outcome IN (0,1)
         """
+        + validity_suffix
     ).fetchone()
 
     month_start = datetime.now().replace(day=1).isoformat()
     month_cost = conn.execute(
-        "SELECT COALESCE(SUM(api_cost_usd), 0) FROM predictions WHERE forecast_timestamp > ?",
+        f"SELECT COALESCE(SUM(api_cost_usd), 0) FROM predictions WHERE forecast_timestamp > ?{validity_suffix}",
         (month_start,),
     ).fetchone()[0]
 

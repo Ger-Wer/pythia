@@ -30,6 +30,7 @@ BOT_COMMANDS = [
     ("logs", "Последние строки логов"),
     ("health", "Техническое состояние сервисов"),
     ("last_predictions", "Последние прогнозы из базы"),
+    ("details", "Подробности по рынку: /details <номер|market_id>"),
 ]
 
 HEAVY_COMMANDS = {"forecast", "resolve", "weekly", "day0", "edge"}
@@ -55,20 +56,39 @@ COMMAND_ALIASES = {
     "здоровье": "health",
     "last_predictions": "last_predictions",
     "последние": "last_predictions",
+    "details": "details",
+    "детали": "details",
 }
 
 
-def normalize_command(text: str | None) -> str | None:
+def parse_command_request(text: str | None) -> tuple[str | None, str | None]:
     if not text:
-        return None
+        return None, None
 
     normalized = re.sub(r"\s+", " ", text.strip().lower())
+    argument: str | None = None
     if normalized.startswith("/"):
         normalized = normalized[1:]
-        normalized = normalized.split(" ", 1)[0]
+        command_part, _, remainder = normalized.partition(" ")
+        normalized = command_part
         normalized = normalized.split("@", 1)[0]
+        argument = remainder.strip() or None
+    else:
+        for alias in sorted(COMMAND_ALIASES, key=len, reverse=True):
+            if normalized == alias:
+                return COMMAND_ALIASES[alias], None
+            if normalized.startswith(f"{alias} "):
+                return COMMAND_ALIASES[alias], normalized[len(alias) :].strip() or None
 
-    return COMMAND_ALIASES.get(normalized)
+        command_part, _, remainder = normalized.partition(" ")
+        normalized = command_part
+        argument = remainder.strip() or None
+
+    return COMMAND_ALIASES.get(normalized), argument
+
+
+def normalize_command(text: str | None) -> str | None:
+    return parse_command_request(text)[0]
 
 
 def is_authorized_update(update: dict[str, Any], allowed_user_id: int) -> bool:
@@ -98,6 +118,7 @@ def build_help_message() -> str:
             "/logs или логи - показать последние строки логов",
             "/health или здоровье - показать состояние сервисов",
             "/last_predictions или последние - вывести последние прогнозы",
+            "/details <номер|market_id> или детали <номер|market_id> - показать полный разбор рынка",
         ]
     )
 
@@ -138,6 +159,61 @@ def _latest_forecast_timestamp(conn: sqlite3.Connection) -> str | None:
     if not row or not row[0]:
         return None
     return str(row[0])
+
+
+def _prediction_columns(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
+    }
+
+
+def _has_column(conn: sqlite3.Connection, column_name: str) -> bool:
+    return column_name in _prediction_columns(conn)
+
+
+def _valid_where_clause(conn: sqlite3.Connection, alias: str = "") -> str:
+    if not _has_column(conn, "is_valid"):
+        return ""
+    prefix = f"{alias}." if alias else ""
+    return f" AND {prefix}is_valid = 1"
+
+
+def _api_cost_label(total_cost: float | None = None) -> str:
+    base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").lower()
+    if "groq.com" in base_url:
+        return "бесплатно (Groq)"
+    if total_cost is None:
+        return "проверьте биллинг провайдера"
+    return f"${float(total_cost):.2f}"
+
+
+def _confidence_ru(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"high", "высокая", "высокий"}:
+        return "высокая"
+    if normalized in {"low", "низкая", "низкий"}:
+        return "низкая"
+    return "средняя"
+
+
+def _infer_icon(question: str) -> str:
+    haystack = (question or "").lower()
+    if any(keyword in haystack for keyword in ("nba", "western conference", "eastern conference", "rookie of the year", "mvp")):
+        return "🏀"
+    if any(keyword in haystack for keyword in ("premier league", "bundesliga", "serie a", "ligue 1", "world cup", "fifa")):
+        return "⚽"
+    if any(keyword in haystack for keyword in ("nhl", "stanley cup")):
+        return "🏒"
+    if any(keyword in haystack for keyword in ("masters tournament", "golf", "pga")):
+        return "⛳"
+    if any(keyword in haystack for keyword in ("bond", "oscar", "emmy", "grammy", "movie", "album")):
+        return "🎬"
+    if any(keyword in haystack for keyword in ("election", "presidential", "primary", "congress", "senate")):
+        return "🗳️"
+    if any(keyword in haystack for keyword in ("bitcoin", "ethereum", "crypto", "btc", "eth")):
+        return "₿"
+    return "•"
 
 
 def _collect_command_issues(stdout: str, stderr: str) -> list[str]:
@@ -182,6 +258,26 @@ def _derive_research_status(issues: list[str]) -> str:
     return "ON"
 
 
+def _derive_research_label(issues: list[str]) -> str:
+    status = _derive_research_status(issues)
+    has_exa_key = bool(os.getenv("EXA_API_KEY", "").strip())
+    has_tavily_key = bool(os.getenv("TAVILY_API_KEY", "").strip())
+
+    if status == "ON":
+        if has_exa_key:
+            return "ON (Exa)"
+        if has_tavily_key:
+            return "ON (Tavily)"
+        return "ON"
+
+    if status == "DEGRADED":
+        if has_tavily_key:
+            return "DEGRADED (Tavily)"
+        return "DEGRADED"
+
+    return "OFF"
+
+
 def format_forecast_report(
     db_path: Path | str,
     run_timestamp: str | None = None,
@@ -202,12 +298,15 @@ def format_forecast_report(
         if not latest_run:
             return "📊 Прогнозов пока нет."
 
+        valid_filter = _valid_where_clause(conn)
         rows = conn.execute(
             """
             SELECT question, market_price, naked_p, dexter_p,
-                   dexter_confidence, api_cost_usd, volume
+                   dexter_confidence, dexter_reasoning, naked_reasoning,
+                   api_cost_usd, volume
             FROM predictions
             WHERE forecast_timestamp = ?
+            """ + valid_filter + """
             ORDER BY ABS(COALESCE(dexter_p, naked_p, market_price) - market_price) DESC
             """,
             (latest_run,),
@@ -216,14 +315,14 @@ def format_forecast_report(
     if not rows:
         return "📊 Для последнего прогона записи не найдены."
 
-    total_cost = sum(float(row[5] or 0) for row in rows)
-    status = research_status or _derive_research_status(issues)
+    total_cost = sum(float(row[7] or 0) for row in rows)
+    status = research_status or _derive_research_label(issues)
     run_day = str(latest_run)[:10]
 
     lines = [
         f"📊 Pythia — прогнозы за {run_day}",
         f"Обработано рынков: {len(rows)}",
-        f"Стоимость: ${total_cost:.2f}",
+        f"Стоимость: {_api_cost_label(total_cost)}",
         f"Research: {status}",
     ]
 
@@ -233,15 +332,22 @@ def format_forecast_report(
         lines.extend(f"- {issue}" for issue in issues[:3])
 
     alerts: list[str] = []
-    for question, market_price, naked_p, dexter_p, _confidence, _cost, _volume in rows:
+    for question, market_price, naked_p, dexter_p, _confidence, dexter_reasoning, naked_reasoning, _cost, _volume in rows:
         best_p = dexter_p if dexter_p is not None else naked_p
         if best_p is None or market_price is None:
             continue
         edge = float(best_p) - float(market_price)
         if abs(edge) > 10:
             direction = "↑" if edge > 0 else "↓"
+            reasoning = (dexter_reasoning or naked_reasoning or "Подробное объяснение смотрите через /details.")
             alerts.append(
-                f"{direction} {shorten(str(question), 55)} — рынок {float(market_price):.0f}%, Pythia {float(best_p):.0f}% ({edge:+.0f}%)"
+                "\n".join(
+                    [
+                        f"{direction} {shorten(str(question), 55)}",
+                        f"  Толпа: {float(market_price):.0f}% | Pythia: {float(best_p):.0f}% ({edge:+.0f}%)",
+                        f"  Почему: {shorten(str(reasoning), 110)}",
+                    ]
+                )
             )
 
     lines.append("")
@@ -253,17 +359,18 @@ def format_forecast_report(
 
     lines.append("")
     lines.append("📋 Топ-5 прогнозов:")
-    for index, (question, market_price, naked_p, dexter_p, _confidence, _cost, volume) in enumerate(rows[:5], start=1):
+    for index, (question, market_price, naked_p, dexter_p, _confidence, _dexter_reasoning, _naked_reasoning, _cost, volume) in enumerate(rows[:5], start=1):
         best_p = dexter_p if dexter_p is not None else naked_p
         best_p_str = "N/A" if best_p is None else f"{float(best_p):.0f}%"
         lines.append(
-            f"{index}. {shorten(str(question), 48)}\n"
+            f"{index}. {_infer_icon(str(question))} {shorten(str(question), 46)}\n"
             f"   рынок: {float(market_price or 0):.0f}% | Pythia: {best_p_str} | объём: ${float(volume or 0):,.0f}"
         )
 
     if len(rows) > 5:
         lines.append("")
         lines.append(f"...и ещё {len(rows) - 5} рынков. Команда /last_predictions покажет последние записи.")
+    lines.append("📊 Подробности по рынку: /details <номер или market_id>")
 
     return "\n".join(lines)
 
@@ -290,17 +397,18 @@ def format_status_report(
             lines.append("Таблица predictions ещё не создана.")
             return "\n".join(lines)
 
-        total = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+        valid_filter = _valid_where_clause(conn)
+        total = conn.execute(f"SELECT COUNT(*) FROM predictions WHERE 1=1{valid_filter}").fetchone()[0]
         resolved = conn.execute(
-            "SELECT COUNT(*) FROM predictions WHERE outcome IS NOT NULL AND outcome IN (0,1)"
+            f"SELECT COUNT(*) FROM predictions WHERE outcome IS NOT NULL AND outcome IN (0,1){valid_filter}"
         ).fetchone()[0]
         today = _current_utc_date()
         today_count = conn.execute(
-            "SELECT COUNT(*) FROM predictions WHERE forecast_timestamp LIKE ?",
+            f"SELECT COUNT(*) FROM predictions WHERE forecast_timestamp LIKE ?{valid_filter}",
             (f"{today}%",),
         ).fetchone()[0]
         month_cost = conn.execute(
-            "SELECT COALESCE(SUM(api_cost_usd), 0) FROM predictions WHERE forecast_timestamp >= ?",
+            f"SELECT COALESCE(SUM(api_cost_usd), 0) FROM predictions WHERE forecast_timestamp >= ?{valid_filter}",
             (_current_month_start(),),
         ).fetchone()[0]
         brier = conn.execute(
@@ -312,17 +420,20 @@ def format_status_report(
             FROM predictions
             WHERE outcome IS NOT NULL AND outcome IN (0,1)
             """
+            + valid_filter
         ).fetchone()
 
     lines.extend(
         [
             "",
+            "🟢 Система работает",
             f"Всего прогнозов: {total}",
             f"Сегодня: {today_count}",
             f"Разрешено: {resolved}",
             f"Ожидают: {total - resolved}",
             "",
-            f"💰 Расходы за месяц: ${float(month_cost or 0):.2f}",
+            f"💰 API: {_api_cost_label(month_cost)}",
+            f"🔍 Research: {_derive_research_label([])}",
         ]
     )
 
@@ -337,7 +448,10 @@ def format_status_report(
             ]
         )
     else:
-        lines.extend(["", "Brier score появится после первых resolved-рынков."])
+        lines.extend(["", f"Brier score пока недоступен: разрешён {resolved} из минимум 20 валидных рынков."])
+
+    next_run = "завтра 06:00 UTC"
+    lines.extend(["", f"Следующий автоматический прогон: {next_run}"])
 
     return "\n".join(lines)
 
@@ -353,7 +467,7 @@ def run_command(command: list[str], timeout: int = 600) -> tuple[int, str, str]:
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
-def run_operator_command(command_key: str) -> str:
+def run_operator_command(command_key: str, command_arg: str | None = None) -> str:
     if command_key == "help":
         return build_help_message()
     if command_key in {"forecast", "resolve", "weekly"}:
@@ -370,6 +484,8 @@ def run_operator_command(command_key: str) -> str:
         return render_status()
     if command_key == "last_predictions":
         return render_last_predictions()
+    if command_key == "details":
+        return render_details(command_arg)
     return build_help_message()
 
 
@@ -394,7 +510,8 @@ def render_health() -> str:
     checks = ["🏥 Здоровье Pythia", ""]
 
     if services:
-        checks.append(format_health_summary(services))
+        checks.append("Сервисы:")
+        checks.extend(f"  {line}" for line in format_health_summary(services).splitlines()[1:])
         checks.append("")
 
     checks.extend(_collect_runtime_health_checks())
@@ -405,18 +522,24 @@ def render_status() -> str:
     return format_status_report(DB_PATH, read_compose_services())
 
 
-def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
-    if not DB_PATH.exists():
-        return f"База данных не найдена: {DB_PATH}"
+def format_last_predictions_report(db_path: Path | str, limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
+    db_path = Path(db_path)
+    if not db_path.exists():
+        return f"База данных не найдена: {db_path}"
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(db_path) as conn:
         if not _predictions_table_exists(conn):
             return "Таблица predictions еще не создана."
 
+        valid_filter = _valid_where_clause(conn)
         rows = conn.execute(
             """
-            SELECT question, market_price, naked_p, dexter_p, forecast_timestamp
+            SELECT market_id, question, market_price, naked_p, dexter_p, forecast_timestamp
             FROM predictions
+            WHERE 1=1
+            """
+            + valid_filter
+            + """
             ORDER BY forecast_timestamp DESC, id DESC
             LIMIT ?
             """,
@@ -427,15 +550,155 @@ def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
         return "В базе пока нет прогнозов."
 
     rendered_rows = [f"📋 Последние {len(rows)} прогнозов:", ""]
-    for question, market_price, naked_p, dexter_p, forecast_timestamp in rows:
+    for index, (market_id, question, market_price, naked_p, dexter_p, _forecast_timestamp) in enumerate(rows, start=1):
         best_p = dexter_p if dexter_p is not None else naked_p
         edge = None if best_p is None or market_price is None else float(best_p) - float(market_price)
         edge_text = "" if edge is None else f" ({edge:+.0f}%)"
         rendered_rows.append(
-            f"• {shorten(str(question), 55)}\n"
-            f"  рынок: {_format_percent(market_price)} | Pythia: {_format_percent(best_p)}{edge_text} | {str(forecast_timestamp)[:19]}"
+            f"{index}. {_infer_icon(str(question))} {shorten(str(question), 52)}\n"
+            f"   Толпа: {_format_percent(market_price)} → Pythia: {_format_percent(best_p)}{edge_text}\n"
+            f"   details: /details {market_id}"
         )
+
     return "\n".join(rendered_rows)
+
+
+def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
+    return format_last_predictions_report(DB_PATH, limit)
+
+
+def _load_details_row(conn: sqlite3.Connection, reference: str) -> tuple[Any, ...] | None:
+    valid_filter = _valid_where_clause(conn)
+
+    if reference.isdigit():
+        offset = max(int(reference) - 1, 0)
+        rows = conn.execute(
+            """
+            SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
+                   dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
+                   volume, end_date, forecast_timestamp
+            FROM predictions
+            WHERE 1=1
+            """
+            + valid_filter
+            + """
+            ORDER BY forecast_timestamp DESC, id DESC
+            LIMIT 1 OFFSET ?
+            """,
+            (offset,),
+        ).fetchall()
+        return rows[0] if rows else None
+
+    rows = conn.execute(
+        """
+        SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
+               dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
+               volume, end_date, forecast_timestamp
+        FROM predictions
+        WHERE market_id = ?
+        """
+        + valid_filter
+        + """
+        ORDER BY forecast_timestamp DESC, id DESC
+        LIMIT 1
+        """,
+        (reference,),
+    ).fetchall()
+    return rows[0] if rows else None
+
+
+def format_details_report(db_path: Path | str, reference: str | None) -> str:
+    db_path = Path(db_path)
+    if not reference:
+        return "Использование: /details <номер или market_id>"
+    if not db_path.exists():
+        return f"База данных не найдена: {db_path}"
+
+    with sqlite3.connect(db_path) as conn:
+        if not _predictions_table_exists(conn):
+            return "Таблица predictions еще не создана."
+
+        row = _load_details_row(conn, reference.strip())
+
+    if not row:
+        return f"Не удалось найти валидный прогноз по ссылке '{reference}'."
+
+    (
+        market_id,
+        question,
+        market_price,
+        dexter_p,
+        naked_p,
+        dexter_confidence,
+        dexter_reasoning,
+        dexter_key_risk,
+        dexter_base_rate,
+        research_brief_json,
+        volume,
+        end_date,
+        forecast_timestamp,
+    ) = row
+
+    best_p = dexter_p if dexter_p is not None else naked_p
+    edge = None if best_p is None or market_price is None else float(best_p) - float(market_price)
+
+    summary = ""
+    key_facts: list[str] = []
+    sources: list[str] = []
+    if research_brief_json:
+        try:
+            research_payload = json.loads(str(research_brief_json))
+            summary = str(research_payload.get("summary") or "").strip()
+            key_facts = [str(item).strip() for item in research_payload.get("key_facts") or [] if str(item).strip()]
+            sources = [str(item).strip() for item in research_payload.get("sources") or [] if str(item).strip()]
+        except json.JSONDecodeError:
+            summary = ""
+
+    lines = [
+        "🔍 Подробный анализ",
+        "",
+        f"{_infer_icon(str(question))} {question}",
+        "",
+        f"Рынок: {_format_percent(market_price)} | Pythia: {_format_percent(best_p)} | Расхождение: {edge:+.1f}%"
+        if edge is not None
+        else f"Рынок: {_format_percent(market_price)} | Pythia: {_format_percent(best_p)}",
+        f"Уверенность: {_confidence_ru(dexter_confidence)}",
+        f"Объём: ${float(volume or 0):,.0f}",
+        f"Дедлайн: {str(end_date)[:10]}",
+        f"Последний прогон: {str(forecast_timestamp)[:19]}",
+    ]
+
+    if dexter_base_rate:
+        lines.extend(["", f"📈 Базовая частота: {dexter_base_rate}"])
+
+    if dexter_reasoning:
+        lines.extend(["", "📊 Рассуждение Pythia:", str(dexter_reasoning)])
+
+    if dexter_key_risk:
+        lines.extend(["", "⚠️ Ключевой риск:", str(dexter_key_risk)])
+
+    if summary or key_facts:
+        lines.extend(["", "🔎 Research brief:"])
+        if summary:
+            lines.append(summary)
+        if key_facts:
+            lines.extend(f"- {fact}" for fact in key_facts[:5])
+
+    if sources:
+        lines.extend(["", f"Источники: {', '.join(sources[:3])}"])
+
+    lines.extend(["", f"market_id: {market_id}"])
+    return "\n".join(lines)
+
+
+def render_details(reference: str | None) -> str:
+    return format_details_report(DB_PATH, reference)
+
+
+def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
+    if not DB_PATH.exists():
+        return f"База данных не найдена: {DB_PATH}"
+    return format_last_predictions_report(DB_PATH, limit)
 
 
 def read_compose_services() -> list[dict[str, str]]:
@@ -580,21 +843,32 @@ def _format_percent(value: Any) -> str:
 
 
 def _collect_runtime_health_checks() -> list[str]:
-    lines: list[str] = []
-    lines.append(_check_llm_backend())
-    lines.append(_check_gamma_api())
+    lines: list[str] = ["API:"]
+    llm_line = _check_llm_backend()
+    gamma_line = _check_gamma_api()
     exa_ok, exa_line = _check_exa_api()
     tavily_ok, tavily_line = _check_tavily_api()
-    lines.append(exa_line)
-    lines.append(tavily_line)
-    lines.append(_check_sqlite())
+    sqlite_ok, sqlite_line = _check_sqlite()
+
+    lines.append(f"  {llm_line}")
+    lines.append(f"  {gamma_line}")
+    lines.append(f"  {exa_line}")
+    lines.append(f"  {tavily_line}")
+    lines.append("")
+    lines.append("База данных:")
+    lines.append(f"  {sqlite_line}")
+    lines.append("")
 
     if exa_ok:
-        lines.append("Research status: ON")
+        lines.append("🔍 Research status: ON (Exa)")
     elif tavily_ok:
-        lines.append("Research status: DEGRADED (Tavily fallback)")
+        lines.append("🔍 Research status: DEGRADED (Tavily fallback)")
     else:
-        lines.append("Research status: OFF")
+        lines.append("🔍 Research status: OFF")
+
+    if llm_line.startswith("✅") and gamma_line.startswith("✅") and sqlite_ok and (exa_ok or tavily_ok):
+        lines.append("")
+        lines.append("Всё в порядке ✅")
 
     return lines
 
@@ -677,15 +951,20 @@ def _check_tavily_api() -> tuple[bool, str]:
         return False, f"❌ Tavily API: {shorten(str(exc), 60)}"
 
 
-def _check_sqlite() -> str:
+def _check_sqlite() -> tuple[bool, str]:
     if not DB_PATH.exists():
-        return f"❌ SQLite: база не найдена ({DB_PATH})"
+        return False, f"❌ SQLite: база не найдена ({DB_PATH})"
     try:
         with sqlite3.connect(DB_PATH) as conn:
-            count = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
-        return f"✅ SQLite: {count} записей"
+            if not _predictions_table_exists(conn):
+                return False, "❌ SQLite: таблица predictions ещё не создана"
+            total = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+            valid = conn.execute(
+                f"SELECT COUNT(*) FROM predictions WHERE 1=1{_valid_where_clause(conn)}"
+            ).fetchone()[0]
+        return True, f"✅ SQLite: {valid} валидных записей ({total} всего)"
     except Exception as exc:
-        return f"❌ SQLite: {shorten(str(exc), 60)}"
+        return False, f"❌ SQLite: {shorten(str(exc), 60)}"
 
 
 def _list_log_files() -> list[Path]:

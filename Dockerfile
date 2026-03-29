@@ -11,7 +11,6 @@ RUN apt-get update \
        build-essential \
        ca-certificates \
        curl \
-       git \
        jq \
        pkg-config \
        procps \
@@ -39,11 +38,6 @@ RUN bun install
 COPY python/requirements.txt /app/python/requirements.txt
 RUN python -m venv /app/python/venv \
     && /app/python/venv/bin/pip install --no-cache-dir -r /app/python/requirements.txt
-
-RUN git clone https://github.com/virattt/dexter.git /app/dexter \
-    && cd /app/dexter \
-    && git checkout --detach e126374a0fd28f50144fe068d8a8c4b4541ed38c \
-    && bun install
 
 COPY src /app/src
 COPY python /app/python

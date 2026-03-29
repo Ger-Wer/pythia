@@ -41,6 +41,12 @@ def check_edge(db_path: str, min_samples: int = 50) -> dict:
             "message": "Predictions table does not exist yet",
         }
 
+    columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
+    }
+    valid_filter = " AND is_valid = 1" if "is_valid" in columns else ""
+
     rows = conn.execute(
         """
         SELECT dexter_p, naked_p, market_price, outcome
@@ -48,6 +54,7 @@ def check_edge(db_path: str, min_samples: int = 50) -> dict:
         WHERE outcome IS NOT NULL AND outcome IN (0, 1)
         AND dexter_p IS NOT NULL AND naked_p IS NOT NULL
         """
+        + valid_filter
     ).fetchall()
 
     n = len(rows)
