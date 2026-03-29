@@ -40,7 +40,10 @@ active_binary = [
 ]
 
 primary_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 21]
-expanded_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 30]
+fallback_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 30]
+diverse_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 60]
+long_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 120]
+broad_window = [m for m in active_binary if 1 < days_to_resolution(m) <= 180]
 
 def vol(m):
     try:
@@ -49,8 +52,10 @@ def vol(m):
         return 0.0
 
 tier1 = [m for m in primary_window if 1000 <= vol(m) <= 100000]
-tier2 = [m for m in expanded_window if 500 <= vol(m) <= 250000]
-tier3 = [m for m in expanded_window if vol(m) >= 500]
+tier2 = [m for m in fallback_window if 500 <= vol(m) <= 250000]
+tier3 = [m for m in diverse_window if 500 <= vol(m) <= 250000]
+tier4 = [m for m in long_window if 500 <= vol(m) <= 500000]
+tier5 = [m for m in broad_window if 100 <= vol(m) <= 1000000]
 
 def hours_old(m):
     try:
@@ -64,12 +69,17 @@ new_72h = [m for m in tier1 if hours_old(m) < 72]
 print('')
 print(f'Total active markets: {len(markets)}')
 print(f'Binary only (1-21d primary window): {len(primary_window)}')
-print(f'Binary only (1-30d fallback window): {len(expanded_window)}')
+print(f'Binary only (1-30d fallback window): {len(fallback_window)}')
+print(f'Binary only (1-60d diverse window):  {len(diverse_window)}')
+print(f'Binary only (1-120d long window):    {len(long_window)}')
+print(f'Binary only (1-180d broad window):   {len(broad_window)}')
 print('')
-print('=== VOLUME TIERS ===')
-print(f'$1K-$100K (primary):   {len(tier1)}')
-print(f'$500-$250K (fallback): {len(tier2)}')
-print(f'$500+ (all fallback):  {len(tier3)}')
+print('=== STAGED TIERS ===')
+print(f'$1K-$100K, 1-21d:      {len(tier1)}')
+print(f'$500-$250K, 1-30d:     {len(tier2)}')
+print(f'$500-$250K, 1-60d:     {len(tier3)}')
+print(f'$500-$500K, 1-120d:    {len(tier4)}')
+print(f'$100-$1M, 1-180d:      {len(tier5)}')
 print('')
 print(f'New (<72h, $1K-$100K): {len(new_72h)}')
 print('')
@@ -78,6 +88,10 @@ if len(tier1) >= 10:
     print(f'PASS - {len(tier1)} markets in primary tier. Proceed to Week 1.')
 elif len(tier2) >= 10:
     print(f'MARGINAL - fallback tier is viable with {len(tier2)} markets.')
+elif len(tier4) >= 10:
+    print(f'EXPANDED - long window is needed, available markets: {len(tier4)}.')
+elif len(tier5) >= 10:
+    print(f'BROAD - only broad window is viable, available markets: {len(tier5)}.')
 else:
     print(f'FAIL - only {len(tier2)} markets. Consider waiting or different approach.')
 
