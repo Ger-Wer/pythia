@@ -30,7 +30,7 @@ case "${1:-}" in
 
   telegram)
     cd /app
-    exec /app/python/venv/bin/python python/telegram_operator.py
+    exec /app/python/venv/bin/python -m python.telegram_operator
     ;;
 
   scheduler)
