@@ -29,7 +29,6 @@ const CANDIDATE_PATTERNS = [
   /^will\s+.+?\s+(pass\b.*)$/i,
   /^will\s+.+?\s+(sign\b.*)$/i,
   /^will\s+.+?\s+(hit\b.*)$/i,
-  /^will\s+.+?\s+(be\b.*)$/i,
 ] as const;
 
 function normalizeText(value: string): string {

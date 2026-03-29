@@ -114,23 +114,23 @@ test('deduplicateByEvent keeps the most informative sub-market in each event gro
 test('applyDiversityConstraints enforces one market per event and three per category', async () => {
   const { applyDiversityConstraints } = await marketSelectorModule;
 
-  const politicsA = makeMarket('election-a', 12, {
-    question: 'Will Alice be elected president?',
+  const politicsA = makeMarket('politics-a', 12, {
+    question: 'Will the Fed cut rates in June 2026?',
     category: 'politics',
     outcomePrices: [0.61, 0.39],
   });
-  const politicsB = makeMarket('election-b', 12, {
-    question: 'Will Bob be elected president?',
+  const politicsB = makeMarket('politics-b', 12, {
+    question: 'Will CPI fall below 3% by June 2026?',
     category: 'politics',
     outcomePrices: [0.41, 0.59],
   });
-  const politicsC = makeMarket('election-c', 12, {
-    question: 'Will Carol be elected president?',
+  const politicsC = makeMarket('politics-c', 12, {
+    question: 'Will Congress pass a TikTok ban by June 2026?',
     category: 'politics',
     outcomePrices: [0.31, 0.69],
   });
-  const politicsD = makeMarket('election-d', 12, {
-    question: 'Will Dave be elected president?',
+  const politicsD = makeMarket('politics-d', 12, {
+    question: 'Will the US government shut down in 2026?',
     category: 'politics',
     outcomePrices: [0.21, 0.79],
   });
@@ -148,9 +148,9 @@ test('applyDiversityConstraints enforces one market per event and three per cate
   ]);
 
   expect(selected.map((market: PolymarketMarket) => market.id)).toEqual([
-    'election-a',
-    'election-b',
-    'election-c',
+    'politics-a',
+    'politics-b',
+    'politics-c',
     'sports-a',
   ]);
 });

@@ -61,11 +61,16 @@ CREATE INDEX IF NOT EXISTS idx_end_date ON predictions(end_date);
 CREATE INDEX IF NOT EXISTS idx_forecast_ts ON predictions(forecast_timestamp);
 `;
 
+function resolveDbPath(): string {
+  return process.env.DB_PATH || CONFIG.paths.db;
+}
+
 export function initDb(): Database {
-  const dbDir = path.dirname(CONFIG.paths.db);
+  const dbPath = resolveDbPath();
+  const dbDir = path.dirname(dbPath);
   mkdirSync(dbDir, { recursive: true });
 
-  const db = new BunDatabase(CONFIG.paths.db, {
+  const db = new BunDatabase(dbPath, {
     create: true,
     strict: true,
   });
