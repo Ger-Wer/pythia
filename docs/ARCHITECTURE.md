@@ -1,17 +1,34 @@
-# Pythia Architecture
+# Архитектура Pythia
 
-## Components
-- **Market Selector**: Gamma REST API → filter binary, $5K-$50K, 3-14 days
-- **Dexter Research**: virattt/dexter agent → structured research brief
-- **Naked R1**: Baseline single-call DeepSeek R1 (permanent control group)
-- **Synthesis**: Calibrated prompt → DeepSeek R1 → probability estimate
-- **Tracker**: SQLite, Brier scores, cost tracking
-- **Alerts**: Telegram Bot — edge alerts, errors, weekly reports
+Pythia спроектирована как Docker-first система, которая запускается на хосте `amper` без отдельного VPS и без входящих портов.
 
-## Design Decisions
-1. No MiroFish — too complex, wrong domain (social media sim)
-2. No GraphRAG — overkill for 5-20 docs per market
-3. No Zep — overkill for single-session forecasting
-4. No local GPU — API is 2.5x cheaper at current volume
-5. A/B test (Dexter vs Naked R1) — permanent baseline comparison
-6. SQLite over PostgreSQL — no concurrent writes, simpler backup
+## Основные компоненты
+
+- `pythia-scheduler` - основной контейнер, который запускает планировщик и ежедневные задания.
+- TypeScript-приложение - собирает рынки, делает прогнозы, пишет данные в БД и отправляет Telegram-уведомления.
+- Python-инструменты - считают edge, Brier score, отчеты по разрешению и вспомогательную аналитику.
+- SQLite - локальное хранилище прогнозов и метрик.
+- `logs/` - журналы выполнения.
+- `data/` - база SQLite и связанные файлы состояния.
+
+## Архитектура размещения на `amper`
+
+Развертывание выполняется под отдельным пользователем `pythia`. Репозиторий клонируется в `/home/pythia/pythia`, а все операции запускаются из этого каталога.
+
+Compose-проект называется `pythia`, а внутренняя сеть тоже изолирована как `pythia_internal`. В обычной работе сервис не публикует порты наружу, поэтому доступ к нему идет через SSH и локальные `docker compose` команды на хосте.
+
+`data` и `logs` монтируются bind mount'ами из рабочей директории на `amper` в контейнер. Это делает состояние прозрачным для оператора и упрощает бэкапы, пересборки и диагностику.
+
+## Изоляция
+
+Изоляция строится на комбинации отдельных пользователя, каталога, сети и томов. Это хорошо отделяет Pythia от других рабочих нагрузок, включая `SproutSignal`, если они живут на том же хосте.
+
+Важно помнить, что это не жесткая граница безопасности уровня отдельной машины: общий kernel и общий Docker daemon все еще остаются общими ресурсами. Поэтому нельзя смешивать сети, тома или права доступа между проектами.
+
+## Дизайнерские решения
+
+- Docker-first вместо bare metal - меньше ручной настройки и меньше расхождений между средами.
+- Один изолированный compose-проект - проще сопровождение и предсказуемый запуск.
+- Без опубликованных портов - меньше поверхность атаки и меньше случайных конфликтов.
+- Bind-mounted `data` и `logs` - состояние видно на хосте и не теряется при пересборке.
+- Отдельный пользователь `pythia` - снижает риск пересечения с другими проектами и делает операции воспроизводимыми.

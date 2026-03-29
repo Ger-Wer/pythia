@@ -1,53 +1,61 @@
-# Pythia 🔮
+# Pythia
 
-Autonomous prediction market intelligence system.
+Pythia - это автономная система прогноза для Polymarket. Она отбирает подходящие рынки, запускает исследование и синтез вероятности, сохраняет результаты в SQLite, считает качество прогнозов и отправляет уведомления в Telegram.
 
-Pythia monitors Polymarket daily, generates probability forecasts using
-LLM-powered research and analysis, tracks accuracy with Brier scores,
-and reports results via Telegram.
-
-## Architecture
+## Архитектура
 
 ```text
-Polymarket Gamma API → Market Selection → [Dexter Research | Naked R1 Baseline]
-→ DeepSeek R1 Synthesis → SQLite → Brier Score Tracking → Telegram Reports
+Polymarket Gamma API
+  -> отбор рынков
+  -> исследование Dexter
+  -> базовый контрольный прогон Naked R1
+  -> синтез вероятности
+  -> SQLite + логи + Brier score
+  -> Telegram-уведомления и отчеты
 ```
 
-## Quick Start
+В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`, а все рабочие действия идут через `docker compose` и `bash scripts/manual_run.sh`.
+
+## Быстрый старт на `amper`
+
+Работайте на хосте `amper` под пользователем `pythia`.
 
 ```bash
-# 1. Clone
-git clone git@github.com:YOUR_USER/pythia.git && cd pythia
-
-# 2. Setup
-bash scripts/setup.sh
-
-# 3. Configure
-cp .env.example .env && nano .env  # add API keys
-
-# 4. Day 0 check — verify market availability
+cd /home/pythia/pythia
+cp .env.example .env
 bash scripts/day0_check.sh
-
-# 5. Test run
-bun run src/main.ts
-
-# 6. Install cron (edit paths first)
-nano scripts/crontab.txt  # update paths
-crontab scripts/crontab.txt
+docker compose build
+bash scripts/manual_run.sh forecast
+bash scripts/manual_run.sh status
+docker compose up -d
 ```
+
+Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`.
+
+## Operations
+
+`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе.
+
+`bash scripts/manual_run.sh logs` открывает журнал scheduler-контейнера.
+
+`bash scripts/manual_run.sh edge` считает edge и Brier score на накопленных данных.
+
+Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`.
 
 ## Decision Framework
 
-After 4 weeks (~50 resolved predictions), run:
+Через 4 недели работы, когда накопится достаточно данных, запускайте:
 
 ```bash
-bun run check-edge
+bash scripts/manual_run.sh edge
 ```
 
-- `GO` → Proceed to Phase 2 (multi-agent debate)
-- `PIVOT` → Iterate prompts, adjust filters
-- `STOP` → Approach doesn't work. Total cost: ~$40.
+Дальше ориентируйтесь на результат:
+
+- `GO` - продолжать текущий подход.
+- `PIVOT` - менять фильтры, промпты или порог отбора.
+- `STOP` - если устойчивого преимущества нет.
 
 ## Cost
 
-Phase 1: ~$13/month (VPS $5.60 + API ~$7.20)
+Отдельный VPS для Pythia не нужен: система работает прямо на `amper` в Docker-контейнере. Дополнительные расходы - только API и сервисы вроде Telegram, а не еще одна выделенная машина.
