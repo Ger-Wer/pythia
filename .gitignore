@@ -24,6 +24,9 @@ python/venv/
 node_modules/
 bun.lockb
 
+# Local worktrees
+.worktrees/
+
 # Output
 *.png
 *.jpg
