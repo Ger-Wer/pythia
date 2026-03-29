@@ -1,5 +1,6 @@
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const BACKOFF_MS = [1000, 3000, 9000] as const;
+const ACTIVE_MARKETS_FETCH_LIMIT = 500;
 
 export interface PolymarketMarket {
   id: string;
@@ -14,6 +15,13 @@ export interface PolymarketMarket {
   closed: boolean;
   resolutionSource: string;
   description: string;
+}
+
+export interface ActiveMarketsParams {
+  minVolume: number;
+  maxVolume: number;
+  maxDaysToResolution: number;
+  limit: number;
 }
 
 interface GammaMarketRaw {
@@ -135,6 +143,10 @@ async function gammaFetch<T>(pathname: string): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error('Gamma API request failed');
 }
 
+export function buildActiveMarketsPath(): string {
+  return `/markets?active=true&closed=false&limit=${ACTIVE_MARKETS_FETCH_LIMIT}`;
+}
+
 function hoursSinceCreated(createdAt: string): number {
   return (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
 }
@@ -170,14 +182,9 @@ function resolvedOutcome(raw: GammaMarketRaw): { outcome?: number; resolvedAt?: 
   return { resolvedAt };
 }
 
-export async function fetchActiveMarkets(params: {
-  minVolume: number;
-  maxVolume: number;
-  maxDaysToResolution: number;
-  limit: number;
-}): Promise<PolymarketMarket[]> {
+export async function fetchActiveMarkets(params: ActiveMarketsParams): Promise<PolymarketMarket[]> {
   const now = Date.now();
-  const rawMarkets = await gammaFetch<GammaMarketRaw[]>('/markets?active=true&closed=false&limit=100');
+  const rawMarkets = await gammaFetch<GammaMarketRaw[]>(buildActiveMarketsPath());
   const markets = rawMarkets
     .map(normalizeMarket)
     .filter((market): market is PolymarketMarket => market !== null)
