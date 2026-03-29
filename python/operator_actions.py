@@ -452,7 +452,10 @@ def read_compose_services() -> list[dict[str, str]]:
         labels = item.get("Labels") or {}
         project = labels.get("com.docker.compose.project")
         service = labels.get("com.docker.compose.service")
+        oneoff = labels.get("com.docker.compose.oneoff")
         if project != "pythia":
+            continue
+        if str(oneoff).lower() == "true":
             continue
         if service not in {"pythia-scheduler", "pythia-telegram"}:
             continue
