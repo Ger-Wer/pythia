@@ -14,6 +14,7 @@ interface MarketSelectionStage extends ActiveMarketsParams {
 interface MarketSelectionPlan {
   newMarketHours: number;
   minimumUniqueEvents: number;
+  minimumUsefulEvents: number;
   maxPerEvent: number;
   maxPerCategory: number;
   stages: MarketSelectionStage[];
@@ -224,6 +225,7 @@ export function buildSelectionPlan(): MarketSelectionPlan {
   return {
     newMarketHours: 72,
     minimumUniqueEvents: 10,
+    minimumUsefulEvents: 5,
     maxPerEvent: 1,
     maxPerCategory: 3,
     stages: [
@@ -246,20 +248,6 @@ export function buildSelectionPlan(): MarketSelectionPlan {
         minVolume: 500,
         maxVolume: 250_000,
         maxDaysToResolution: 60,
-        limit: 1_000,
-      },
-      {
-        label: 'fallback-long',
-        minVolume: 500,
-        maxVolume: 500_000,
-        maxDaysToResolution: 120,
-        limit: 1_000,
-      },
-      {
-        label: 'fallback-broad',
-        minVolume: 100,
-        maxVolume: 1_000_000,
-        maxDaysToResolution: 180,
         limit: 1_000,
       },
     ],
@@ -363,6 +351,11 @@ export async function selectMarkets(): Promise<PolymarketMarket[]> {
 
   if (selected.length < requiredUniqueEvents) {
     console.warn(`Only ${selected.length} diversified markets selected after all stages.`);
+  }
+  if (selected.length < plan.minimumUsefulEvents) {
+    console.warn(
+      `Only ${selected.length} useful markets found within the 60-day horizon. Proceeding without expanding to longer-dated markets.`,
+    );
   }
 
   const nNew = selected.filter((market) => marketAgeHours(market) < plan.newMarketHours).length;

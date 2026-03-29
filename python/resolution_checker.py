@@ -7,6 +7,7 @@ Pythia Resolution Checker
 import json
 import os
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -58,21 +59,38 @@ def send_telegram(text: str) -> None:
         print(f"Telegram send failed: {exc}")
 
 
-def fetch_market(market_id: str) -> dict[str, Any] | None:
+def mark_market_invalid(conn: sqlite3.Connection, market_id: str, reason: str) -> None:
+    if "is_valid" not in prediction_columns(conn):
+        print(f"Не удалось инвалидировать {market_id}: в таблице нет is_valid")
+        return
+
+    conn.execute(
+        "UPDATE predictions SET is_valid = 0 WHERE market_id = ?",
+        (market_id,),
+    )
+    print(f"Маркет {market_id} помечен невалидным: {reason}")
+
+
+def fetch_market(market_id: str) -> tuple[dict[str, Any] | None, bool]:
     last_error: Exception | None = None
+    saw_http_422 = True
     for attempt, timeout in enumerate((20, 20, 20), start=1):
         try:
             response = requests.get(f"{GAMMA_API}/markets/{market_id}", timeout=timeout)
             response.raise_for_status()
-            return response.json()
+            return response.json(), False
         except requests.RequestException as exc:
             last_error = exc
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code != 422:
+                saw_http_422 = False
             if attempt < 3:
-                import time
-
                 time.sleep(1 if attempt == 1 else 3)
+    if saw_http_422:
+        print(f"Gamma API вернул HTTP 422 для {market_id} три раза подряд")
+        return None, True
     print(f"Failed to fetch market {market_id}: {last_error}")
-    return None
+    return None, False
 
 
 def parse_prices(value: Any) -> list[float]:
@@ -205,7 +223,11 @@ def main() -> None:
     cancelled_today: list[str] = []
 
     for market_id in market_ids:
-        market = fetch_market(str(market_id))
+        market, should_invalidate = fetch_market(str(market_id))
+        if should_invalidate:
+            mark_market_invalid(conn, str(market_id), "Gamma API returned HTTP 422 three times")
+            continue
+
         if not market:
             continue
 

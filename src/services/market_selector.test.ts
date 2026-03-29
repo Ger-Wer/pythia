@@ -36,6 +36,7 @@ test('buildSelectionPlan enforces staged expansion and diversity constraints', a
   expect(buildSelectionPlan()).toEqual({
     newMarketHours: 72,
     minimumUniqueEvents: 10,
+    minimumUsefulEvents: 5,
     maxPerEvent: 1,
     maxPerCategory: 3,
     stages: [
@@ -58,20 +59,6 @@ test('buildSelectionPlan enforces staged expansion and diversity constraints', a
         minVolume: 500,
         maxVolume: 250_000,
         maxDaysToResolution: 60,
-        limit: 1_000,
-      },
-      {
-        label: 'fallback-long',
-        minVolume: 500,
-        maxVolume: 500_000,
-        maxDaysToResolution: 120,
-        limit: 1_000,
-      },
-      {
-        label: 'fallback-broad',
-        minVolume: 100,
-        maxVolume: 1_000_000,
-        maxDaysToResolution: 180,
         limit: 1_000,
       },
     ],
