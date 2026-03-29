@@ -258,7 +258,7 @@ def main() -> None:
             f"📊 Разрешилось маркетов: {len(resolved_today)}\n"
             f"✅ Точные прогнозы (|p - outcome| < 0.3): {', '.join(correct[:5]) or 'нет'}\n"
             f"❌ Сильные промахи (|p - outcome| > 0.7): {', '.join(wrong[:5]) or 'нет'}\n"
-            f"Накопленный Brier: dexter={dexter_avg}, "
+            f"Накопленный Brier: research+R1={dexter_avg}, "
             f"naked={naked_avg}, "
             f"market={market_avg}"
         )

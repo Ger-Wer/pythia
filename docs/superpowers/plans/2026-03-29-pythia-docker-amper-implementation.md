@@ -1,10 +1,12 @@
 # Pythia Docker Deployment on `amper` Implementation Plan
 
+> Исторический план: документ отражает план на момент написания. Актуальная production-реализация уже не использует Dexter runtime; текущее состояние системы описано в `README.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md` и `docs/AUDIT.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Перевести Pythia на Docker-first deployment на `amper`, изолировать её от `SproutSignal`, обновить документацию на русском и развернуть рабочий scheduler-контейнер на сервере.
 
-**Architecture:** Pythia будет запускаться в отдельном Docker Compose project `pythia` под пользователем `pythia`, без опубликованных портов и без общих runtime-путей со `SproutSignal`. Один image содержит Bun, Python 3.11, Dexter и `supercronic`; long-running контейнер `pythia-scheduler` выполняет задачи по расписанию, а ручные операции идут через `scripts/manual_run.sh`.
+**Architecture:** Pythia будет запускаться в отдельном Docker Compose project `pythia` под пользователем `pythia`, без опубликованных портов и без общих runtime-путей со `SproutSignal`. Один image содержит Bun, Python 3.11, собственный research-слой и `supercronic`; long-running контейнер `pythia-scheduler` выполняет задачи по расписанию, а ручные операции идут через `scripts/manual_run.sh`.
 
 **Tech Stack:** Docker Compose, `python:3.11-slim`, Bun, SQLite, Bash, supercronic, GitHub, SSH, Oracle Cloud `amper`
 
@@ -15,7 +17,7 @@
 ### Создать
 
 - `.dockerignore` — исключения для Docker build context
-- `Dockerfile` — container image с Python 3.11, Bun, Dexter и supercronic
+- `Dockerfile` — container image с Python 3.11, Bun, собственным research-слоем и supercronic
 - `docker-compose.yml` — isolated Compose stack `pythia`
 - `supercronic.crontab` — расписание batch-задач внутри контейнера
 - `scripts/entrypoint.sh` — единый operational entrypoint
@@ -475,7 +477,7 @@ Pythia ежедневно забирает бинарные маркеты с Po
 ## Архитектура
 
 ```text
-Polymarket Gamma API -> Market Selection -> [Dexter Research | Naked R1 Baseline]
+Polymarket Gamma API -> Market Selection -> [Research Layer | Naked R1 Baseline]
 -> DeepSeek R1 Synthesis -> SQLite -> Brier Score Tracking -> Telegram Reports
 ```
 
@@ -552,7 +554,7 @@ bash scripts/manual_run.sh edge
 ## Основные компоненты
 
 - **Market Selector**: Gamma REST API -> фильтрация бинарных рынков
-- **Dexter Research**: сбор research brief по рынку
+- **Research Layer**: сбор research brief по рынку
 - **Naked R1**: базовый single-call прогноз без research
 - **Synthesis**: финальная вероятностная оценка через DeepSeek R1
 - **Tracker**: SQLite, Brier score, cost tracking

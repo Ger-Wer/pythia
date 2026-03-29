@@ -1,5 +1,7 @@
 # Дизайн Docker-деплоя Pythia на `amper`
 
+> Историческая спецификация: документ фиксирует дизайн на момент 2026-03-29. Актуальное состояние production-системы описано в `README.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md` и `docs/AUDIT.md`. Текущий production-образ не включает Dexter runtime.
+
 Дата: 2026-03-29
 Статус: одобрено для перехода к планированию
 Область: только deployment-архитектура и операционная модель. Основная логика прогнозирования Pythia сохраняется без изменений, если только требования контейнерного запуска не потребуют узкой совместимой правки.
@@ -90,7 +92,7 @@
 
 Минусы:
 - всё ещё общий kernel и общий Docker daemon со SproutSignal
-- container image должен корректно собирать Bun, Python и Dexter-зависимости и на `amd64`, и на `arm64`
+- container image должен корректно собирать Bun, Python и зависимости Pythia на `amd64` и `arm64`
 
 ## Выбранный вариант
 
@@ -122,7 +124,7 @@ Pythia будет развёрнута на `amper` под отдельным Li
   - Python 3.11 runtime
   - SQLite tools
   - код приложения
-  - клон Dexter
+  - собственный research-слой Pythia
   - `supercronic`
 - Scheduler-контейнер работает постоянно и запускает batch-задачи по расписанию.
 - Ручные операции используют тот же image, чтобы не было расхождения между host-runtime и production-runtime.
@@ -172,11 +174,11 @@ Image должен устанавливать минимальный набор 
 - используется architecture-aware binary, выбранный во время Docker build
 - `supercronic` становится scheduler-процессом в long-running контейнере
 
-### Dexter
+### Research layer
 
-- Dexter клонируется внутрь image на этапе build
-- Dexter dependencies устанавливаются на этапе build
-- обновление Dexter привязано к пересборке image
+- production-образ не включает Dexter runtime
+- внутри image живёт только собственный research-слой Pythia
+- обновление research-логики привязано к обычной пересборке image
 
 ## Дизайн Compose service
 
@@ -410,4 +412,3 @@ Docker deployment layer считается готовым к реализаци�
 - host-based cron для Pythia
 - shared runtime со SproutSignal
 - изменение продуктового scope прогнозной системы
-

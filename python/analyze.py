@@ -63,7 +63,7 @@ def calibration_curve(db_path: str, output_path: str):
 
     for ax, (name, idx) in zip(
         axes,
-        [("Dexter", 0), ("Naked R1", 1), ("Market Price", 2)],
+        [("Research+R1", 0), ("Naked R1", 1), ("Рынок", 2)],
     ):
         preds = [r[idx] / 100.0 for r in rows]
         outcomes = [r[3] for r in rows]

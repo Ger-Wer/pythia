@@ -9,11 +9,11 @@ import {
 import { initDb, insertPrediction } from './services/db';
 import type { Database } from './services/db';
 import {
-  dexterResearch,
+  buildResearchBrief,
   multiSearch,
   resetSearchWarningCache,
-} from './services/dexter_runner';
-import type { DexterBrief } from './services/dexter_runner';
+} from './services/research_runner';
+import type { ResearchBrief } from './services/research_runner';
 import { selectMarkets } from './services/market_selector';
 import { nakedR1Predict } from './services/naked_r1';
 import {
@@ -107,7 +107,7 @@ function formatMarketLog(market: PolymarketMarket): string {
   return `${market.question} | volume=$${market.volume.toFixed(0)} | market=${marketPriceFromYesOutcome(market).toFixed(1)}% | age=${marketAgeHours(market).toFixed(1)}h`;
 }
 
-function buildResearchBriefText(brief: DexterBrief): string {
+function buildResearchBriefText(brief: ResearchBrief): string {
   return [
     `Сводка: ${brief.summary}`,
     `Ключевые факты:\n- ${brief.key_facts.join('\n- ')}`,
@@ -141,7 +141,7 @@ async function processMarket(
     }
 
     let synthesis: SynthesisResult | null = null;
-    const brief = await dexterResearch(market, costTracker, newsResults);
+    const brief = await buildResearchBrief(market, costTracker, newsResults);
     if (brief) {
       synthesis = await runSynthesis(
         market,
@@ -149,7 +149,7 @@ async function processMarket(
         costTracker,
       );
       if (synthesis) {
-        log(`Dexter+R1: ${synthesis.probability}% (market: ${marketPrice.toFixed(1)}%)`);
+        log(`Research+R1: ${synthesis.probability}% (market: ${marketPrice.toFixed(1)}%)`);
       }
     }
 
@@ -187,7 +187,7 @@ async function processMarket(
           '*Pythia: сильное расхождение с рынком*',
           `Маркет: ${escapeMarkdown(market.question)}`,
           `Рыночная цена: ${marketPrice.toFixed(1)}%`,
-          synthesis ? `Dexter\\+R1: ${synthesis.probability}%` : 'Dexter\\+R1: N/A',
+          synthesis ? `Research\\+R1: ${synthesis.probability}%` : 'Research\\+R1: N/A',
           naked ? `Naked R1: ${naked.probability}%` : 'Naked R1: N/A',
         ].join('\n'),
       );

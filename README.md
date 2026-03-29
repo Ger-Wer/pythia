@@ -7,7 +7,7 @@ Pythia - это автономная система прогноза для Poly
 ```text
 Polymarket Gamma API
   -> отбор рынков
-  -> mini-research / news-light слой
+  -> исследовательский news-light слой
   -> базовый контрольный прогон Naked R1
   -> синтез вероятности
   -> SQLite + логи + Brier score
@@ -16,7 +16,7 @@ Polymarket Gamma API
 
 В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Для повседневной работы используется Telegram-оператор, а хостовые команды `docker compose` и `bash scripts/manual_run.sh` оставлены для развёртывания и диагностики.
 
-Важно: в production сейчас используется не нативный runtime `Dexter`, а лёгкий research-слой поверх Exa/Tavily и одного LLM-вызова. Это сознательное упрощение Phase 1, а не недоработка деплоя.
+Важно: в production сейчас используется собственный research-слой поверх Exa/Tavily и одного LLM-вызова. Нативный runtime `Dexter` в образ не включается и в проде не используется.
 
 Текущий отбор рынков настроен под реальное предложение Polymarket на конец марта 2026 года и работает ступенчато:
 
@@ -54,7 +54,7 @@ bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
-Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска переключайтесь на Telegram-бота.
+Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска переключайтесь на Telegram-бота. Полный технический аудит и описание runtime-потока смотрите в [docs/AUDIT.md](docs/AUDIT.md).
 
 ## Telegram-оператор
 

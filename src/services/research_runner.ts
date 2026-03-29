@@ -4,7 +4,7 @@ import { CONFIG } from '../config';
 import type { PolymarketMarket } from '../tools/polymarket';
 import { CostTracker } from './cost_tracker';
 
-export interface DexterBrief {
+export interface ResearchBrief {
   summary: string;
   key_facts: string[];
   for_yes: string[];
@@ -239,24 +239,24 @@ export async function searchNews(query: string, limit: number): Promise<NewsResu
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/Exa HTTP 401/i.test(message)) {
-      warnSearchOnce('exa-401', 'Research warning: Exa API returned 401. Falling back to Tavily if configured.');
+      warnSearchOnce('exa-401', 'Предупреждение research-слоя: Exa API вернул 401. Переключаюсь на Tavily, если он настроен.');
     } else {
-      warnSearchOnce('exa-failed', 'Research warning: Exa search failed. Falling back to Tavily if configured.');
+      warnSearchOnce('exa-failed', 'Предупреждение research-слоя: поиск через Exa завершился ошибкой. Переключаюсь на Tavily, если он настроен.');
     }
   }
 
   try {
     const tavilyResults = await searchTavily(query, limit);
     if (tavilyResults.length === 0 && !CONFIG.exa.tavilyApiKey) {
-      warnSearchOnce('research-off', 'Research warning: no working search provider configured. Continuing in degraded mode.');
+      warnSearchOnce('research-off', 'Предупреждение research-слоя: не настроен ни один рабочий search provider. Продолжаю в degraded mode.');
     }
     return tavilyResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/401|403/i.test(message)) {
-      warnSearchOnce('tavily-auth', 'Research warning: Tavily authentication failed. Continuing in degraded mode.');
+      warnSearchOnce('tavily-auth', 'Предупреждение research-слоя: Tavily отклонил ключ. Продолжаю в degraded mode.');
     } else {
-      warnSearchOnce('tavily-failed', 'Research warning: Tavily search failed. Continuing in degraded mode.');
+      warnSearchOnce('tavily-failed', 'Предупреждение research-слоя: поиск через Tavily завершился ошибкой. Продолжаю в degraded mode.');
     }
     return [];
   }
@@ -277,13 +277,13 @@ export async function multiSearch(
   return deduplicateNewsResults(aggregated).slice(0, 8);
 }
 
-// TODO: Replace this Phase 1 mini-research fallback with a proper Dexter Agent integration
-// once a stable non-interactive programmatic path is validated for this repo/runtime pair.
-export async function dexterResearch(
+// Phase 1 research path: multi-search через Exa/Tavily плюс один структурированный LLM summary-call.
+// Это production research-контур Pythia, он не зависит от Dexter framework.
+export async function buildResearchBrief(
   market: PolymarketMarket,
   costTracker: CostTracker,
   searchResults?: NewsResult[],
-): Promise<DexterBrief | null> {
+): Promise<ResearchBrief | null> {
   const resolvedSearchResults = searchResults ?? await multiSearch(market.question, market.category, 3);
   if (resolvedSearchResults.length === 0) {
     return null;

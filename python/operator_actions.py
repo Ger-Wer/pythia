@@ -222,15 +222,15 @@ def _collect_command_issues(stdout: str, stderr: str) -> list[str]:
 
     if "Exa HTTP 401" in combined:
         issues.append("Exa API вернул 401. Поиск новостей через Exa недоступен.")
-    elif "Exa search failed" in combined:
+    elif "Exa search failed" in combined or "поиск через Exa завершился ошибкой" in combined:
         issues.append("Exa API недоступен. Используется fallback, если он настроен.")
 
-    if "Tavily HTTP 401" in combined or "Tavily authentication failed" in combined:
+    if "Tavily HTTP 401" in combined or "Tavily authentication failed" in combined or "Tavily отклонил ключ" in combined:
         issues.append("Tavily API отклонил ключ.")
-    elif "Tavily search failed" in combined:
+    elif "Tavily search failed" in combined or "поиск через Tavily завершился ошибкой" in combined:
         issues.append("Tavily API недоступен.")
 
-    if "no working search provider configured" in combined:
+    if "no working search provider configured" in combined or "не настроен ни один рабочий search provider" in combined:
         issues.append("Research-слой работает без внешнего поиска новостей.")
 
     unique_issues: list[str] = []
@@ -323,7 +323,7 @@ def format_forecast_report(
         f"📊 Pythia — прогнозы за {run_day}",
         f"Обработано рынков: {len(rows)}",
         f"Стоимость: {_api_cost_label(total_cost)}",
-        f"Research: {status}",
+        f"Исследование: {status}",
     ]
 
     if issues:
@@ -433,7 +433,7 @@ def format_status_report(
             f"Ожидают: {total - resolved}",
             "",
             f"💰 API: {_api_cost_label(month_cost)}",
-            f"🔍 Research: {_derive_research_label([])}",
+            f"🔍 Исследование: {_derive_research_label([])}",
         ]
     )
 
@@ -443,7 +443,7 @@ def format_status_report(
                 "",
                 "Brier score (чем ниже, тем лучше):",
                 f"- Naked R1: {brier[0]}",
-                f"- Dexter: {brier[1] if brier[1] is not None else 'N/A'}",
+                f"- Research+R1: {brier[1] if brier[1] is not None else 'N/A'}",
                 f"- Рынок: {brier[2]}",
             ]
         )
@@ -557,7 +557,7 @@ def format_last_predictions_report(db_path: Path | str, limit: int = DEFAULT_LAS
         rendered_rows.append(
             f"{index}. {_infer_icon(str(question))} {shorten(str(question), 52)}\n"
             f"   Толпа: {_format_percent(market_price)} → Pythia: {_format_percent(best_p)}{edge_text}\n"
-            f"   details: /details {market_id}"
+            f"   детали: /details {market_id}"
         )
 
     return "\n".join(rendered_rows)
@@ -678,7 +678,7 @@ def format_details_report(db_path: Path | str, reference: str | None) -> str:
         lines.extend(["", "⚠️ Ключевой риск:", str(dexter_key_risk)])
 
     if summary or key_facts:
-        lines.extend(["", "🔎 Research brief:"])
+        lines.extend(["", "🔎 Исследовательская сводка:"])
         if summary:
             lines.append(summary)
         if key_facts:
@@ -800,13 +800,13 @@ def _run_edge_check() -> str:
             "",
             "Brier score:",
             f"- Naked R1: {result['brier_naked']}",
-            f"- Dexter: {result['brier_dexter']}",
+            f"- Research+R1: {result['brier_dexter']}",
             f"- Рынок: {result['brier_market']}",
             "",
             "Edge vs рынок:",
             f"- Naked: {result['edge_naked_vs_market']:+.4f}",
-            f"- Dexter: {result['edge_dexter_vs_market']:+.4f}",
-            f"- p-value Dexter: {result['p_value_dexter']}",
+            f"- Research+R1: {result['edge_dexter_vs_market']:+.4f}",
+            f"- p-value Research+R1: {result['p_value_dexter']}",
             "",
             f"Решение: {emoji.get(result['decision'], '⚪')} {result['decision']}",
             result["interpretation"],
@@ -860,11 +860,11 @@ def _collect_runtime_health_checks() -> list[str]:
     lines.append("")
 
     if exa_ok:
-        lines.append("🔍 Research status: ON (Exa)")
+        lines.append("🔍 Исследование: ON (Exa)")
     elif tavily_ok:
-        lines.append("🔍 Research status: DEGRADED (Tavily fallback)")
+        lines.append("🔍 Исследование: DEGRADED (Tavily fallback)")
     else:
-        lines.append("🔍 Research status: OFF")
+        lines.append("🔍 Исследование: OFF")
 
     if llm_line.startswith("✅") and gamma_line.startswith("✅") and sqlite_ok and (exa_ok or tavily_ok):
         lines.append("")

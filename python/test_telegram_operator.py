@@ -167,7 +167,7 @@ class TelegramOperatorTests(unittest.TestCase):
 
             self.assertIn("Pythia", rendered)
             self.assertIn("Обработано рынков: 2", rendered)
-            self.assertIn("Research: DEGRADED", rendered)
+            self.assertIn("Исследование: DEGRADED", rendered)
             self.assertIn("Расхождения", rendered)
             self.assertIn("Почему:", rendered)
             self.assertNotIn("Invalid legacy row", rendered)

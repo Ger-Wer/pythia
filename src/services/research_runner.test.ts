@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 
-const dexterRunnerModule = import('./dexter_runner');
+const researchRunnerModule = import('./research_runner');
 
 test('buildSearchQueries generates complementary fact and forecast queries', async () => {
-  const { buildSearchQueries } = await dexterRunnerModule;
+  const { buildSearchQueries } = await researchRunnerModule;
 
   const queries = buildSearchQueries(
     'Will the Oklahoma City Thunder win the NBA Western Conference Finals?',
@@ -18,7 +18,7 @@ test('buildSearchQueries generates complementary fact and forecast queries', asy
 });
 
 test('deduplicateNewsResults keeps the first result for each unique URL', async () => {
-  const { deduplicateNewsResults } = await dexterRunnerModule;
+  const { deduplicateNewsResults } = await researchRunnerModule;
 
   const deduplicated = deduplicateNewsResults([
     {

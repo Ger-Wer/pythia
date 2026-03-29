@@ -126,7 +126,7 @@ _{datetime.now().strftime('%Y-%m-%d')}_
 • В ожидании: {total - resolved}
 
 *Brier score (↓ меньше = лучше):*
-• Dexter: {f'{brier_data[0]:.4f}' if brier_data[0] is not None else 'N/A'}
+• Research+R1: {f'{brier_data[0]:.4f}' if brier_data[0] is not None else 'N/A'}
 • Naked R1: {f'{brier_data[1]:.4f}' if brier_data[1] is not None else 'N/A'}
 • Рыночная цена: {f'{brier_data[2]:.4f}' if brier_data[2] is not None else 'N/A'}
 
