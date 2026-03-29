@@ -28,7 +28,7 @@ export interface PredictionRow {
 
 const INVALID_DATA_CUTOFF = '2026-03-29T17:37:00';
 
-const SCHEMA_SQL = `
+const BASE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS predictions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     market_id TEXT NOT NULL,
@@ -64,11 +64,14 @@ CREATE TABLE IF NOT EXISTS predictions (
     UNIQUE(market_id, forecast_timestamp)
 );
 
-CREATE INDEX IF NOT EXISTS idx_outcome ON predictions(outcome);
-CREATE INDEX IF NOT EXISTS idx_end_date ON predictions(end_date);
-CREATE INDEX IF NOT EXISTS idx_forecast_ts ON predictions(forecast_timestamp);
-CREATE INDEX IF NOT EXISTS idx_predictions_valid ON predictions(is_valid);
 `;
+
+const INDEX_SQL = [
+  'CREATE INDEX IF NOT EXISTS idx_outcome ON predictions(outcome)',
+  'CREATE INDEX IF NOT EXISTS idx_end_date ON predictions(end_date)',
+  'CREATE INDEX IF NOT EXISTS idx_forecast_ts ON predictions(forecast_timestamp)',
+  'CREATE INDEX IF NOT EXISTS idx_predictions_valid ON predictions(is_valid)',
+] as const;
 
 const REQUIRED_MIGRATIONS = [
   {
@@ -109,6 +112,12 @@ function ensurePredictionMigrations(db: Database): void {
   );
 }
 
+function ensurePredictionIndexes(db: Database): void {
+  for (const sql of INDEX_SQL) {
+    db.run(sql);
+  }
+}
+
 function resolveDbPath(): string {
   return process.env.DB_PATH || CONFIG.paths.db;
 }
@@ -123,8 +132,9 @@ export function initDb(): Database {
     strict: true,
   });
   db.run('PRAGMA journal_mode = WAL;');
-  db.run(SCHEMA_SQL);
+  db.run(BASE_TABLE_SQL);
   ensurePredictionMigrations(db);
+  ensurePredictionIndexes(db);
 
   return db;
 }
@@ -206,7 +216,7 @@ export function getUnresolved(db: Database): PredictionRow[] {
       forecast_timestamp,
       api_cost_usd
     FROM predictions
-    WHERE outcome IS NULL
+    WHERE outcome IS NULL AND is_valid = 1
     ORDER BY forecast_timestamp ASC
   `);
 
@@ -233,7 +243,7 @@ export function updateOutcome(
         ELSE NULL
       END,
       brier_market = ((market_price / 100.0) - @outcome) * ((market_price / 100.0) - @outcome)
-    WHERE market_id = @market_id
+    WHERE market_id = @market_id AND is_valid = 1
   `);
 
   stmt.run({
@@ -265,7 +275,7 @@ function getCostInRange(db: Database, start: Date, end: Date): number {
   const stmt = db.query(`
     SELECT COALESCE(SUM(api_cost_usd), 0) AS total
     FROM predictions
-    WHERE forecast_timestamp >= ?1 AND forecast_timestamp < ?2
+    WHERE forecast_timestamp >= ?1 AND forecast_timestamp < ?2 AND is_valid = 1
   `);
 
   const row = stmt.get(start.toISOString(), end.toISOString()) as { total?: number } | undefined;
