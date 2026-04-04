@@ -585,6 +585,24 @@ def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
 def _load_details_row(conn: sqlite3.Connection, reference: str) -> tuple[Any, ...] | None:
     valid_filter = _valid_where_clause(conn)
 
+    rows = conn.execute(
+        """
+        SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
+               dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
+               volume, end_date, forecast_timestamp
+        FROM predictions
+        WHERE market_id = ?
+        """
+        + valid_filter
+        + """
+        ORDER BY forecast_timestamp DESC, id DESC
+        LIMIT 1
+        """,
+        (reference,),
+    ).fetchall()
+    if rows:
+        return rows[0]
+
     if reference.isdigit():
         offset = max(int(reference) - 1, 0)
         rows = conn.execute(
@@ -604,22 +622,7 @@ def _load_details_row(conn: sqlite3.Connection, reference: str) -> tuple[Any, ..
         ).fetchall()
         return rows[0] if rows else None
 
-    rows = conn.execute(
-        """
-        SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
-               dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
-               volume, end_date, forecast_timestamp
-        FROM predictions
-        WHERE market_id = ?
-        """
-        + valid_filter
-        + """
-        ORDER BY forecast_timestamp DESC, id DESC
-        LIMIT 1
-        """,
-        (reference,),
-    ).fetchall()
-    return rows[0] if rows else None
+    return None
 
 
 def format_details_report(db_path: Path | str, reference: str | None) -> str:
