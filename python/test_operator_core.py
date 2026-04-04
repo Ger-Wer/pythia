@@ -86,6 +86,40 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(details["research"]["primary_driver"], "Результаты Wolves в оставшихся турах")
             self.assertEqual(details["research"]["second_order_effects"][0], "Плохие xG-метрики")
 
+    def test_connect_opens_database_read_only(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("1", "Will this work?", "2026-04-04T00:00:00", 1),
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
+            with core._connect() as conn:
+                with self.assertRaises(sqlite3.OperationalError):
+                    conn.execute(
+                        """
+                        INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        ("2", "Should fail", "2026-04-04T00:00:00", 1),
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

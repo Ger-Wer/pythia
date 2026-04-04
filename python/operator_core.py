@@ -4,6 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 
 class OperatorCore:
@@ -14,7 +15,8 @@ class OperatorCore:
     def _connect(self) -> sqlite3.Connection:
         if not self.db_path.exists():
             raise FileNotFoundError(self.db_path)
-        return sqlite3.connect(self.db_path)
+        db_uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
+        return sqlite3.connect(db_uri, uri=True)
 
     @staticmethod
     def _predictions_table_exists(conn: sqlite3.Connection) -> bool:
