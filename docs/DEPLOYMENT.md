@@ -147,6 +147,36 @@ curl -I http://127.0.0.1:8787/api/auth/me
 
 Далее настройте reverse proxy для `b1w.duckdns.org` на upstream `127.0.0.1:8787`.
 
+Пример `nginx`-конфига:
+
+```nginx
+server {
+    listen 80;
+    server_name b1w.duckdns.org;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name b1w.duckdns.org;
+
+    auth_basic "Pythia Private Dashboard";
+    auth_basic_user_file /etc/nginx/.htpasswd-pythia;
+
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    add_header Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none';" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
 ## Расписание
 
 Встроенный scheduler запускает задачи по UTC:
