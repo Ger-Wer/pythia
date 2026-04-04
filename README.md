@@ -11,10 +11,10 @@ Polymarket Gamma API
   -> базовый контрольный прогон Naked R1
   -> синтез вероятности
   -> SQLite + логи + Brier score
-  -> Telegram-уведомления и отчеты
+  -> Dashboard API + Telegram-уведомления и отчеты
 ```
 
-В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Для повседневной работы используется Telegram-оператор, а хостовые команды `docker compose` и `bash scripts/manual_run.sh` оставлены для развёртывания и диагностики.
+В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Основной интерфейс оператора теперь web-dashboard, а Telegram остаётся каналом алертов и быстрых команд.
 
 Важно: в production сейчас используется собственный research-слой поверх Exa/Tavily и одного LLM-вызова. Нативный runtime `Dexter` в образ не включается и в проде не используется.
 
@@ -61,11 +61,11 @@ bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
-Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска переключайтесь на Telegram-бота. Полный технический аудит и описание runtime-потока смотрите в [docs/AUDIT.md](docs/AUDIT.md).
+Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска используйте dashboard, а Telegram держите как fallback. Полный технический аудит и описание runtime-потока смотрите в [docs/AUDIT.md](docs/AUDIT.md).
 
 ## Telegram-оператор
 
-Pythia поддерживает операторский Telegram-бот без веб-дашборда. Он работает в личном чате, принимает команды только от авторизованного пользователя и возвращает ответы на русском языке.
+Pythia поддерживает операторский Telegram-бот как резервный интерфейс. Он работает в личном чате, принимает команды только от авторизованного пользователя и возвращает ответы на русском языке.
 
 Доступные slash-команды:
 
@@ -95,7 +95,9 @@ Pythia поддерживает операторский Telegram-бот без 
 
 `bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе. Это полезно для хостовой проверки, но не заменяет Telegram-оператора.
 
-`bash scripts/manual_run.sh logs` открывает журналы `pythia-scheduler` и `pythia-telegram`.
+`bash scripts/manual_run.sh logs` открывает журналы `pythia-scheduler`, `pythia-telegram` и `pythia-dashboard`.
+
+`bash scripts/manual_run.sh dashboard-logs` показывает только логи dashboard-сервиса.
 
 `bash scripts/manual_run.sh edge` считает edge и Brier score на накопленных данных.
 
@@ -105,7 +107,21 @@ Pythia поддерживает операторский Telegram-бот без 
 - `resolution` - 18:00 UTC
 - `weekly report` - воскресенье, 20:00 UTC
 
-Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`. Для ручного запуска сценариев используйте Telegram-бота, а не прямой bare-metal доступ.
+Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`. Для ручного запуска сценариев используйте dashboard или Telegram, а не прямой bare-metal доступ.
+
+## Operator Dashboard
+
+Dashboard поднимается сервисом `pythia-dashboard` и слушает только loopback-порт `127.0.0.1:8787` на хосте `amper`. Публикация наружу делается reverse proxy на `b1w.duckdns.org`.
+
+Что даёт dashboard:
+
+- обзор системы и последнего прогона;
+- таблицу рынков и карточку ключевого расхождения;
+- детальный разбор рынка;
+- watchlist с заметками;
+- безопасные operator actions (`forecast`, `resolve`, `weekly`).
+
+Telegram остаётся для алертов и как fallback-канал управления.
 
 ## Критерий решения
 

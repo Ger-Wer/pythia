@@ -15,14 +15,14 @@ Pythia — это автономная batch-система прогнозной
 - сохраняет прогнозы и метаданные в SQLite;
 - отслеживает resolved-маркеты;
 - считает Brier score и edge;
-- отправляет операторские сообщения и отчёты в Telegram.
+- отдаёт операторские данные в dashboard и отправляет алерты/отчёты в Telegram.
 
 Система не делает следующее:
 
 - не торгует;
 - не хранит криптоключи;
-- не открывает публичный веб-интерфейс;
-- не требует входящих сетевых портов.
+- не открывает публичный backend API без авторизации;
+- не требует прямого внешнего входа в контейнеры.
 
 ## 2. Текущее production-размещение
 
@@ -37,7 +37,7 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
 - собственные bind-mounted каталоги:
   - `/home/pythia/pythia/data`
   - `/home/pythia/pythia/logs`
-- отсутствуют опубликованные порты.
+- dashboard публикуется только на loopback хоста: `127.0.0.1:8787 -> pythia-dashboard:8080`.
 
 На том же хосте работает `SproutSignal`, но Pythia не делит с ним сети, volumes и runtime-пути. Жёсткой изоляции на уровне отдельной машины нет, потому что общий kernel и общий Docker daemon остаются общими.
 
@@ -54,6 +54,11 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
   - принимает операторские команды только от одного разрешённого Telegram user ID;
   - читает ту же SQLite и те же логи;
   - использует read-only доступ к `/var/run/docker.sock` для health/status.
+- `pythia-dashboard`
+  - web-консоль оператора (React SPA + FastAPI API);
+  - использует cookie-session auth;
+  - выполняет whitelisted operator actions (`forecast`, `resolve`, `weekly`);
+  - доступен извне только через reverse proxy на `b1w.duckdns.org`.
 
 ### Технологический стек
 
@@ -64,6 +69,7 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
 - Exa — primary news search provider;
 - Tavily — fallback news search provider;
 - Telegram Bot API — операторские команды и алерты.
+- FastAPI + React/Vite — dashboard-слой оператора.
 
 ### Production-модели на 2026-03-29
 
@@ -236,9 +242,11 @@ Python-скрипт `resolution_checker.py`:
 
 Отдельно из базы удаляется техническая заглушка `market-init`, чтобы она не попадала в операционные выборки и не засоряла аудит.
 
-## 8. Telegram-оператор
+## 8. Операторский интерфейс
 
-Telegram-бот — это основной операторский интерфейс системы.
+Основной операторский интерфейс — web-dashboard.
+
+Telegram-бот остаётся как fallback-канал и канал алертов.
 
 Поддерживаемые команды:
 
@@ -272,7 +280,7 @@ Telegram-бот — это основной операторский интер�
 - доступность Exa;
 - доступность Tavily;
 - доступность SQLite;
-- состояние контейнеров `pythia-scheduler` и `pythia-telegram`.
+- состояние контейнеров `pythia-scheduler`, `pythia-telegram` и `pythia-dashboard`.
 
 Health-ответ агрегирует проблемы и показывает human-readable статус:
 
@@ -307,7 +315,7 @@ Health-ответ агрегирует проблемы и показывает 
 
 ## 12. Ограничения и честные оговорки
 
-- У системы нет веб-дашборда; операторский интерфейс — Telegram.
+- Dashboard зависит от reverse proxy и корректной HTTPS-конфигурации.
 - На одном хосте с `SproutSignal` нельзя добиться абсолютной изоляции уровня отдельной машины.
 - Исторические поля `dexter_*` в БД сохраняются для обратной совместимости, хотя реального Dexter runtime нет.
 - Качество research зависит от внешних search provider и LLM backend.
@@ -372,6 +380,7 @@ Pythia на текущем этапе — это не торговая сист�
 - отдельного research-контура `Research+R1`;
 - SQLite-хранилища;
 - Python-аналитики для resolved markets;
-- Telegram-оператора как основного интерфейса.
+- web-dashboard как основного интерфейса;
+- Telegram-оператора как канала алертов и fallback-управления.
 
 Dexter как внешний фреймворк в production не используется. Любые упоминания `dexter_*` в БД и коде относятся к legacy-схеме имени основного research-контура, а не к живому Dexter runtime.

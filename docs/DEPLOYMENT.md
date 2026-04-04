@@ -68,6 +68,14 @@ cp .env.example .env
 
 Заполните реальные ключи LLM, Telegram и поискового слоя. Для нормального research лучше держать сразу оба ключа: `EXA_API_KEY` как primary и `TAVILY_API_KEY` как fallback. Если оба отсутствуют или оба недоступны, Pythia продолжит работать в degraded mode без внешних новостей.
 
+Для dashboard обязательно заполните:
+
+- `DASHBOARD_USERNAME`
+- `DASHBOARD_PASSWORD_HASH`
+- `DASHBOARD_SESSION_SECRET`
+- `DASHBOARD_PUBLIC_BASE_URL`
+- `DASHBOARD_COOKIE_SECURE=true` (для production за reverse proxy с HTTPS)
+
 ## Проверка Day 0
 
 Перед первым запуском проверьте доступность рынков:
@@ -123,7 +131,21 @@ docker compose logs --tail=50 pythia-telegram
 /status
 ```
 
-Если ответы не приходят, сначала проверьте, что `pythia-telegram` в `Up` или `healthy`, а затем смотрите его логи. Для повседневной работы используйте именно Telegram-оператора, а не старый host-only путь.
+Если ответы не приходят, сначала проверьте, что `pythia-telegram` в `Up` или `healthy`, а затем смотрите его логи. Для повседневной работы используйте dashboard, а Telegram оставьте как резервный канал.
+
+## Проверка dashboard
+
+После `docker compose up -d --build` проверьте:
+
+```bash
+docker compose ps
+docker compose logs --tail=50 pythia-dashboard
+curl -I http://127.0.0.1:8787/api/auth/me
+```
+
+Ожидается HTTP 200 от `api/auth/me` и статус `healthy` у `pythia-dashboard`.
+
+Далее настройте reverse proxy для `b1w.duckdns.org` на upstream `127.0.0.1:8787`.
 
 ## Расписание
 
@@ -147,5 +169,5 @@ docker compose logs --tail=50 pythia-telegram
 - Работайте только как пользователь `pythia`.
 - Не запускайте Pythia из каталога `SproutSignal`.
 - Не делите сети и тома между проектами.
-- Не публикуйте порты наружу.
+- Не публикуйте dashboard напрямую наружу. Используйте только loopback-публикацию `127.0.0.1:8787` + reverse proxy.
 - Держите все операции внутри compose-проекта `pythia`.
