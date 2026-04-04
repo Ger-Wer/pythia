@@ -65,6 +65,13 @@ class LatestRunResponse(BaseModel):
     items: list[dict[str, Any]]
 
 
+class MarketHistoryPoint(BaseModel):
+    forecast_timestamp: str | None = None
+    market_price: float | None = None
+    research_probability: float | None = None
+    naked_probability: float | None = None
+
+
 class MarketDetailsResponse(BaseModel):
     market_id: str
     question: str
@@ -72,12 +79,15 @@ class MarketDetailsResponse(BaseModel):
     research_probability: float | None = None
     naked_probability: float | None = None
     confidence: str | None = None
+    verdict_summary: str = ""
+    is_watched: bool = False
     reasoning: str | None = None
     key_risk: str | None = None
     base_rate: str | None = None
     volume: float | None = None
     end_date: str | None = None
     forecast_timestamp: str | None = None
+    history: list[MarketHistoryPoint] = []
     research: dict[str, Any]
 
 

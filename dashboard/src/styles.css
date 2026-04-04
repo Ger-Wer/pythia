@@ -331,6 +331,14 @@ a {
   margin: 6px 0 0;
 }
 
+.signal-submeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 6px;
+  font-size: 0.92rem;
+}
+
 .signal-edge-badge {
   flex-shrink: 0;
   border-radius: 999px;
@@ -338,6 +346,18 @@ a {
   background: #f3ead0;
   color: #725800;
   font-weight: 700;
+}
+
+.signal-card-side {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.signal-card-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .action-summary-card {
@@ -412,6 +432,38 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.detail-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.detail-metric-card {
+  min-height: 100%;
+}
+
+.detail-lead {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.detail-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-stack p {
+  margin: 0;
+}
+
+.source-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
 }
 
 .status-box {
@@ -537,6 +589,10 @@ input {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .detail-metric-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -553,7 +609,19 @@ input {
     flex-direction: column;
   }
 
+  .signal-card-side {
+    justify-items: start;
+  }
+
+  .signal-card-actions {
+    justify-content: flex-start;
+  }
+
   .signal-edge-badge {
     align-self: flex-start;
+  }
+
+  .timeline-list li {
+    flex-direction: column;
   }
 }

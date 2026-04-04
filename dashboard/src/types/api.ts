@@ -17,6 +17,8 @@ export interface LatestRunItem {
   market_price?: number | null;
   research_probability?: number | null;
   naked_probability?: number | null;
+  confidence?: string | null;
+  research_status?: StatusLevel | null;
   edge?: number | null;
   volume?: number | null;
   end_date?: string | null;
@@ -75,12 +77,20 @@ export interface MarketDetailsResponse {
   research_probability?: number | null;
   naked_probability?: number | null;
   confidence?: string | null;
+  verdict_summary?: string;
+  is_watched?: boolean;
   reasoning?: string | null;
   key_risk?: string | null;
   base_rate?: string | null;
   volume?: number | null;
   end_date?: string | null;
   forecast_timestamp?: string | null;
+  history?: Array<{
+    forecast_timestamp?: string | null;
+    market_price?: number | null;
+    research_probability?: number | null;
+    naked_probability?: number | null;
+  }>;
   research: {
     summary?: string;
     key_facts?: string[];

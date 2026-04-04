@@ -245,11 +245,37 @@ class OperatorCore:
                 """,
                 (market_id,),
             ).fetchone()
+            history_rows = conn.execute(
+                """
+                SELECT forecast_timestamp, market_price, dexter_p, naked_p
+                FROM predictions
+                WHERE market_id = ?
+                """
+                + valid_filter
+                + """
+                ORDER BY forecast_timestamp ASC, id ASC
+                """,
+                (market_id,),
+            ).fetchall()
+            is_watched = False
+            if self._table_exists(conn, "watchlist"):
+                is_watched = (
+                    conn.execute(
+                        "SELECT 1 FROM watchlist WHERE market_id = ? LIMIT 1",
+                        (market_id,),
+                    ).fetchone()
+                    is not None
+                )
 
         if not row:
             raise LookupError(market_id)
 
         research = self._parse_research_brief(row[9])
+        verdict_summary = self._build_verdict_summary(
+            market_price=row[2],
+            research_probability=row[3],
+            confidence=row[5],
+        )
         return {
             "market_id": str(row[0]),
             "question": row[1],
@@ -257,12 +283,23 @@ class OperatorCore:
             "research_probability": row[3],
             "naked_probability": row[4],
             "confidence": row[5],
+            "verdict_summary": verdict_summary,
+            "is_watched": is_watched,
             "reasoning": row[6],
             "key_risk": row[7],
             "base_rate": row[8],
             "volume": row[10],
             "end_date": row[11],
             "forecast_timestamp": row[12],
+            "history": [
+                {
+                    "forecast_timestamp": history_row[0],
+                    "market_price": history_row[1],
+                    "research_probability": history_row[2],
+                    "naked_probability": history_row[3],
+                }
+                for history_row in history_rows
+            ],
             "research": {
                 "summary": str(research.get("summary") or "").strip(),
                 "key_facts": self._research_list(research, "key_facts"),
@@ -304,6 +341,7 @@ class OperatorCore:
                     {self._select_expression(conn, "market_price")},
                     {self._select_expression(conn, "dexter_p")},
                     {self._select_expression(conn, "naked_p")},
+                    {self._select_expression(conn, "dexter_confidence", cast_text=True)},
                     {self._select_expression(conn, "volume")},
                     {self._select_expression(conn, "end_date", cast_text=True)}
                 FROM predictions
@@ -333,9 +371,11 @@ class OperatorCore:
                     "market_price": market_price,
                     "research_probability": research_probability,
                     "naked_probability": naked_probability,
+                    "confidence": row[6],
+                    "research_status": "ON" if research_probability is not None else "DEGRADED",
                     "edge": edge,
-                    "volume": row[6],
-                    "end_date": row[7],
+                    "volume": row[7],
+                    "end_date": row[8],
                 }
             )
 
@@ -380,6 +420,25 @@ class OperatorCore:
             "research_warning": "",
             "checks": checks,
         }
+
+    @staticmethod
+    def _build_verdict_summary(
+        *,
+        market_price: float | None,
+        research_probability: float | None,
+        confidence: str | None,
+    ) -> str:
+        if market_price is None or research_probability is None:
+            return "Pythia пока не собрала достаточно данных, чтобы сформулировать итоговый вердикт по рынку."
+
+        edge = float(research_probability) - float(market_price)
+        direction = "выше" if edge >= 0 else "ниже"
+        strength = "умеренно" if abs(edge) < 10 else "заметно"
+        confidence_text = f" при уверенности {confidence}" if confidence else ""
+        return (
+            f"Pythia {strength} оценивает рынок {direction} текущей рыночной цены:"
+            f" {research_probability:.1f}% против {market_price:.1f}%{confidence_text}."
+        )
 
     def get_last_action_summary(self) -> dict[str, Any]:
         status_path = self._status_file_path()

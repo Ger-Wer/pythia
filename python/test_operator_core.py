@@ -194,7 +194,7 @@ class OperatorCoreTests(unittest.TestCase):
                     )
                     """
                 )
-                conn.execute(
+                conn.executemany(
                     """
                     INSERT INTO predictions (
                         market_id, question, category, market_price, dexter_p, naked_p,
@@ -202,45 +202,98 @@ class OperatorCoreTests(unittest.TestCase):
                         research_brief_json, volume, end_date, forecast_timestamp, outcome, api_cost_usd, is_valid
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        "572833",
-                        "Will Wolves finish in last place in the 2025-26 English Premier League?",
-                        "sports",
-                        53.0,
-                        68.0,
-                        58.0,
-                        "medium",
-                        "Команда выглядит уязвимой относительно рынка.",
-                        "Риск внезапного улучшения формы.",
-                        "Последние команды лиги часто остаются внизу таблицы.",
-                        json.dumps(
-                            {
-                                "summary": "Короткая сводка",
-                                "key_facts": ["Wolves идут последними"],
-                                "catalyst_type": "sports_form",
-                                "primary_driver": "Результаты Wolves в оставшихся турах",
-                                "second_order_effects": ["Плохие xG-метрики", "Потеря очков с прямыми конкурентами"],
-                                "disconfirming_signal": "Серия побед Wolves",
-                                "sources": ["https://example.com/wolves"],
-                            },
-                            ensure_ascii=False,
+                    [
+                        (
+                            "572833",
+                            "Will Wolves finish in last place in the 2025-26 English Premier League?",
+                            "sports",
+                            53.0,
+                            68.0,
+                            58.0,
+                            "medium",
+                            "Команда выглядит уязвимой относительно рынка.",
+                            "Риск внезапного улучшения формы.",
+                            "Последние команды лиги часто остаются внизу таблицы.",
+                            json.dumps(
+                                {
+                                    "summary": "Короткая сводка",
+                                    "key_facts": ["Wolves идут последними"],
+                                    "catalyst_type": "sports_form",
+                                    "primary_driver": "Результаты Wolves в оставшихся турах",
+                                    "second_order_effects": ["Плохие xG-метрики", "Потеря очков с прямыми конкурентами"],
+                                    "disconfirming_signal": "Серия побед Wolves",
+                                    "sources": ["https://example.com/wolves"],
+                                },
+                                ensure_ascii=False,
+                            ),
+                            28974,
+                            "2026-05-27T00:00:00",
+                            "2026-04-04T08:16:48.766Z",
+                            None,
+                            0.0,
+                            1,
                         ),
-                        28974,
-                        "2026-05-27T00:00:00",
-                        "2026-04-04T08:16:48.766Z",
-                        None,
-                        0.0,
-                        1,
-                    ),
+                        (
+                            "572833",
+                            "Will Wolves finish in last place in the 2025-26 English Premier League?",
+                            "sports",
+                            49.0,
+                            61.0,
+                            55.0,
+                            "low",
+                            "Ранний прогноз по Wolves.",
+                            "Слабый ранний тезис.",
+                            "Исторически около 40%.",
+                            json.dumps(
+                                {
+                                    "summary": "Ранняя сводка",
+                                    "primary_driver": "Старт сезона Wolves",
+                                    "second_order_effects": ["Слабый календарь"],
+                                    "disconfirming_signal": "Три победы подряд",
+                                    "sources": ["https://example.com/early-wolves"],
+                                },
+                                ensure_ascii=False,
+                            ),
+                            15000,
+                            "2026-05-27T00:00:00",
+                            "2026-04-03T08:16:48.766Z",
+                            None,
+                            0.0,
+                            1,
+                        ),
+                    ],
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE watchlist (
+                        market_id TEXT PRIMARY KEY,
+                        note TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO watchlist (market_id, note, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("572833", "Следить за Wolves", "2026-04-04T09:00:00Z", "2026-04-04T09:00:00Z"),
                 )
 
             core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
             overview = core.get_overview()
             details = core.get_market_details("572833")
 
-            self.assertEqual(overview["valid_predictions"], 1)
+            self.assertEqual(overview["valid_predictions"], 2)
             self.assertEqual(overview["latest_run"]["markets_processed"], 1)
+            self.assertEqual(overview["top_signals"][0]["confidence"], "medium")
+            self.assertEqual(overview["top_signals"][0]["research_status"], "ON")
             self.assertEqual(details["market_id"], "572833")
+            self.assertTrue(details["is_watched"])
+            self.assertEqual(len(details["history"]), 2)
+            self.assertEqual(details["history"][0]["forecast_timestamp"], "2026-04-03T08:16:48.766Z")
+            self.assertIn("рынок", details["verdict_summary"].lower())
             self.assertEqual(details["research"]["primary_driver"], "Результаты Wolves в оставшихся турах")
             self.assertEqual(details["research"]["second_order_effects"][0], "Плохие xG-метрики")
 

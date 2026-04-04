@@ -152,6 +152,32 @@ class DashboardApiTests(unittest.TestCase):
                         1,
                     ),
                 )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
+                        research_brief_json, volume, end_date, forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "572833",
+                        "Will Wolves finish in last place in the 2025-26 English Premier League?",
+                        "sports",
+                        49.0,
+                        61.0,
+                        55.0,
+                        "low",
+                        "Ранний разбор.",
+                        "Ранний риск.",
+                        "Исторически около 40%.",
+                        '{"summary":"Ранняя сводка","primary_driver":"Старт сезона Wolves","second_order_effects":["Слабый календарь"],"disconfirming_signal":"Три победы подряд","sources":["https://example.com/early"]}',
+                        18000,
+                        "2026-05-27T00:00:00",
+                        "2026-04-03T08:16:48.766Z",
+                        1,
+                    ),
+                )
 
             app = create_app(
                 db_path=db_path,
@@ -169,6 +195,11 @@ class DashboardApiTests(unittest.TestCase):
 
             add_watch = client.post("/api/watchlist", json={"market_id": "572833", "note": "Следить"})
             self.assertEqual(add_watch.status_code, 200)
+
+            details_after_watch = client.get("/api/markets/572833")
+            self.assertTrue(details_after_watch.json()["is_watched"])
+            self.assertEqual(len(details_after_watch.json()["history"]), 2)
+            self.assertIn("рынок", details_after_watch.json()["verdict_summary"].lower())
 
             watchlist = client.get("/api/watchlist")
             self.assertEqual(watchlist.status_code, 200)
