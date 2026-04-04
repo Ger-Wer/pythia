@@ -1,17 +1,175 @@
 import json
+import os
 import sqlite3
 import unittest
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from python.operator_core import OperatorCore
 
 
 class OperatorCoreTests(unittest.TestCase):
+    def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("m1", "Will this work read-only?", "2026-04-04T08:16:48Z", 1),
+                )
+                conn.commit()
+
+            os.chmod(db_path, 0o444)
+            os.chmod(temp_dir, 0o555)
+            try:
+                core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir) / "logs")
+                overview = core.get_overview()
+            finally:
+                os.chmod(temp_dir, 0o755)
+                os.chmod(db_path, 0o644)
+
+            self.assertEqual(overview["watchlist_count"], 0)
+
+    def test_get_overview_includes_summary_first_contract(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        volume REAL,
+                        end_date TEXT,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, forecast_timestamp, outcome, volume, end_date, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "m1",
+                            "Will Wolves finish last?",
+                            "sports",
+                            43.6,
+                            65.0,
+                            68.0,
+                            "medium",
+                            "2026-04-04T08:16:48Z",
+                            None,
+                            10000,
+                            "2026-05-01T00:00:00Z",
+                            1,
+                        ),
+                        (
+                            "m2",
+                            "Will Fed cut rates?",
+                            "politics",
+                            58.0,
+                            41.0,
+                            46.0,
+                            "low",
+                            "2026-04-04T08:16:48Z",
+                            1,
+                            20000,
+                            "2026-06-01T00:00:00Z",
+                            1,
+                        ),
+                        (
+                            "m3",
+                            "Will BTC hit 150k?",
+                            "crypto",
+                            31.0,
+                            48.0,
+                            44.0,
+                            "medium",
+                            "2026-04-04T08:16:48Z",
+                            None,
+                            30000,
+                            "2026-07-01T00:00:00Z",
+                            1,
+                        ),
+                    ],
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE watchlist (
+                        market_id TEXT PRIMARY KEY,
+                        note TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO watchlist (market_id, note, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("m1", "Проверить после следующего прогона", "2026-04-04T09:00:00Z", "2026-04-04T09:00:00Z"),
+                )
+                conn.commit()
+
+            (log_dir / "operator_action_status.json").write_text(
+                json.dumps(
+                    {
+                        "action": "forecast",
+                        "status": "success",
+                        "summary": "Обработано 3 рынка, research ON, 2 сильных расхождения.",
+                        "started_at": "2026-04-04T09:10:00Z",
+                        "finished_at": "2026-04-04T09:10:40Z",
+                        "duration_seconds": 40,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            overview = core.get_overview()
+
+            self.assertEqual(overview["resolved_predictions"], 1)
+            self.assertEqual(overview["watchlist_count"], 1)
+            self.assertEqual(len(overview["top_signals"]), 3)
+            self.assertEqual(overview["last_action"]["action"], "forecast")
+            self.assertEqual(overview["statuses"]["research"], "ON")
+
     def test_get_overview_and_market_details_from_sqlite(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (
@@ -89,7 +247,7 @@ class OperatorCoreTests(unittest.TestCase):
     def test_connect_opens_database_read_only(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (
@@ -120,10 +278,66 @@ class OperatorCoreTests(unittest.TestCase):
                         ("2", "Should fail", "2026-04-04T00:00:00", 1),
                     )
 
+    def test_get_health_degrades_on_invalid_sqlite_file(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            db_path.write_text("not a sqlite database", encoding="utf-8")
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
+            health = core.get_health()
+
+            self.assertEqual(health["system_status"], "DEGRADED")
+            self.assertTrue(any(check["component"] == "sqlite" for check in health["checks"]))
+
+    def test_get_last_action_summary_normalizes_partial_payload(self):
+        with TemporaryDirectory() as temp_dir:
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            (log_dir / "operator_action_status.json").write_text(
+                json.dumps({"action": "forecast"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            core = OperatorCore(db_path=Path(temp_dir) / "missing.db", log_dir=log_dir)
+            payload = core.get_last_action_summary()
+
+            self.assertEqual(payload["action"], "forecast")
+            self.assertEqual(payload["status"], "failed")
+            self.assertIn("Не удалось", payload["summary"])
+            self.assertEqual(payload["technical_log"], "")
+
+    def test_run_safe_action_preserves_stdout_and_stderr_in_technical_log(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.commit()
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir) / "logs")
+            with patch("python.operator_core.subprocess.run") as mock_run:
+                mock_run.return_value.returncode = 1
+                mock_run.return_value.stdout = "stdout line"
+                mock_run.return_value.stderr = "stderr line"
+
+                payload = core.run_safe_action("forecast")
+
+            self.assertIn("stdout line", payload["technical_log"])
+            self.assertIn("stderr line", payload["technical_log"])
+
     def test_resolve_market_reference_and_canonical_details_schema(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (
@@ -210,7 +424,7 @@ class OperatorCoreTests(unittest.TestCase):
     def test_watchlist_add_list_remove(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (

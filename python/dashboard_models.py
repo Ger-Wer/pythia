@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -15,9 +15,48 @@ class MeResponse(BaseModel):
     username: str | None = None
 
 
+class StatusSummary(BaseModel):
+    system: Literal["ON", "DEGRADED", "OFF"]
+    research: Literal["ON", "DEGRADED", "OFF"]
+
+
+class LatestRunSummary(BaseModel):
+    forecast_timestamp: str | None
+    markets_processed: int
+
+
+class ActionResponse(BaseModel):
+    action: str | None = None
+    status: str
+    summary: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_seconds: float | None = None
+    technical_log: str = ""
+    returncode: int | None = None
+
+
+class HealthResponse(BaseModel):
+    system_status: Literal["ON", "DEGRADED", "OFF"]
+    research_status: Literal["ON", "DEGRADED", "OFF"]
+    research_warning: str = ""
+    checks: list[dict[str, str]]
+
+
+class LogsResponse(BaseModel):
+    latest_file: str | None = None
+    excerpt: str = ""
+
+
 class OverviewResponse(BaseModel):
+    statuses: StatusSummary
     valid_predictions: int
-    latest_run: dict[str, Any]
+    resolved_predictions: int
+    watchlist_count: int
+    latest_run: LatestRunSummary
+    top_signals: list[dict[str, Any]]
+    last_action: ActionResponse
+    research_warning: str = ""
 
 
 class LatestRunResponse(BaseModel):

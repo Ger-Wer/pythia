@@ -3,9 +3,9 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Обзор" },
-  { to: "/runs/latest", label: "Последний прогон" },
-  { to: "/watchlist", label: "Watchlist" },
+  { to: "/", label: "Сводка" },
+  { to: "/runs/latest", label: "Сигналы" },
+  { to: "/watchlist", label: "Избранное" },
   { to: "/operations", label: "Операции" },
 ];
 
@@ -61,7 +61,7 @@ export function Layout() {
     <div className="app-shell">
       <aside className="side-nav">
         <div className="brand">Pythia</div>
-        <p className="brand-sub">Operator Console</p>
+        <p className="brand-sub">Панель оператора</p>
         <nav className="nav-list">
           {NAV_ITEMS.map((item) => {
             const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));

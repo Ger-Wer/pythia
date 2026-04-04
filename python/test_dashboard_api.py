@@ -1,7 +1,9 @@
 import sqlite3
 import unittest
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -9,10 +11,64 @@ from python.dashboard_api import create_app
 
 
 class DashboardApiTests(unittest.TestCase):
+    def test_dashboard_api_returns_health_logs_and_human_action_summary(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    "INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid) VALUES (?, ?, ?, ?)",
+                    ("m1", "Will example happen?", "2026-04-04T08:16:48Z", 1),
+                )
+                conn.commit()
+
+            (log_dir / "forecast_20260404.log").write_text(
+                "[2026-04-04T09:10:00Z] Forecast completed successfully\n",
+                encoding="utf-8",
+            )
+
+            app = create_app(
+                db_path=db_path,
+                log_dir=log_dir,
+                session_secret="test-secret",
+                dashboard_username="operator",
+                dashboard_password_hash="plain:secret-pass",
+            )
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            with patch("python.operator_core.subprocess.run") as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = "Forecast completed successfully"
+                mock_run.return_value.stderr = ""
+
+                health_res = client.get("/api/health")
+                logs_res = client.get("/api/logs")
+                action_res = client.post("/api/actions/forecast")
+
+            self.assertEqual(health_res.status_code, 200)
+            self.assertEqual(logs_res.status_code, 200)
+            self.assertEqual(action_res.status_code, 200)
+            self.assertEqual(health_res.json()["system_status"], "ON")
+            self.assertEqual(logs_res.json()["latest_file"], "forecast_20260404.log")
+            self.assertIn("summary", action_res.json())
+
     def test_login_and_overview_flow(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (
@@ -47,7 +103,7 @@ class DashboardApiTests(unittest.TestCase):
     def test_market_details_and_watchlist_endpoints(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE predictions (

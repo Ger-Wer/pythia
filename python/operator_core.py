@@ -4,9 +4,10 @@ import json
 import os
 import sqlite3
 import subprocess
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ContextManager
 from urllib.parse import quote
 
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
@@ -17,15 +18,15 @@ class OperatorCore:
         self.db_path = Path(db_path)
         self.log_dir = Path(log_dir)
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> ContextManager[sqlite3.Connection]:
         if not self.db_path.exists():
             raise FileNotFoundError(self.db_path)
         db_uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
-        return sqlite3.connect(db_uri, uri=True)
+        return closing(sqlite3.connect(db_uri, uri=True))
 
-    def _connect_rw(self) -> sqlite3.Connection:
+    def _connect_rw(self) -> ContextManager[sqlite3.Connection]:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(self.db_path)
+        return closing(sqlite3.connect(self.db_path))
 
     def predictions_table_exists(self) -> bool:
         with self._connect() as conn:
@@ -39,11 +40,35 @@ class OperatorCore:
         return row is not None
 
     @staticmethod
+    def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    @staticmethod
     def _prediction_columns(conn: sqlite3.Connection) -> set[str]:
         return {str(row[1]) for row in conn.execute("PRAGMA table_info(predictions)").fetchall()}
 
     def _has_column(self, conn: sqlite3.Connection, column_name: str) -> bool:
         return column_name in self._prediction_columns(conn)
+
+    def _select_expression(
+        self,
+        conn: sqlite3.Connection,
+        column_name: str,
+        *,
+        table_alias: str | None = None,
+        cast_text: bool = False,
+    ) -> str:
+        if self._has_column(conn, column_name):
+            if table_alias:
+                return f"{table_alias}.{column_name}"
+            return column_name
+        if cast_text:
+            return f"NULL AS {column_name}"
+        return f"NULL AS {column_name}"
 
     def _valid_where_clause(self, conn: sqlite3.Connection, alias: str = "") -> str:
         if not self._has_column(conn, "is_valid"):
@@ -62,6 +87,11 @@ class OperatorCore:
             )
             """
         )
+
+    def _status_file_path(self, *, ensure_parent: bool = False) -> Path:
+        if ensure_parent:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        return self.log_dir / "operator_action_status.json"
 
     @staticmethod
     def _parse_research_brief(payload: str | None) -> dict[str, Any]:
@@ -138,17 +168,31 @@ class OperatorCore:
         with self._connect() as conn:
             if not self._predictions_table_exists(conn):
                 return {
+                    "statuses": {
+                        "system": "DEGRADED",
+                        "research": "ON",
+                    },
                     "valid_predictions": 0,
+                    "resolved_predictions": 0,
+                    "watchlist_count": 0,
                     "latest_run": {
                         "forecast_timestamp": None,
                         "markets_processed": 0,
                     },
+                    "top_signals": [],
+                    "last_action": self.get_last_action_summary(),
+                    "research_warning": "",
                 }
 
             valid_filter = self._valid_where_clause(conn)
             valid_predictions = conn.execute(
                 f"SELECT COUNT(*) FROM predictions WHERE 1=1{valid_filter}"
             ).fetchone()[0]
+            resolved_predictions = 0
+            if self._has_column(conn, "outcome"):
+                resolved_predictions = conn.execute(
+                    f"SELECT COUNT(*) FROM predictions WHERE outcome IN (0, 1){valid_filter}"
+                ).fetchone()[0]
             latest_ts = conn.execute(
                 f"SELECT MAX(forecast_timestamp) FROM predictions WHERE 1=1{valid_filter}"
             ).fetchone()[0]
@@ -159,12 +203,24 @@ class OperatorCore:
                     (latest_ts,),
                 ).fetchone()[0]
 
+        latest_run = self.get_latest_run()
+        health = self.get_health()
+
         return {
+            "statuses": {
+                "system": health["system_status"],
+                "research": health["research_status"],
+            },
             "valid_predictions": valid_predictions,
+            "resolved_predictions": resolved_predictions,
+            "watchlist_count": self.get_watchlist_count(),
             "latest_run": {
                 "forecast_timestamp": latest_ts,
                 "markets_processed": markets_processed,
             },
+            "top_signals": latest_run["items"][:5],
+            "last_action": self.get_last_action_summary(),
+            "research_warning": health["research_warning"],
         }
 
     def get_market_details(self, market_id: str) -> dict[str, Any]:
@@ -240,8 +296,16 @@ class OperatorCore:
                 }
 
             rows = conn.execute(
-                """
-                SELECT market_id, question, category, market_price, dexter_p, naked_p, volume, end_date
+                f"""
+                SELECT
+                    market_id,
+                    question,
+                    {self._select_expression(conn, "category", cast_text=True)},
+                    {self._select_expression(conn, "market_price")},
+                    {self._select_expression(conn, "dexter_p")},
+                    {self._select_expression(conn, "naked_p")},
+                    {self._select_expression(conn, "volume")},
+                    {self._select_expression(conn, "end_date", cast_text=True)}
                 FROM predictions
                 WHERE forecast_timestamp = ?
                 """
@@ -281,15 +345,134 @@ class OperatorCore:
             "items": items,
         }
 
+    def get_watchlist_count(self) -> int:
+        try:
+            with self._connect() as conn:
+                if not self._table_exists(conn, "watchlist"):
+                    return 0
+                row = conn.execute("SELECT COUNT(*) FROM watchlist").fetchone()
+                return int(row[0]) if row else 0
+        except (FileNotFoundError, sqlite3.Error):
+            return 0
+
+    def get_health(self) -> dict[str, Any]:
+        system_status = "ON"
+        checks: list[dict[str, str]] = []
+
+        try:
+            with self._connect() as conn:
+                if self._predictions_table_exists(conn):
+                    count = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+                    checks.append({"component": "sqlite", "status": "ON", "detail": f"{count} predictions"})
+                else:
+                    system_status = "DEGRADED"
+                    checks.append({"component": "sqlite", "status": "DEGRADED", "detail": "predictions table missing"})
+        except FileNotFoundError:
+            system_status = "DEGRADED"
+            checks.append({"component": "sqlite", "status": "DEGRADED", "detail": "database file missing"})
+        except sqlite3.Error as exc:
+            system_status = "DEGRADED"
+            checks.append({"component": "sqlite", "status": "DEGRADED", "detail": str(exc)})
+
+        return {
+            "system_status": system_status,
+            "research_status": "ON",
+            "research_warning": "",
+            "checks": checks,
+        }
+
+    def get_last_action_summary(self) -> dict[str, Any]:
+        status_path = self._status_file_path()
+        if not status_path.exists():
+            return {
+                "action": None,
+                "status": "idle",
+                "summary": "Без недавних операторских действий.",
+                "started_at": None,
+                "finished_at": None,
+                "duration_seconds": None,
+                "technical_log": "",
+                "returncode": None,
+            }
+
+        try:
+            payload = json.loads(status_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {
+                "action": "unknown",
+                "status": "failed",
+                "summary": "Не удалось прочитать статус последнего действия.",
+                "started_at": None,
+                "finished_at": None,
+                "duration_seconds": None,
+                "technical_log": "",
+                "returncode": None,
+            }
+
+        if not isinstance(payload, dict):
+            return {
+                "action": "unknown",
+                "status": "failed",
+                "summary": "Некорректный формат статуса последнего действия.",
+                "started_at": None,
+                "finished_at": None,
+                "duration_seconds": None,
+                "technical_log": "",
+                "returncode": None,
+            }
+
+        if "status" not in payload or "summary" not in payload:
+            return {
+                "action": payload.get("action"),
+                "status": "failed",
+                "summary": "Не удалось прочитать полный статус последнего действия.",
+                "started_at": payload.get("started_at"),
+                "finished_at": payload.get("finished_at"),
+                "duration_seconds": payload.get("duration_seconds"),
+                "technical_log": str(payload.get("technical_log") or ""),
+                "returncode": payload.get("returncode"),
+            }
+
+        payload.setdefault("action", None)
+        payload.setdefault("started_at", None)
+        payload.setdefault("finished_at", None)
+        payload.setdefault("duration_seconds", None)
+        payload.setdefault("technical_log", "")
+        payload.setdefault("returncode", None)
+        return payload
+
+    def get_logs_summary(self) -> dict[str, Any]:
+        log_files = sorted(self.log_dir.glob("*.log"))
+        if not log_files:
+            return {
+                "latest_file": None,
+                "excerpt": "",
+            }
+
+        latest_log = log_files[-1]
+        excerpt = latest_log.read_text(encoding="utf-8", errors="ignore")[-2000:]
+        return {
+            "latest_file": latest_log.name,
+            "excerpt": excerpt,
+        }
+
     def list_watchlist(self) -> list[dict[str, Any]]:
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
             if self._predictions_table_exists(conn):
                 valid_filter = self._valid_where_clause(conn, alias="p2")
                 rows = conn.execute(
-                    """
-                    SELECT w.market_id, w.note, w.created_at, w.updated_at,
-                           p.question, p.market_price, p.dexter_p, p.naked_p, p.forecast_timestamp
+                    f"""
+                    SELECT
+                           w.market_id,
+                           w.note,
+                           w.created_at,
+                           w.updated_at,
+                           {self._select_expression(conn, "question", table_alias="p", cast_text=True)},
+                           {self._select_expression(conn, "market_price", table_alias="p")},
+                           {self._select_expression(conn, "dexter_p", table_alias="p")},
+                           {self._select_expression(conn, "naked_p", table_alias="p")},
+                           {self._select_expression(conn, "forecast_timestamp", table_alias="p", cast_text=True)}
                     FROM watchlist w
                     LEFT JOIN predictions p
                       ON p.market_id = w.market_id
@@ -363,6 +546,7 @@ class OperatorCore:
         base_dir = Path(os.getenv("PYTHIA_BASE_DIR", str(Path(__file__).resolve().parent.parent)))
         entrypoint = base_dir / "scripts" / "entrypoint.sh"
         command = ["bash", str(entrypoint), action]
+        started_at = datetime.now(timezone.utc)
 
         completed = subprocess.run(
             command,
@@ -371,10 +555,44 @@ class OperatorCore:
             text=True,
             check=False,
         )
-        return {
+        finished_at = datetime.now(timezone.utc)
+        technical_chunks = [chunk.strip() for chunk in [completed.stdout, completed.stderr] if chunk and chunk.strip()]
+        technical_log = "\n".join(technical_chunks)[-4000:]
+        summary = self._summarize_action_output(
+            action=action,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+        payload = {
             "action": action,
             "returncode": completed.returncode,
-            "stdout": completed.stdout[-4000:],
-            "stderr": completed.stderr[-4000:],
             "status": "success" if completed.returncode == 0 else "failed",
+            "summary": summary,
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_seconds": round((finished_at - started_at).total_seconds(), 2),
+            "technical_log": technical_log,
         }
+        self._status_file_path(ensure_parent=True).write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return payload
+
+    @staticmethod
+    def _summarize_action_output(action: str, returncode: int, stdout: str, stderr: str) -> str:
+        if returncode == 0:
+            output = stdout.strip()
+            if output:
+                first_line = output.splitlines()[0].strip()
+                if first_line:
+                    return first_line
+            return f"Команда {action} завершилась успешно."
+
+        error_output = (stderr or stdout).strip()
+        if error_output:
+            first_line = error_output.splitlines()[0].strip()
+            if first_line:
+                return first_line
+        return f"Команда {action} завершилась с ошибкой."
