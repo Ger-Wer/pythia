@@ -611,6 +611,18 @@ def build_operator_core(db_path: Path | str = DB_PATH, log_dir: Path | str = LOG
     return OperatorCore(db_path=db_path, log_dir=log_dir)
 
 
+def add_watchlist_item(market_id: str, note: str = "") -> str:
+    core = build_operator_core()
+    core.add_to_watchlist(market_id, note)
+    return f"Рынок {market_id} добавлен в watchlist."
+
+
+def remove_watchlist_item(market_id: str) -> str:
+    core = build_operator_core()
+    core.remove_from_watchlist(market_id)
+    return f"Рынок {market_id} удалён из watchlist."
+
+
 def format_market_details(details: dict[str, Any]) -> str:
     research = details.get("research") or {}
     question = details.get("question")

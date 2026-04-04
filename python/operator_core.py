@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -17,6 +18,10 @@ class OperatorCore:
             raise FileNotFoundError(self.db_path)
         db_uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
         return sqlite3.connect(db_uri, uri=True)
+
+    def _connect_rw(self) -> sqlite3.Connection:
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        return sqlite3.connect(self.db_path)
 
     def predictions_table_exists(self) -> bool:
         with self._connect() as conn:
@@ -41,6 +46,18 @@ class OperatorCore:
             return ""
         prefix = f"{alias}." if alias else ""
         return f" AND {prefix}is_valid = 1"
+
+    def _ensure_watchlist_table(self, conn: sqlite3.Connection) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS watchlist (
+                market_id TEXT PRIMARY KEY,
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
 
     @staticmethod
     def _parse_research_brief(payload: str | None) -> dict[str, Any]:
@@ -196,3 +213,78 @@ class OperatorCore:
                 "sources": self._research_list(research, "sources"),
             },
         }
+
+    def list_watchlist(self) -> list[dict[str, Any]]:
+        with self._connect_rw() as conn:
+            self._ensure_watchlist_table(conn)
+            if self._predictions_table_exists(conn):
+                valid_filter = self._valid_where_clause(conn, alias="p2")
+                rows = conn.execute(
+                    """
+                    SELECT w.market_id, w.note, w.created_at, w.updated_at,
+                           p.question, p.market_price, p.dexter_p, p.naked_p, p.forecast_timestamp
+                    FROM watchlist w
+                    LEFT JOIN predictions p
+                      ON p.market_id = w.market_id
+                     AND p.id = (
+                          SELECT id FROM predictions p2
+                          WHERE p2.market_id = w.market_id
+                    """
+                    + valid_filter
+                    + """
+                          ORDER BY p2.forecast_timestamp DESC, p2.id DESC
+                          LIMIT 1
+                     )
+                    ORDER BY w.updated_at DESC, w.market_id ASC
+                    """
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT w.market_id, w.note, w.created_at, w.updated_at,
+                           NULL AS question, NULL AS market_price,
+                           NULL AS dexter_p, NULL AS naked_p, NULL AS forecast_timestamp
+                    FROM watchlist w
+                    ORDER BY w.updated_at DESC, w.market_id ASC
+                    """
+                ).fetchall()
+        return [
+            {
+                "market_id": str(row[0]),
+                "note": str(row[1] or ""),
+                "created_at": str(row[2]),
+                "updated_at": str(row[3]),
+                "question": row[4],
+                "market_price": row[5],
+                "research_probability": row[6],
+                "naked_probability": row[7],
+                "forecast_timestamp": row[8],
+            }
+            for row in rows
+        ]
+
+    def add_to_watchlist(self, market_id: str, note: str = "") -> None:
+        market_id = str(market_id).strip()
+        if not market_id:
+            raise ValueError("market_id is required")
+
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect_rw() as conn:
+            self._ensure_watchlist_table(conn)
+            conn.execute(
+                """
+                INSERT INTO watchlist (market_id, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(market_id) DO UPDATE SET
+                    note = excluded.note,
+                    updated_at = excluded.updated_at
+                """,
+                (market_id, str(note or "").strip(), now, now),
+            )
+            conn.commit()
+
+    def remove_from_watchlist(self, market_id: str) -> None:
+        with self._connect_rw() as conn:
+            self._ensure_watchlist_table(conn)
+            conn.execute("DELETE FROM watchlist WHERE market_id = ?", (str(market_id).strip(),))
+            conn.commit()

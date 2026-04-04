@@ -207,6 +207,52 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertNotIn("dexter_key_risk", details)
             self.assertNotIn("dexter_base_rate", details)
 
+    def test_watchlist_add_list_remove(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, market_price, dexter_p, naked_p, forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "572834",
+                        "Will Burnley finish in last place?",
+                        43.6,
+                        65.0,
+                        68.0,
+                        "2026-04-04T08:16:48.766Z",
+                        1,
+                    ),
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
+            core.add_to_watchlist("572834", "Сильный сигнал по борьбе за выживание")
+            items = core.list_watchlist()
+            self.assertEqual(len(items), 1)
+            self.assertEqual(items[0]["market_id"], "572834")
+            self.assertEqual(items[0]["question"], "Will Burnley finish in last place?")
+            self.assertEqual(items[0]["note"], "Сильный сигнал по борьбе за выживание")
+
+            core.remove_from_watchlist("572834")
+            self.assertEqual(core.list_watchlist(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
