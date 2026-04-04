@@ -271,7 +271,7 @@ class TelegramOperatorTests(unittest.TestCase):
                             "Thunder выглядят сильнее рынка из-за формы лидеров и глубины состава.",
                             "Травма ключевого игрока до плей-офф.",
                             "Команда с лучшим посевом побеждает конференцию примерно в трети сезонов.",
-                            '{"summary":"Короткая справка","key_facts":["Thunder лидируют на Западе"],"sources":["https://example.com/nba"]}',
+                            '{"summary":"Короткая справка","key_facts":["Thunder лидируют на Западе"],"catalyst_type":"sports_form","primary_driver":"Форма лидеров Thunder","second_order_effects":["Рост ожиданий по playoff seeding","Подтверждение от betting odds"],"disconfirming_signal":"Травма SGA","sources":["https://example.com/nba"]}',
                             445436,
                             "2026-05-20T00:00:00",
                             "2026-03-29T18:00:00",
@@ -306,7 +306,69 @@ class TelegramOperatorTests(unittest.TestCase):
             self.assertIn("Короткая справка", details)
             self.assertIn("Травма ключевого игрока", details)
             self.assertIn("Thunder", details)
+            self.assertIn("Главный драйвер", details)
+            self.assertIn("Форма лидеров Thunder", details)
+            self.assertIn("Что должно подтверждать прогноз", details)
+            self.assertIn("Рост ожиданий по playoff seeding", details)
+            self.assertIn("Что быстро опровергнет прогноз", details)
+            self.assertIn("Травма SGA", details)
             self.assertNotIn("Invalid legacy row", details)
+
+    def test_format_details_report_handles_legacy_brief_without_catalyst_fields(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        dexter_reasoning TEXT,
+                        dexter_key_risk TEXT,
+                        dexter_base_rate TEXT,
+                        research_brief_json TEXT,
+                        volume REAL,
+                        end_date TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, market_price, dexter_p, naked_p,
+                        dexter_confidence, dexter_reasoning, dexter_key_risk,
+                        dexter_base_rate, research_brief_json, volume, end_date,
+                        forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "market-legacy-ok",
+                        "Will example happen?",
+                        41.0,
+                        44.0,
+                        40.0,
+                        "medium",
+                        "Небольшой перевес в сторону YES.",
+                        "Риск новых негативных данных.",
+                        "Похожие события происходят примерно в 40% случаев.",
+                        '{"summary":"Legacy summary","key_facts":["Legacy fact"],"sources":["https://example.com/legacy"]}',
+                        1000,
+                        "2026-05-01T00:00:00",
+                        "2026-03-29T18:00:00",
+                        1,
+                    ),
+                )
+
+            details = format_details_report(db_path, "market-legacy-ok")
+            self.assertIn("Главный драйвер", details)
+            self.assertIn("нет данных", details.lower())
 
 
 if __name__ == "__main__":

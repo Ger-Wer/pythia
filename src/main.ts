@@ -114,6 +114,10 @@ function buildResearchBriefText(brief: ResearchBrief): string {
     `Аргументы за YES:\n- ${brief.for_yes.join('\n- ')}`,
     `Аргументы против YES:\n- ${brief.against_yes.join('\n- ')}`,
     `Что толпа может упускать: ${brief.crowd_might_miss}`,
+    `Тип катализатора: ${brief.catalyst_type}`,
+    `Главный драйвер: ${brief.primary_driver}`,
+    `Что должно подтверждать прогноз:\n- ${brief.second_order_effects.length > 0 ? brief.second_order_effects.join('\n- ') : 'Нет данных.'}`,
+    `Что быстро опровергнет прогноз: ${brief.disconfirming_signal}`,
   ].join('\n\n');
 }
 

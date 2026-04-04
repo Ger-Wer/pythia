@@ -197,6 +197,21 @@ def _confidence_ru(value: str | None) -> str:
     return "средняя"
 
 
+def _research_field(payload: dict[str, Any], key: str, default: str = "Нет данных.") -> str:
+    value = payload.get(key)
+    if value is None:
+        return default
+    normalized = str(value).strip()
+    return normalized or default
+
+
+def _research_list(payload: dict[str, Any], key: str) -> list[str]:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
 def _infer_icon(question: str) -> str:
     haystack = (question or "").lower()
     if any(keyword in haystack for keyword in ("nba", "western conference", "eastern conference", "rookie of the year", "mvp")):
@@ -645,12 +660,18 @@ def format_details_report(db_path: Path | str, reference: str | None) -> str:
     summary = ""
     key_facts: list[str] = []
     sources: list[str] = []
+    primary_driver = "Нет данных."
+    second_order_effects: list[str] = []
+    disconfirming_signal = "Нет данных."
     if research_brief_json:
         try:
             research_payload = json.loads(str(research_brief_json))
             summary = str(research_payload.get("summary") or "").strip()
             key_facts = [str(item).strip() for item in research_payload.get("key_facts") or [] if str(item).strip()]
             sources = [str(item).strip() for item in research_payload.get("sources") or [] if str(item).strip()]
+            primary_driver = _research_field(research_payload, "primary_driver")
+            second_order_effects = _research_list(research_payload, "second_order_effects")
+            disconfirming_signal = _research_field(research_payload, "disconfirming_signal")
         except json.JSONDecodeError:
             summary = ""
 
@@ -683,6 +704,17 @@ def format_details_report(db_path: Path | str, reference: str | None) -> str:
             lines.append(summary)
         if key_facts:
             lines.extend(f"- {fact}" for fact in key_facts[:5])
+
+    lines.extend(["", "📌 Главный драйвер:", primary_driver])
+
+    lines.append("")
+    lines.append("🔁 Что должно подтверждать прогноз:")
+    if second_order_effects:
+        lines.extend(f"- {item}" for item in second_order_effects[:3])
+    else:
+        lines.append("- Нет данных.")
+
+    lines.extend(["", "🚫 Что быстро опровергнет прогноз:", disconfirming_signal])
 
     if sources:
         lines.extend(["", f"Источники: {', '.join(sources[:3])}"])

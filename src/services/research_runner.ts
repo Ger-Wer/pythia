@@ -10,6 +10,20 @@ export interface ResearchBrief {
   for_yes: string[];
   against_yes: string[];
   crowd_might_miss: string;
+  catalyst_type:
+    | 'polling'
+    | 'regulatory'
+    | 'macro'
+    | 'geopolitics'
+    | 'sports_form'
+    | 'injury_or_roster'
+    | 'award_cycle'
+    | 'crypto'
+    | 'corporate'
+    | 'other';
+  primary_driver: string;
+  second_order_effects: string[];
+  disconfirming_signal: string;
   sources: string[];
   research_cost_usd: number;
 }
@@ -47,6 +61,21 @@ const researchSchema = z.object({
   for_yes: z.array(z.string()).min(1).max(3),
   against_yes: z.array(z.string()).min(1).max(3),
   crowd_might_miss: z.string().min(1),
+  catalyst_type: z.enum([
+    'polling',
+    'regulatory',
+    'macro',
+    'geopolitics',
+    'sports_form',
+    'injury_or_roster',
+    'award_cycle',
+    'crypto',
+    'corporate',
+    'other',
+  ]).optional().default('other'),
+  primary_driver: z.string().optional().default('Нет данных.'),
+  second_order_effects: z.array(z.string()).optional().default([]),
+  disconfirming_signal: z.string().optional().default('Нет данных.'),
   sources: z.array(z.string()).min(1),
 });
 const emittedSearchWarnings = new Set<string>();
@@ -132,6 +161,82 @@ export function buildSearchQueries(question: string, category?: string): string[
     `${normalizedQuestion} latest news facts 2026`,
     `${context}${normalizedCategory ? ` ${normalizedCategory}` : ''} prediction odds forecast 2026`,
   ];
+}
+
+export function buildResearchPrompt(market: PolymarketMarket, searchResults: NewsResult[]): string {
+  const daysRemaining = Math.max(
+    1,
+    Math.ceil((new Date(market.endDate).getTime() - Date.now()) / 86_400_000),
+  );
+
+  return `Ты — аналитик prediction markets. Подготовь краткую исследовательскую справку.
+
+ВОПРОС РЫНКА: ${market.question}
+ДЕДЛАЙН: ${market.endDate} (через ${daysRemaining} дней)
+РЫНОЧНАЯ ЦЕНА: ${(market.outcomePrices[0] * 100).toFixed(1)}%
+КАТЕГОРИЯ: ${market.category || 'не указана'}
+
+ИСТОЧНИКИ:
+${searchResults
+  .map(
+    (result, index) =>
+      `${index + 1}. ${result.title}\nURL: ${result.url}\nSNIPPET: ${result.snippet || 'No snippet available.'}`,
+  )
+  .join('\n\n')}
+
+ЗАДАЧА:
+1. Выдели 3-5 ключевых фактов
+2. Дай 2 аргумента за YES
+3. Дай 2 аргумента против YES
+4. Что толпа может недооценивать?
+5. Определи тип катализатора
+6. Назови главный драйвер вероятности
+7. Назови 1-3 вторичных сигнала, которые должны подтверждать тезис
+8. Назови один сигнал, который быстро опровергнет прогноз
+
+Ответ строго JSON:
+{
+  "summary": "...",
+  "key_facts": ["...", "..."],
+  "for_yes": ["...", "..."],
+  "against_yes": ["...", "..."],
+  "crowd_might_miss": "...",
+  "catalyst_type": "polling|regulatory|macro|geopolitics|sports_form|injury_or_roster|award_cycle|crypto|corporate|other",
+  "primary_driver": "...",
+  "second_order_effects": ["...", "..."],
+  "disconfirming_signal": "...",
+  "sources": ["..."]
+}`;
+}
+
+export function parseResearchResponse(raw: string): Omit<ResearchBrief, 'research_cost_usd'> | null {
+  const jsonText = extractJson(raw);
+
+  if (!jsonText) {
+    return null;
+  }
+
+  try {
+    const parsed = researchSchema.parse(JSON.parse(jsonText));
+    return {
+      summary: parsed.summary.trim(),
+      key_facts: parsed.key_facts.map((fact) => fact.trim()).filter(Boolean).slice(0, 5),
+      for_yes: parsed.for_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
+      against_yes: parsed.against_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
+      crowd_might_miss: parsed.crowd_might_miss.trim(),
+      catalyst_type: parsed.catalyst_type,
+      primary_driver: parsed.primary_driver.trim() || 'Нет данных.',
+      second_order_effects: parsed.second_order_effects
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 3),
+      disconfirming_signal: parsed.disconfirming_signal.trim() || 'Нет данных.',
+      sources: parsed.sources.map((source) => source.trim()).filter(Boolean),
+    };
+  } catch (error) {
+    console.error('Failed to parse research response:', error);
+    return null;
+  }
 }
 
 export function deduplicateNewsResults(results: NewsResult[]): NewsResult[] {
@@ -300,39 +405,8 @@ export async function buildResearchBrief(
     1,
     Math.ceil((new Date(market.endDate).getTime() - Date.now()) / 86_400_000),
   );
-
-  const prompt = `Ты — аналитик prediction-рынков. Подготовь краткую исследовательскую справку.
-
-ВОПРОС РЫНКА: ${market.question}
-ДЕДЛАЙН: ${market.endDate} (через ${daysRemaining} дней)
-ТЕКУЩАЯ ЦЕНА РЫНКА: ${(market.outcomePrices[0] * 100).toFixed(1)}%
-(это коллективная оценка вероятности тысячами людей, которые ставят реальные деньги)
-
-НАЙДЕННЫЕ ИСТОЧНИКИ:
-${resolvedSearchResults
-  .map(
-    (result, index) =>
-      `${index + 1}. ${result.title}\nURL: ${result.url}\nSNIPPET: ${result.snippet || 'No snippet available.'}`,
-  )
-  .join('\n\n')}
-
-ЗАДАЧА:
-1. Выдели 3-5 ключевых фактов, влияющих на исход
-2. Какие факты ЗА исход "Да", какие ПРОТИВ
-3. Что толпа может недооценивать или переоценивать?
-4. Ближайший исторический прецедент
-
-Пиши кратко, на русском. Максимум 200 слов.
-
-Ответь JSON:
-{
-  "summary": "краткая справка",
-  "key_facts": ["факт 1", "факт 2", "факт 3"],
-  "for_yes": ["аргумент за 1", "аргумент за 2"],
-  "against_yes": ["аргумент против 1", "аргумент против 2"],
-  "crowd_might_miss": "что толпа может упускать",
-  "sources": ["url1", "url2"]
-}`;
+  void daysRemaining;
+  const prompt = buildResearchPrompt(market, resolvedSearchResults);
 
   const completion = await client.chat.completions.create({
     model: CONFIG.deepseek.modelResearch,
@@ -354,7 +428,11 @@ ${resolvedSearchResults
   }
 
   try {
-    const parsed = researchSchema.parse(JSON.parse(jsonText));
+    const parsed = parseResearchResponse(jsonText);
+    if (!parsed) {
+      console.error(`Failed to parse research response for market ${market.id}`);
+      return null;
+    }
     const researchCost = costTracker.trackCall(
       CONFIG.deepseek.modelResearch,
       completion.usage?.prompt_tokens ?? 0,
@@ -362,12 +440,7 @@ ${resolvedSearchResults
     );
 
     return {
-      summary: parsed.summary.trim(),
-      key_facts: parsed.key_facts.map((fact) => fact.trim()).filter(Boolean).slice(0, 5),
-      for_yes: parsed.for_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
-      against_yes: parsed.against_yes.map((fact) => fact.trim()).filter(Boolean).slice(0, 3),
-      crowd_might_miss: parsed.crowd_might_miss.trim(),
-      sources: parsed.sources.map((source) => source.trim()).filter(Boolean),
+      ...parsed,
       research_cost_usd: researchCost,
     };
   } catch (error) {

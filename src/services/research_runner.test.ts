@@ -51,3 +51,45 @@ test('deduplicateNewsResults keeps the first result for each unique URL', async 
     },
   ]);
 });
+
+test('parseResearchResponse supports catalyst and spillover fields', async () => {
+  const { parseResearchResponse } = await researchRunnerModule;
+
+  const parsed = parseResearchResponse(`{
+    "summary": "Сильнее всего влияет форма команды и домашнее преимущество.",
+    "key_facts": ["Thunder лидируют на Западе", "Состав без серьёзных травм"],
+    "for_yes": ["Лучшая форма", "Домашнее преимущество"],
+    "against_yes": ["Сильные соперники", "Риск травм"],
+    "crowd_might_miss": "Глубина состава лучше, чем у конкурентов.",
+    "catalyst_type": "sports_form",
+    "primary_driver": "Текущая форма и здоровье лидеров Thunder",
+    "second_order_effects": ["Подтверждение от betting odds", "Рост ожиданий по playoff seeding"],
+    "disconfirming_signal": "Травма SGA перед плей-офф",
+    "sources": ["https://example.com/nba"]
+  }`);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.catalyst_type).toBe('sports_form');
+  expect(parsed?.primary_driver).toContain('Thunder');
+  expect(parsed?.second_order_effects).toHaveLength(2);
+  expect(parsed?.disconfirming_signal).toContain('Травма');
+});
+
+test('parseResearchResponse keeps working for legacy research briefs', async () => {
+  const { parseResearchResponse } = await researchRunnerModule;
+
+  const parsed = parseResearchResponse(`{
+    "summary": "Короткая справка.",
+    "key_facts": ["Факт 1"],
+    "for_yes": ["Аргумент за"],
+    "against_yes": ["Аргумент против"],
+    "crowd_might_miss": "Толпа недооценивает календарь.",
+    "sources": ["https://example.com/legacy"]
+  }`);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.catalyst_type).toBe('other');
+  expect(parsed?.primary_driver).toBe('Нет данных.');
+  expect(parsed?.second_order_effects).toEqual([]);
+  expect(parsed?.disconfirming_signal).toBe('Нет данных.');
+});
