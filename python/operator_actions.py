@@ -689,6 +689,8 @@ def _render_details_with_core(db_path: Path | str, reference: str | None, core: 
         return f"База данных не найдена: {db_path}"
 
     core = core or build_operator_core(db_path=db_path)
+    if not core.predictions_table_exists():
+        return "Таблица predictions еще не создана."
     market_id = core.resolve_market_reference(reference.strip())
 
     if not market_id:

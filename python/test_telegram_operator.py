@@ -370,6 +370,15 @@ class TelegramOperatorTests(unittest.TestCase):
             self.assertIn("Главный драйвер", details)
             self.assertIn("нет данных", details.lower())
 
+    def test_format_details_report_reports_missing_predictions_table(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path):
+                pass
+
+            details = format_details_report(db_path, "572833")
+            self.assertEqual(details, "Таблица predictions еще не создана.")
+
     def test_format_details_report_prefers_exact_numeric_market_id_over_list_index(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"

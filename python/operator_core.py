@@ -18,6 +18,10 @@ class OperatorCore:
         db_uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
         return sqlite3.connect(db_uri, uri=True)
 
+    def predictions_table_exists(self) -> bool:
+        with self._connect() as conn:
+            return self._predictions_table_exists(conn)
+
     @staticmethod
     def _predictions_table_exists(conn: sqlite3.Connection) -> bool:
         row = conn.execute(
