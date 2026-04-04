@@ -69,6 +69,47 @@ services:
       timeout: 10s
       retries: 3
 
+  pythia-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pythia:latest
+    container_name: pythia-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      DB_PATH: ${DB_PATH:-/app/data/pythia.db}
+      LOG_DIR: ${LOG_DIR:-/app/logs}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-operator}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:-plain:change-me}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-change-me-session-secret}
+      DASHBOARD_PUBLIC_BASE_URL: ${DASHBOARD_PUBLIC_BASE_URL:-https://b1w.duckdns.org}
+      DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-true}
+      DASHBOARD_STATIC_DIR: /app/dashboard_dist
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: ["dashboard"]
+    ports:
+      - "127.0.0.1:8787:8080"
+    networks:
+      - pythia_internal
+    mem_limit: 768m
+    cpus: 0.5
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/auth/me >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   pythia_internal:
     name: pythia_internal

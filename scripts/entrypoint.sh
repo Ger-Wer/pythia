@@ -33,6 +33,11 @@ case "${1:-}" in
     exec /app/python/venv/bin/python -m python.telegram_operator
     ;;
 
+  dashboard)
+    cd /app
+    exec /app/python/venv/bin/python -m uvicorn python.dashboard_api:app --host 0.0.0.0 --port 8080
+    ;;
+
   scheduler)
     exec supercronic -json -no-reap /app/supercronic.crontab
     ;;

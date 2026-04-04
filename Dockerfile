@@ -1,3 +1,11 @@
+FROM node:22-slim AS dashboard-builder
+
+WORKDIR /frontend
+COPY dashboard/package*.json /frontend/
+RUN npm install
+COPY dashboard/ /frontend/
+RUN npm run build
+
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -42,6 +50,7 @@ RUN python -m venv /app/python/venv \
 COPY src /app/src
 COPY python /app/python
 COPY scripts /app/scripts
+COPY --from=dashboard-builder /frontend/dist /app/dashboard_dist
 COPY supercronic.crontab /app/supercronic.crontab
 COPY .env.example /app/.env.example
 COPY README.md LICENSE /app/

@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 SCHEDULER_SERVICE="pythia-scheduler"
 TELEGRAM_SERVICE="pythia-telegram"
+DASHBOARD_SERVICE="pythia-dashboard"
 SERVICE="$SCHEDULER_SERVICE"
 ENTRYPOINT="/app/scripts/entrypoint.sh"
 COMMAND="${1:-help}"
@@ -23,8 +24,9 @@ Commands:
   edge      - calculate edge and Brier scores
   db        - open SQLite shell
   logs      - tail scheduler and telegram logs
+  dashboard-logs - tail dashboard logs
   shell     - open shell in the container
-  status    - show compose and database status for both services
+  status    - show compose and database status for all services
   help      - show this message
 EOF
 }
@@ -66,7 +68,11 @@ case "$COMMAND" in
     ;;
 
   logs)
-    docker compose logs -f --tail=100 "$SCHEDULER_SERVICE" "$TELEGRAM_SERVICE"
+    docker compose logs -f --tail=100 "$SCHEDULER_SERVICE" "$TELEGRAM_SERVICE" "$DASHBOARD_SERVICE"
+    ;;
+
+  dashboard-logs)
+    docker compose logs -f --tail=100 "$DASHBOARD_SERVICE"
     ;;
 
   shell)

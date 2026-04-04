@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from python.dashboard_auth import DashboardAuthConfig, build_serializer, verify_password
 from python.dashboard_models import (
@@ -26,6 +29,7 @@ def create_app(
     dashboard_username: str,
     dashboard_password_hash: str,
     cookie_secure: bool = False,
+    static_dir: Path | str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Pythia Dashboard API")
     auth = DashboardAuthConfig(
@@ -116,4 +120,58 @@ def create_app(
             raise HTTPException(status_code=404, detail="UNKNOWN_ACTION")
         return core.run_safe_action(action)
 
+    resolved_static_dir: Path | None = None
+    if static_dir is not None:
+        candidate = Path(static_dir)
+        if candidate.exists():
+            resolved_static_dir = candidate
+
+    if resolved_static_dir is not None:
+        assets_dir = resolved_static_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+        @app.get("/")
+        def serve_dashboard_root() -> FileResponse:
+            return FileResponse(resolved_static_dir / "index.html")
+
+        @app.get("/{path:path}")
+        def serve_dashboard_fallback(path: str) -> FileResponse:
+            if path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="NOT_FOUND")
+            candidate = resolved_static_dir / path
+            if candidate.exists() and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(resolved_static_dir / "index.html")
+
     return app
+
+
+def _env_bool(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def create_app_from_env() -> FastAPI:
+    base_dir = Path(os.getenv("PYTHIA_BASE_DIR", str(Path(__file__).resolve().parent.parent)))
+    db_path = os.getenv("DB_PATH", str(base_dir / "data" / "pythia.db"))
+    log_dir = os.getenv("LOG_DIR", str(base_dir / "logs"))
+    session_secret = os.getenv("DASHBOARD_SESSION_SECRET", "change-me-session-secret")
+    dashboard_username = os.getenv("DASHBOARD_USERNAME", "operator")
+    dashboard_password_hash = os.getenv("DASHBOARD_PASSWORD_HASH", "plain:change-me")
+    static_dir = os.getenv("DASHBOARD_STATIC_DIR", str(base_dir / "dashboard_dist"))
+    cookie_secure = _env_bool("DASHBOARD_COOKIE_SECURE", False)
+    return create_app(
+        db_path=db_path,
+        log_dir=log_dir,
+        session_secret=session_secret,
+        dashboard_username=dashboard_username,
+        dashboard_password_hash=dashboard_password_hash,
+        cookie_secure=cookie_secure,
+        static_dir=static_dir,
+    )
+
+
+app = create_app_from_env()
