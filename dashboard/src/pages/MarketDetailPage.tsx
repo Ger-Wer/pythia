@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { TimelinePanel } from "../components/TimelinePanel";
 import type { MarketDetailsResponse } from "../types/api";
 
 function percent(value: number | null | undefined): string {
@@ -12,7 +13,6 @@ function percent(value: number | null | undefined): string {
 
 export function MarketDetailPage() {
   const { marketId } = useParams<{ marketId: string }>();
-  const navigate = useNavigate();
   const [details, setDetails] = useState<MarketDetailsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,11 +24,6 @@ export function MarketDetailPage() {
         return;
       }
       try {
-        const me = await api.me();
-        if (!me.authenticated) {
-          navigate("/login");
-          return;
-        }
         const payload = await api.marketDetails(marketId);
         if (active) {
           setDetails(payload);
@@ -43,14 +38,11 @@ export function MarketDetailPage() {
     return () => {
       active = false;
     };
-  }, [marketId, navigate]);
+  }, [marketId]);
 
   return (
-    <main className="page">
-      <div className="toolbar">
-        <Link to="/runs/latest">Назад к последнему прогону</Link>
-      </div>
-      <section className="card">
+    <main className="page-grid">
+      <section className="panel">
         <h1>Детали рынка</h1>
         {error ? <p>{error}</p> : null}
         {!details && !error ? <p>Загрузка...</p> : null}
@@ -64,9 +56,12 @@ export function MarketDetailPage() {
             <p>Уверенность: {details.confidence ?? "нет данных"}</p>
             <p>Риск: {details.key_risk ?? "нет данных"}</p>
             <p>Драйвер: {details.research.primary_driver ?? "нет данных"}</p>
+            <p>Обоснование: {details.reasoning ?? "нет данных"}</p>
+            <p>Базовая частота: {details.base_rate ?? "нет данных"}</p>
           </>
         ) : null}
       </section>
+      <TimelinePanel forecastTimestamp={details?.forecast_timestamp} endDate={details?.end_date} />
     </main>
   );
 }

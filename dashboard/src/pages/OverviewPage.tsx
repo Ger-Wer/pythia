@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { MarketSummaryCard } from "../components/MarketSummaryCard";
+import { StatusPills } from "../components/StatusPills";
+import type { LatestRunItem } from "../types/api";
 import type { OverviewResponse } from "../types/api";
 
 export function OverviewPage() {
-  const navigate = useNavigate();
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [topEdge, setTopEdge] = useState<LatestRunItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const me = await api.me();
-        if (!me.authenticated) {
-          navigate("/login");
-          return;
-        }
-        const payload = await api.overview();
+        const [payload, latestRun] = await Promise.all([api.overview(), api.latestRun()]);
         if (active) {
           setOverview(payload);
+          const sorted = [...latestRun.items].sort((a, b) => Math.abs(b.edge ?? 0) - Math.abs(a.edge ?? 0));
+          setTopEdge(sorted[0] ?? null);
         }
       } catch {
         if (active) {
@@ -31,17 +30,19 @@ export function OverviewPage() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, []);
+
+  const systemStatus = overview && overview.latest_run.markets_processed > 0 ? "ON" : "DEGRADED";
+  const researchStatus = topEdge ? "ON" : "DEGRADED";
 
   return (
-    <main className="page">
-      <div className="toolbar">
-        <Link to="/runs/latest">Последний прогон</Link>
-        <Link to="/watchlist">Watchlist</Link>
-        <Link to="/operations">Операции</Link>
-      </div>
-      <section className="card">
+    <main className="page-grid">
+      <section className="panel">
         <h1>Обзор Pythia</h1>
+        <StatusPills
+          system={systemStatus === "ON" ? "ON" : "DEGRADED"}
+          research={researchStatus === "ON" ? "ON" : "DEGRADED"}
+        />
         {error ? <p>{error}</p> : null}
         {!overview && !error ? <p>Загрузка...</p> : null}
         {overview ? (
@@ -52,6 +53,7 @@ export function OverviewPage() {
           </>
         ) : null}
       </section>
+      <MarketSummaryCard item={topEdge} />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import type {
+  ActionResponse,
   LatestRunResponse,
   MarketDetailsResponse,
   MeResponse,
@@ -36,7 +37,7 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   runAction: (action: "forecast" | "resolve" | "weekly") =>
-    request(`/api/actions/${action}`, { method: "POST" }),
+    request<ActionResponse>(`/api/actions/${action}`, { method: "POST" }),
   addWatchlist: (marketId: string, note: string) =>
     request<{ ok: boolean }>("/api/watchlist", {
       method: "POST",

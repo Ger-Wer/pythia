@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { Layout } from "../components/Layout";
 import { LatestRunPage } from "../pages/LatestRunPage";
 import { LoginPage } from "../pages/LoginPage";
 import { MarketDetailPage } from "../pages/MarketDetailPage";
@@ -8,9 +9,15 @@ import { WatchlistPage } from "../pages/WatchlistPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
-  { path: "/", element: <OverviewPage /> },
-  { path: "/runs/latest", element: <LatestRunPage /> },
-  { path: "/markets/:marketId", element: <MarketDetailPage /> },
-  { path: "/watchlist", element: <WatchlistPage /> },
-  { path: "/operations", element: <OperationsPage /> },
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <OverviewPage /> },
+      { path: "runs/latest", element: <LatestRunPage /> },
+      { path: "markets/:marketId", element: <MarketDetailPage /> },
+      { path: "watchlist", element: <WatchlistPage /> },
+      { path: "operations", element: <OperationsPage /> },
+    ],
+  },
 ]);

@@ -68,3 +68,11 @@ export interface MeResponse {
   authenticated: boolean;
   username: string | null;
 }
+
+export interface ActionResponse {
+  action: string;
+  returncode: number;
+  stdout: string;
+  stderr: string;
+  status: "success" | "failed";
+}

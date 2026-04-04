@@ -21,7 +21,7 @@ export function LoginPage() {
 
   return (
     <main className="login-shell">
-      <form className="login-card card" onSubmit={handleSubmit}>
+      <form className="login-card" onSubmit={handleSubmit}>
         <h1>Pythia</h1>
         <p>Операторская консоль</p>
         <label htmlFor="username">Логин</label>

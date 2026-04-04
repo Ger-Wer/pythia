@@ -1,10 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { WatchlistPanel } from "../components/WatchlistPanel";
 import type { WatchlistItem } from "../types/api";
 
 export function WatchlistPage() {
-  const navigate = useNavigate();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [marketId, setMarketId] = useState("");
   const [note, setNote] = useState("");
@@ -19,11 +18,6 @@ export function WatchlistPage() {
     let active = true;
     async function load() {
       try {
-        const me = await api.me();
-        if (!me.authenticated) {
-          navigate("/login");
-          return;
-        }
         const payload = await api.watchlist();
         if (active) {
           setItems(payload.items);
@@ -38,7 +32,7 @@ export function WatchlistPage() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, []);
 
   async function onAdd(event: FormEvent) {
     event.preventDefault();
@@ -68,13 +62,10 @@ export function WatchlistPage() {
   }
 
   return (
-    <main className="page">
-      <div className="toolbar">
-        <Link to="/">Назад к обзору</Link>
-      </div>
-      <section className="card">
+    <main className="page-grid">
+      <section className="panel">
         <h1>Watchlist</h1>
-        <form onSubmit={onAdd}>
+        <form onSubmit={onAdd} className="watchlist-form">
           <label htmlFor="market-id">market_id</label>
           <input id="market-id" value={marketId} onChange={(event) => setMarketId(event.target.value)} />
           <label htmlFor="watch-note">Заметка</label>
@@ -82,18 +73,8 @@ export function WatchlistPage() {
           <button type="submit">Добавить</button>
         </form>
         {error ? <p>{error}</p> : null}
-        <ul>
-          {items.map((item) => (
-            <li key={item.market_id}>
-              <strong>{item.market_id}</strong> {item.question ? `— ${item.question}` : ""}{" "}
-              {item.note ? `(${item.note})` : ""}
-              <button type="button" onClick={() => onRemove(item.market_id)}>
-                Удалить
-              </button>
-            </li>
-          ))}
-        </ul>
       </section>
+      <WatchlistPanel items={items} onRemove={onRemove} />
     </main>
   );
 }

@@ -1,49 +1,27 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { ActionBar } from "../components/ActionBar";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { api } from "../api/client";
+import type { ActionResponse } from "../types/api";
 
 type ActionName = "forecast" | "resolve" | "weekly";
 
-function actionLabel(action: ActionName): string {
-  if (action === "forecast") return "Запустить forecast";
-  if (action === "resolve") return "Запустить resolve";
-  return "Запустить weekly";
-}
-
 export function OperationsPage() {
-  const navigate = useNavigate();
   const [busy, setBusy] = useState<ActionName | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<ActionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ActionName | null>(null);
 
   useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const me = await api.me();
-        if (!me.authenticated) {
-          navigate("/login");
-        }
-      } catch {
-        if (active) {
-          navigate("/login");
-        }
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, [navigate]);
+    setStatus(null);
+  }, []);
 
   async function runAction(action: ActionName) {
     setBusy(action);
     setError(null);
-    setStatus(null);
     try {
       const result = await api.runAction(action);
-      const outcome = typeof result === "object" && result !== null && "status" in result ? String(result.status) : "ok";
-      setStatus(`${actionLabel(action)}: ${outcome}`);
+      setStatus(result);
     } catch {
       setError(`Не удалось выполнить команду ${action}.`);
     } finally {
@@ -52,26 +30,37 @@ export function OperationsPage() {
   }
 
   return (
-    <main className="page">
-      <div className="toolbar">
-        <Link to="/">Назад к обзору</Link>
-      </div>
-      <section className="card">
+    <main className="page-grid">
+      <section className="panel">
         <h1>Операторские действия</h1>
-        <div className="toolbar">
-          <button type="button" disabled={busy !== null} onClick={() => runAction("forecast")}>
-            Запустить forecast
-          </button>
-          <button type="button" disabled={busy !== null} onClick={() => runAction("resolve")}>
-            Запустить resolve
-          </button>
-          <button type="button" disabled={busy !== null} onClick={() => runAction("weekly")}>
-            Запустить weekly
-          </button>
-        </div>
-        {status ? <p>{status}</p> : null}
+        <ActionBar busyAction={busy} onRun={(action) => setConfirmAction(action)} />
+        {status ? (
+          <div className={status.status === "success" ? "status-box ok" : "status-box off"}>
+            <p>
+              Команда <strong>{status.action}</strong>: {status.status} (код {status.returncode})
+            </p>
+            <pre>{status.stdout || status.stderr || "Вывод пуст."}</pre>
+          </div>
+        ) : null}
         {error ? <p>{error}</p> : null}
       </section>
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title="Подтвердить запуск"
+        description={
+          confirmAction
+            ? `Запустить команду ${confirmAction}? Для weekly это может занять несколько минут.`
+            : ""
+        }
+        confirmText="Запустить"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (confirmAction) {
+            runAction(confirmAction);
+          }
+          setConfirmAction(null);
+        }}
+      />
     </main>
   );
 }
