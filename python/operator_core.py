@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+
+SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
 
 
 class OperatorCore:
@@ -214,6 +218,69 @@ class OperatorCore:
             },
         }
 
+    def get_latest_run(self) -> dict[str, Any]:
+        with self._connect() as conn:
+            if not self._predictions_table_exists(conn):
+                return {
+                    "forecast_timestamp": None,
+                    "markets_processed": 0,
+                    "items": [],
+                }
+
+            valid_filter = self._valid_where_clause(conn)
+            latest_ts_row = conn.execute(
+                f"SELECT MAX(forecast_timestamp) FROM predictions WHERE 1=1{valid_filter}"
+            ).fetchone()
+            latest_ts = str(latest_ts_row[0]) if latest_ts_row and latest_ts_row[0] else None
+            if not latest_ts:
+                return {
+                    "forecast_timestamp": None,
+                    "markets_processed": 0,
+                    "items": [],
+                }
+
+            rows = conn.execute(
+                """
+                SELECT market_id, question, category, market_price, dexter_p, naked_p, volume, end_date
+                FROM predictions
+                WHERE forecast_timestamp = ?
+                """
+                + valid_filter
+                + """
+                ORDER BY id ASC
+                """,
+                (latest_ts,),
+            ).fetchall()
+
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            market_price = row[3]
+            research_probability = row[4]
+            naked_probability = row[5]
+            best_probability = research_probability if research_probability is not None else naked_probability
+            edge = None
+            if best_probability is not None and market_price is not None:
+                edge = float(best_probability) - float(market_price)
+            items.append(
+                {
+                    "market_id": str(row[0]),
+                    "question": row[1],
+                    "category": row[2],
+                    "market_price": market_price,
+                    "research_probability": research_probability,
+                    "naked_probability": naked_probability,
+                    "edge": edge,
+                    "volume": row[6],
+                    "end_date": row[7],
+                }
+            )
+
+        return {
+            "forecast_timestamp": latest_ts,
+            "markets_processed": len(items),
+            "items": items,
+        }
+
     def list_watchlist(self) -> list[dict[str, Any]]:
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
@@ -288,3 +355,26 @@ class OperatorCore:
             self._ensure_watchlist_table(conn)
             conn.execute("DELETE FROM watchlist WHERE market_id = ?", (str(market_id).strip(),))
             conn.commit()
+
+    def run_safe_action(self, action: str) -> dict[str, Any]:
+        if action not in SAFE_ACTION_NAMES:
+            raise ValueError(action)
+
+        base_dir = Path(os.getenv("PYTHIA_BASE_DIR", str(Path(__file__).resolve().parent.parent)))
+        entrypoint = base_dir / "scripts" / "entrypoint.sh"
+        command = ["bash", str(entrypoint), action]
+
+        completed = subprocess.run(
+            command,
+            cwd=base_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return {
+            "action": action,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout[-4000:],
+            "stderr": completed.stderr[-4000:],
+            "status": "success" if completed.returncode == 0 else "failed",
+        }
