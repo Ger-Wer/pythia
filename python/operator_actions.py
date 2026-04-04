@@ -607,49 +607,6 @@ def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
     return format_last_predictions_report(DB_PATH, limit)
 
 
-def _load_details_row(conn: sqlite3.Connection, reference: str) -> tuple[Any, ...] | None:
-    valid_filter = _valid_where_clause(conn)
-
-    rows = conn.execute(
-        """
-        SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
-               dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
-               volume, end_date, forecast_timestamp
-        FROM predictions
-        WHERE market_id = ?
-        """
-        + valid_filter
-        + """
-        ORDER BY forecast_timestamp DESC, id DESC
-        LIMIT 1
-        """,
-        (reference,),
-    ).fetchall()
-    if rows:
-        return rows[0]
-
-    if reference.isdigit():
-        offset = max(int(reference) - 1, 0)
-        rows = conn.execute(
-            """
-            SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence,
-                   dexter_reasoning, dexter_key_risk, dexter_base_rate, research_brief_json,
-                   volume, end_date, forecast_timestamp
-            FROM predictions
-            WHERE 1=1
-            """
-            + valid_filter
-            + """
-            ORDER BY forecast_timestamp DESC, id DESC
-            LIMIT 1 OFFSET ?
-            """,
-            (offset,),
-        ).fetchall()
-        return rows[0] if rows else None
-
-    return None
-
-
 def build_operator_core(db_path: Path | str = DB_PATH, log_dir: Path | str = LOG_DIR) -> OperatorCore:
     return OperatorCore(db_path=db_path, log_dir=log_dir)
 
@@ -658,12 +615,12 @@ def format_market_details(details: dict[str, Any]) -> str:
     research = details.get("research") or {}
     question = details.get("question")
     market_price = details.get("market_price")
-    research_probability = details.get("research_probability", details.get("dexter_p"))
-    naked_probability = details.get("naked_probability", details.get("naked_p"))
-    confidence = details.get("confidence", details.get("dexter_confidence"))
-    reasoning = details.get("reasoning", details.get("dexter_reasoning"))
-    key_risk = details.get("key_risk", details.get("dexter_key_risk"))
-    base_rate = details.get("base_rate", details.get("dexter_base_rate"))
+    research_probability = details.get("research_probability")
+    naked_probability = details.get("naked_probability")
+    confidence = details.get("confidence")
+    reasoning = details.get("reasoning")
+    key_risk = details.get("key_risk")
+    base_rate = details.get("base_rate")
     volume = details.get("volume")
     end_date = details.get("end_date")
     forecast_timestamp = details.get("forecast_timestamp")
@@ -724,13 +681,6 @@ def format_market_details(details: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _resolve_details_market_id(conn: sqlite3.Connection, reference: str) -> str | None:
-    row = _load_details_row(conn, reference)
-    if not row:
-        return None
-    return str(row[0])
-
-
 def _render_details_with_core(db_path: Path | str, reference: str | None, core: OperatorCore | None = None) -> str:
     db_path = Path(db_path)
     if not reference:
@@ -738,16 +688,11 @@ def _render_details_with_core(db_path: Path | str, reference: str | None, core: 
     if not db_path.exists():
         return f"База данных не найдена: {db_path}"
 
-    with sqlite3.connect(db_path) as conn:
-        if not _predictions_table_exists(conn):
-            return "Таблица predictions еще не создана."
-
-        market_id = _resolve_details_market_id(conn, reference.strip())
+    core = core or build_operator_core(db_path=db_path)
+    market_id = core.resolve_market_reference(reference.strip())
 
     if not market_id:
         return f"Не удалось найти валидный прогноз по ссылке '{reference}'."
-
-    core = core or build_operator_core(db_path=db_path)
     details = core.get_market_details(market_id)
     return format_market_details(details)
 

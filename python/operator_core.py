@@ -63,6 +63,52 @@ class OperatorCore:
             return []
         return [str(item).strip() for item in value if str(item).strip()]
 
+    def resolve_market_reference(self, reference: str) -> str | None:
+        reference = reference.strip()
+        if not reference:
+            return None
+
+        with self._connect() as conn:
+            if not self._predictions_table_exists(conn):
+                return None
+
+            valid_filter = self._valid_where_clause(conn)
+            row = conn.execute(
+                """
+                SELECT market_id
+                FROM predictions
+                WHERE market_id = ?
+                """
+                + valid_filter
+                + """
+                ORDER BY forecast_timestamp DESC, id DESC
+                LIMIT 1
+                """,
+                (reference,),
+            ).fetchone()
+            if row:
+                return str(row[0])
+
+            if reference.isdigit():
+                offset = max(int(reference) - 1, 0)
+                row = conn.execute(
+                    """
+                    SELECT market_id
+                    FROM predictions
+                    WHERE 1=1
+                    """
+                    + valid_filter
+                    + """
+                    ORDER BY forecast_timestamp DESC, id DESC
+                    LIMIT 1 OFFSET ?
+                    """,
+                    (offset,),
+                ).fetchone()
+                if row:
+                    return str(row[0])
+
+        return None
+
     def get_overview(self) -> dict[str, Any]:
         with self._connect() as conn:
             if not self._predictions_table_exists(conn):
@@ -128,17 +174,11 @@ class OperatorCore:
             "question": row[1],
             "market_price": row[2],
             "research_probability": row[3],
-            "dexter_p": row[3],
             "naked_probability": row[4],
-            "naked_p": row[4],
             "confidence": row[5],
-            "dexter_confidence": row[5],
             "reasoning": row[6],
-            "dexter_reasoning": row[6],
             "key_risk": row[7],
-            "dexter_key_risk": row[7],
             "base_rate": row[8],
-            "dexter_base_rate": row[8],
             "volume": row[10],
             "end_date": row[11],
             "forecast_timestamp": row[12],
