@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from python.operator_core import OperatorCore
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = Path(os.getenv("LOG_DIR", str(BASE_DIR / "logs")))
 DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db")))
@@ -393,6 +395,7 @@ def format_forecast_report(
 def format_status_report(
     db_path: Path | str,
     services: list[dict[str, str]] | None = None,
+    overview_override: dict[str, Any] | None = None,
 ) -> str:
     db_path = Path(db_path)
     lines = ["📈 Статус Pythia"]
@@ -438,6 +441,13 @@ def format_status_report(
             + valid_filter
         ).fetchone()
 
+    latest_run = None
+    latest_run_markets_processed = None
+    if overview_override:
+        total = int(overview_override.get("valid_predictions", total) or 0)
+        latest_run = overview_override.get("latest_run") or {}
+        latest_run_markets_processed = latest_run.get("markets_processed")
+
     lines.extend(
         [
             "",
@@ -451,6 +461,15 @@ def format_status_report(
             f"🔍 Исследование: {_derive_research_label([])}",
         ]
     )
+
+    if latest_run and latest_run.get("forecast_timestamp"):
+        lines.extend(
+            [
+                "",
+                f"Последний прогон: {latest_run.get('forecast_timestamp')} "
+                f"({latest_run_markets_processed or 0} рынков)",
+            ]
+        )
 
     if brier and brier[0] is not None:
         lines.extend(
@@ -534,7 +553,13 @@ def render_health() -> str:
 
 
 def render_status() -> str:
-    return format_status_report(DB_PATH, read_compose_services())
+    core = build_operator_core()
+    overview: dict[str, Any] | None = None
+    try:
+        overview = core.get_overview()
+    except FileNotFoundError:
+        pass
+    return format_status_report(DB_PATH, read_compose_services(), overview_override=overview)
 
 
 def format_last_predictions_report(db_path: Path | str, limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
@@ -625,58 +650,31 @@ def _load_details_row(conn: sqlite3.Connection, reference: str) -> tuple[Any, ..
     return None
 
 
-def format_details_report(db_path: Path | str, reference: str | None) -> str:
-    db_path = Path(db_path)
-    if not reference:
-        return "Использование: /details <номер или market_id>"
-    if not db_path.exists():
-        return f"База данных не найдена: {db_path}"
+def build_operator_core(db_path: Path | str = DB_PATH, log_dir: Path | str = LOG_DIR) -> OperatorCore:
+    return OperatorCore(db_path=db_path, log_dir=log_dir)
 
-    with sqlite3.connect(db_path) as conn:
-        if not _predictions_table_exists(conn):
-            return "Таблица predictions еще не создана."
 
-        row = _load_details_row(conn, reference.strip())
-
-    if not row:
-        return f"Не удалось найти валидный прогноз по ссылке '{reference}'."
-
-    (
-        market_id,
-        question,
-        market_price,
-        dexter_p,
-        naked_p,
-        dexter_confidence,
-        dexter_reasoning,
-        dexter_key_risk,
-        dexter_base_rate,
-        research_brief_json,
-        volume,
-        end_date,
-        forecast_timestamp,
-    ) = row
-
-    best_p = dexter_p if dexter_p is not None else naked_p
+def format_market_details(details: dict[str, Any]) -> str:
+    research = details.get("research") or {}
+    question = details.get("question")
+    market_price = details.get("market_price")
+    research_probability = details.get("research_probability", details.get("dexter_p"))
+    naked_probability = details.get("naked_probability", details.get("naked_p"))
+    confidence = details.get("confidence", details.get("dexter_confidence"))
+    reasoning = details.get("reasoning", details.get("dexter_reasoning"))
+    key_risk = details.get("key_risk", details.get("dexter_key_risk"))
+    base_rate = details.get("base_rate", details.get("dexter_base_rate"))
+    volume = details.get("volume")
+    end_date = details.get("end_date")
+    forecast_timestamp = details.get("forecast_timestamp")
+    best_p = research_probability if research_probability is not None else naked_probability
     edge = None if best_p is None or market_price is None else float(best_p) - float(market_price)
-
-    summary = ""
-    key_facts: list[str] = []
-    sources: list[str] = []
-    primary_driver = "Нет данных."
-    second_order_effects: list[str] = []
-    disconfirming_signal = "Нет данных."
-    if research_brief_json:
-        try:
-            research_payload = json.loads(str(research_brief_json))
-            summary = str(research_payload.get("summary") or "").strip()
-            key_facts = [str(item).strip() for item in research_payload.get("key_facts") or [] if str(item).strip()]
-            sources = [str(item).strip() for item in research_payload.get("sources") or [] if str(item).strip()]
-            primary_driver = _research_field(research_payload, "primary_driver")
-            second_order_effects = _research_list(research_payload, "second_order_effects")
-            disconfirming_signal = _research_field(research_payload, "disconfirming_signal")
-        except json.JSONDecodeError:
-            summary = ""
+    summary = str(research.get("summary") or "").strip()
+    key_facts = [str(item).strip() for item in research.get("key_facts") or [] if str(item).strip()]
+    sources = [str(item).strip() for item in research.get("sources") or [] if str(item).strip()]
+    primary_driver = str(research.get("primary_driver") or "Нет данных.").strip() or "Нет данных."
+    second_order_effects = [str(item).strip() for item in research.get("second_order_effects") or [] if str(item).strip()]
+    disconfirming_signal = str(research.get("disconfirming_signal") or "Нет данных.").strip() or "Нет данных."
 
     lines = [
         "🔍 Подробный анализ",
@@ -686,20 +684,20 @@ def format_details_report(db_path: Path | str, reference: str | None) -> str:
         f"Рынок: {_format_percent(market_price)} | Pythia: {_format_percent(best_p)} | Расхождение: {edge:+.1f}%"
         if edge is not None
         else f"Рынок: {_format_percent(market_price)} | Pythia: {_format_percent(best_p)}",
-        f"Уверенность: {_confidence_ru(dexter_confidence)}",
+        f"Уверенность: {_confidence_ru(confidence)}",
         f"Объём: ${float(volume or 0):,.0f}",
         f"Дедлайн: {str(end_date)[:10]}",
         f"Последний прогон: {str(forecast_timestamp)[:19]}",
     ]
 
-    if dexter_base_rate:
-        lines.extend(["", f"📈 Базовая частота: {dexter_base_rate}"])
+    if base_rate:
+        lines.extend(["", f"📈 Базовая частота: {base_rate}"])
 
-    if dexter_reasoning:
-        lines.extend(["", "📊 Рассуждение Pythia:", str(dexter_reasoning)])
+    if reasoning:
+        lines.extend(["", "📊 Рассуждение Pythia:", str(reasoning)])
 
-    if dexter_key_risk:
-        lines.extend(["", "⚠️ Ключевой риск:", str(dexter_key_risk)])
+    if key_risk:
+        lines.extend(["", "⚠️ Ключевой риск:", str(key_risk)])
 
     if summary or key_facts:
         lines.extend(["", "🔎 Исследовательская сводка:"])
@@ -722,12 +720,44 @@ def format_details_report(db_path: Path | str, reference: str | None) -> str:
     if sources:
         lines.extend(["", f"Источники: {', '.join(sources[:3])}"])
 
-    lines.extend(["", f"market_id: {market_id}"])
+    lines.extend(["", f"market_id: {details.get('market_id')}"])
     return "\n".join(lines)
 
 
+def _resolve_details_market_id(conn: sqlite3.Connection, reference: str) -> str | None:
+    row = _load_details_row(conn, reference)
+    if not row:
+        return None
+    return str(row[0])
+
+
+def _render_details_with_core(db_path: Path | str, reference: str | None, core: OperatorCore | None = None) -> str:
+    db_path = Path(db_path)
+    if not reference:
+        return "Использование: /details <номер или market_id>"
+    if not db_path.exists():
+        return f"База данных не найдена: {db_path}"
+
+    with sqlite3.connect(db_path) as conn:
+        if not _predictions_table_exists(conn):
+            return "Таблица predictions еще не создана."
+
+        market_id = _resolve_details_market_id(conn, reference.strip())
+
+    if not market_id:
+        return f"Не удалось найти валидный прогноз по ссылке '{reference}'."
+
+    core = core or build_operator_core(db_path=db_path)
+    details = core.get_market_details(market_id)
+    return format_market_details(details)
+
+
+def format_details_report(db_path: Path | str, reference: str | None) -> str:
+    return _render_details_with_core(db_path, reference)
+
+
 def render_details(reference: str | None) -> str:
-    return format_details_report(DB_PATH, reference)
+    return _render_details_with_core(DB_PATH, reference, build_operator_core(DB_PATH, LOG_DIR))
 
 
 def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:

@@ -99,6 +99,7 @@ def handle_update(update: dict[str, Any]) -> None:
             CURRENT_JOB = command_key
             send_message(chat_id, f"Запускаю {command_key}. Это может занять несколько минут.")
 
+        # Shared data access now lives in operator_actions/operator_core.
         result = run_operator_command(command_key, command_arg)
         send_message(chat_id, result)
     except Exception as exc:
