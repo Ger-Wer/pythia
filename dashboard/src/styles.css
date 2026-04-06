@@ -719,6 +719,10 @@ a {
   margin: 0;
 }
 
+.transparency-label {
+  font-weight: 600;
+}
+
 .detail-lead {
   margin: 0;
   font-size: 1rem;
