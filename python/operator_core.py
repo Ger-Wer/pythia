@@ -497,6 +497,16 @@ class OperatorCore:
             research_probability=row[3],
             confidence=row[5],
         )
+        research_summary = str(research.get("summary") or "").strip()
+        research_key_facts = self._research_list(research, "key_facts")
+        transparency_facts: list[str] = []
+        for item in [*research_key_facts, research_summary, self._research_field(research, "primary_driver")]:
+            normalized = str(item).strip()
+            if normalized and normalized not in transparency_facts:
+                transparency_facts.append(normalized)
+        falsifier = self._research_field(research, "disconfirming_signal")
+        if falsifier == "Нет данных." and row[7]:
+            falsifier = str(row[7]).strip()
         return {
             "market_id": str(row[0]),
             "question": row[1],
@@ -512,6 +522,7 @@ class OperatorCore:
             "volume": row[10],
             "end_date": row[11],
             "forecast_timestamp": row[12],
+            "last_updated": row[12],
             "history": [
                 {
                     "forecast_timestamp": history_row[0],
@@ -521,9 +532,15 @@ class OperatorCore:
                 }
                 for history_row in history_rows
             ],
+            "transparency": {
+                "facts": transparency_facts,
+                "sources": self._research_list(research, "sources"),
+                "falsifier": falsifier,
+                "updated_at": row[12],
+            },
             "research": {
-                "summary": str(research.get("summary") or "").strip(),
-                "key_facts": self._research_list(research, "key_facts"),
+                "summary": research_summary,
+                "key_facts": research_key_facts,
                 "catalyst_type": str(research.get("catalyst_type") or "other").strip() or "other",
                 "primary_driver": self._research_field(research, "primary_driver"),
                 "second_order_effects": self._research_list(research, "second_order_effects"),

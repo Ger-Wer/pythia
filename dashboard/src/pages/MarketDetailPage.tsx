@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ProbabilityHistoryChart } from "../components/ProbabilityHistoryChart";
 import { SectionHeader } from "../components/SectionHeader";
 import { TimelinePanel } from "../components/TimelinePanel";
 import { TOOLTIP_CONTENT } from "../content/tooltips";
@@ -81,6 +82,25 @@ export function MarketDetailPage() {
       ? details.research_probability - details.market_price
       : null;
 
+  const transparency = details
+    ? {
+        facts:
+          details.transparency?.facts ??
+          [
+            ...(details.research.key_facts ?? []),
+            details.research.summary ?? "",
+            details.research.primary_driver ?? "",
+          ].filter((item): item is string => Boolean(item.trim())),
+        sources: details.transparency?.sources ?? details.research.sources ?? [],
+        falsifier:
+          details.transparency?.falsifier ??
+          details.research.disconfirming_signal ??
+          details.key_risk ??
+          "нет данных",
+        updated_at: details.transparency?.updated_at ?? details.last_updated ?? details.forecast_timestamp ?? null,
+      }
+    : null;
+
   return (
     <main className="page-grid">
       <section className="panel hero-panel">
@@ -150,33 +170,97 @@ export function MarketDetailPage() {
         </section>
       ) : null}
 
-      <section className="page-grid">
+      {details ? (
+        <section className="panel">
+          <SectionHeader
+            title="История оценки"
+            subtitle="Как менялись цены и оценки Pythia по мере появления новых данных."
+            tooltip={TOOLTIP_CONTENT.timeline}
+          />
+          <ProbabilityHistoryChart history={details.history} />
+        </section>
+      ) : null}
+
+      {details ? (
         <section className="panel">
           <SectionHeader
             title="Что может сломать прогноз"
             subtitle="Главные поводы перепроверить рынок или ждать новых данных."
             tooltip={TOOLTIP_CONTENT.keyRisk}
           />
-          {details ? (
-            <div className="detail-stack">
-              <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
-              <p className="muted">Что отслеживать дальше</p>
-              <p className="muted">Дисквалифицирующий сигнал</p>
-              <p>{details.research.disconfirming_signal ?? "нет данных"}</p>
-              {!!details.research.second_order_effects?.length ? (
-                <>
-                  <p className="muted">Вторичные эффекты:</p>
-                  <ul className="attention-list">
-                    {details.research.second_order_effects.map((effect) => (
-                      <li key={effect}>{effect}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="detail-stack">
+            <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
+            <p className="muted">Что может опровергнуть прогноз</p>
+            <p>{transparency?.falsifier ?? "нет данных"}</p>
+          </div>
         </section>
+      ) : null}
 
+      {details ? (
+        <section className="panel">
+          <SectionHeader
+            title="Прозрачность вывода"
+            subtitle="Короткая справка о том, на каких опорах держится текущая оценка."
+            tooltip={TOOLTIP_CONTENT.researchBrief}
+          />
+          <div className="transparency-grid">
+            <article className="transparency-card">
+              <p className="muted">Какие факты использованы</p>
+              <ul className="attention-list">
+                {transparency?.facts?.length ? transparency.facts.map((fact) => <li key={fact}>{fact}</li>) : <li>Нет данных</li>}
+              </ul>
+            </article>
+            <article className="transparency-card">
+              <p className="muted">Какие источники использованы</p>
+              <ul className="source-list">
+                {transparency?.sources?.length ? (
+                  transparency.sources.map((source) => (
+                    <li key={source}>
+                      <a href={source} target="_blank" rel="noreferrer">
+                        {source}
+                      </a>
+                    </li>
+                  ))
+                ) : (
+                  <li>Нет данных</li>
+                )}
+              </ul>
+            </article>
+            <article className="transparency-card">
+              <p className="muted">Что может опровергнуть прогноз</p>
+              <p>{transparency?.falsifier ?? "нет данных"}</p>
+            </article>
+            <article className="transparency-card">
+              <p className="muted">Последнее обновление</p>
+              <p>{transparency?.updated_at ? transparency.updated_at : "нет данных"}</p>
+            </article>
+          </div>
+        </section>
+      ) : null}
+
+      {details ? (
+        <section className="panel">
+          <SectionHeader
+            title="Что отслеживать дальше"
+            subtitle="Какие вторичные сигналы стоит держать в поле зрения после чтения разбора."
+            tooltip={TOOLTIP_CONTENT.researchBrief}
+          />
+          <div className="detail-stack">
+            <p className="detail-lead">Следующие сигналы помогут понять, сохраняется ли текущий тезис.</p>
+            {!!details.research.second_order_effects?.length ? (
+              <ul className="attention-list">
+                {details.research.second_order_effects.map((effect) => (
+                  <li key={effect}>{effect}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">Вторичные эффекты пока не выделены.</p>
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="page-grid">
         <section className="panel">
           <SectionHeader
             title="Источники и исследовательская справка"

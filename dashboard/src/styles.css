@@ -611,6 +611,114 @@ a {
   min-height: 100%;
 }
 
+.probability-history-chart {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.probability-history-chart-frame {
+  border-radius: 18px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: linear-gradient(180deg, rgba(247, 251, 247, 0.96) 0%, rgba(255, 255, 255, 0.9) 100%);
+  padding: 12px;
+}
+
+.probability-history-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 640 / 240;
+}
+
+.probability-history-gridline {
+  stroke: rgba(23, 34, 30, 0.08);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.probability-history-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.probability-history-point {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.probability-history-point-last {
+  stroke-width: 2.5;
+}
+
+.probability-history-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.probability-history-meta {
+  display: grid;
+  gap: 10px;
+}
+
+.probability-history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.probability-history-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.probability-history-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.probability-history-legend-item strong {
+  font-weight: 700;
+}
+
+.probability-history-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.transparency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.transparency-card {
+  border-radius: 16px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.transparency-card p {
+  margin: 0;
+}
+
 .detail-lead {
   margin: 0;
   font-size: 1rem;
@@ -766,6 +874,10 @@ input {
   .detail-metric-grid {
     grid-template-columns: 1fr;
   }
+
+  .transparency-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -795,6 +907,10 @@ input {
   }
 
   .timeline-list li {
+    flex-direction: column;
+  }
+
+  .probability-history-footnote {
     flex-direction: column;
   }
 }

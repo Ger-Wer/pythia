@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
@@ -123,6 +123,13 @@ class MarketHistoryPoint(BaseModel):
     naked_probability: float | None = None
 
 
+class MarketTransparency(BaseModel):
+    facts: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    falsifier: str | None = None
+    updated_at: str | None = None
+
+
 class MarketDetailsResponse(BaseModel):
     market_id: str
     question: str
@@ -138,7 +145,9 @@ class MarketDetailsResponse(BaseModel):
     volume: float | None = None
     end_date: str | None = None
     forecast_timestamp: str | None = None
-    history: list[MarketHistoryPoint] = []
+    last_updated: str | None = None
+    history: list[MarketHistoryPoint] = Field(default_factory=list)
+    transparency: MarketTransparency = Field(default_factory=MarketTransparency)
     research: dict[str, Any]
 
 

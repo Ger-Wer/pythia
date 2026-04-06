@@ -142,12 +142,19 @@ export interface MarketDetailsResponse {
   volume?: number | null;
   end_date?: string | null;
   forecast_timestamp?: string | null;
+  last_updated?: string | null;
   history?: Array<{
     forecast_timestamp?: string | null;
     market_price?: number | null;
     research_probability?: number | null;
     naked_probability?: number | null;
   }>;
+  transparency?: {
+    facts?: string[];
+    sources?: string[];
+    falsifier?: string | null;
+    updated_at?: string | null;
+  };
   research: {
     summary?: string;
     key_facts?: string[];
