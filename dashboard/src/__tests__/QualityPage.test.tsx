@@ -31,7 +31,14 @@ describe("QualityPage", () => {
         edge_research_vs_market: null,
         edge_naked_vs_market: null,
       },
-      category_breakdown: [],
+      category_breakdown: [
+        {
+          category: "macro",
+          resolved: 8,
+          brier_research: 0.18,
+          brier_market: 0.21,
+        },
+      ],
       calibration_image: null,
       glossary: [],
     });
@@ -41,6 +48,9 @@ describe("QualityPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/недостаточно resolved-рынков/i)).toBeInTheDocument();
     });
+
+    expect(screen.getByText("category breakdown")).toBeInTheDocument();
+    expect(screen.getByText("macro")).toBeInTheDocument();
   });
 
   it("shows the quality metrics, breakdown, and glossary when data is complete", async () => {

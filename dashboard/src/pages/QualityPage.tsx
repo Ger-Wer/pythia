@@ -33,7 +33,7 @@ export function QualityPage() {
     };
   }, []);
 
-  const showBreakdown = quality?.status === "COMPLETE" && quality.category_breakdown.length > 0;
+  const showBreakdown = quality?.category_breakdown.length > 0;
 
   return (
     <main className="page-grid">
