@@ -10,14 +10,21 @@ describe("InfoTooltip", () => {
       <InfoTooltip
         label="Что это?"
         title="Статус research"
-        description="Показывает, доступны ли новости и research-слой."
+        what="Показывает, доступны ли новости и research-слой."
+        why="Это влияет на качество reasoning."
+        how="Смотрите на ON, DEGRADED или OFF."
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Что это?" }));
 
     expect(screen.getByText("Статус research")).toBeInTheDocument();
+    expect(screen.getByText("Что это")).toBeInTheDocument();
     expect(screen.getByText("Показывает, доступны ли новости и research-слой.")).toBeInTheDocument();
+    expect(screen.getByText("Почему важно")).toBeInTheDocument();
+    expect(screen.getByText("Это влияет на качество reasoning.")).toBeInTheDocument();
+    expect(screen.getByText("Как читать")).toBeInTheDocument();
+    expect(screen.getByText("Смотрите на ON, DEGRADED или OFF.")).toBeInTheDocument();
   });
 
   it("hides the tooltip after the cursor leaves the trigger area", async () => {
@@ -27,7 +34,9 @@ describe("InfoTooltip", () => {
       <InfoTooltip
         label="Что это?"
         title="Статус research"
-        description="Показывает, доступны ли новости и research-слой."
+        what="Показывает, доступны ли новости и research-слой."
+        why="Это влияет на качество reasoning."
+        how="Смотрите на ON, DEGRADED или OFF."
       />,
     );
 
@@ -49,7 +58,9 @@ describe("InfoTooltip", () => {
         <InfoTooltip
           label="Что это?"
           title="Статус research"
-          description="Показывает, доступны ли новости и research-слой."
+          what="Показывает, доступны ли новости и research-слой."
+          why="Это влияет на качество reasoning."
+          how="Смотрите на ON, DEGRADED или OFF."
         />
       </div>,
     );
@@ -67,5 +78,35 @@ describe("InfoTooltip", () => {
 
     await user.click(screen.getByRole("button", { name: "Снаружи" }));
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("keeps only one tooltip open at a time", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <div>
+        <InfoTooltip
+          label="Что это? Первый"
+          title="Первый tooltip"
+          what="Первое описание."
+          why="Первая причина."
+          how="Первый способ чтения."
+        />
+        <InfoTooltip
+          label="Что это? Второй"
+          title="Второй tooltip"
+          what="Второе описание."
+          why="Вторая причина."
+          how="Второй способ чтения."
+        />
+      </div>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Что это? Первый" }));
+    expect(screen.getByText("Первый tooltip")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Что это? Второй" }));
+    expect(screen.queryByText("Первый tooltip")).not.toBeInTheDocument();
+    expect(screen.getByText("Второй tooltip")).toBeInTheDocument();
   });
 });

@@ -8,7 +8,9 @@ interface KpiCardProps {
   tooltip?: {
     label: string;
     title: string;
-    description: string;
+    what: string;
+    why: string;
+    how: string;
   };
 }
 
@@ -18,7 +20,13 @@ export function KpiCard({ label, value, note, tone = "default", tooltip }: KpiCa
       <div className="kpi-card-header">
         <span className="kpi-card-label">{label}</span>
         {tooltip ? (
-          <InfoTooltip label={tooltip.label} title={tooltip.title} description={tooltip.description} />
+          <InfoTooltip
+            label={tooltip.label}
+            title={tooltip.title}
+            what={tooltip.what}
+            why={tooltip.why}
+            how={tooltip.how}
+          />
         ) : null}
       </div>
       <strong className="kpi-card-value">{value}</strong>

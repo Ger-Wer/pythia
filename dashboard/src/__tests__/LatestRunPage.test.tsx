@@ -105,9 +105,23 @@ describe("LatestRunPage", () => {
     expect(screen.getAllByText("Уверенность: medium").length).toBeGreaterThan(0);
     expect(screen.getAllByText("В избранное").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Убрать из избранного" })).toBeInTheDocument();
+    expect(screen.getAllByText("Почему важно: сильное расхождение с рынком, стоит открыть разбор.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Только сильные" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Только избранное" })).toBeInTheDocument();
 
     const signalItems = screen.getAllByRole("listitem");
     expect(within(signalItems[0]).getByText("Will Burnley finish in last place in the 2025-26 English Premier League?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Только сильные" }));
+    expect(screen.queryByText("Will the Fed cut rates by July?")).not.toBeInTheDocument();
+    expect(screen.getByText("Will BTC hit 150k in 2026?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Только сильные" }));
+    await user.click(screen.getByRole("button", { name: "Только избранное" }));
+    expect(screen.getByText("Will the Fed cut rates by July?")).toBeInTheDocument();
+    expect(screen.queryByText("Will BTC hit 150k in 2026?")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Только избранное" }));
 
     await user.click(screen.getAllByRole("button", { name: "В избранное" })[0]);
 

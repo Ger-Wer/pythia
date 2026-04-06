@@ -7,7 +7,9 @@ interface ActionSummaryCardProps {
   tooltip?: {
     label: string;
     title: string;
-    description: string;
+    what: string;
+    why: string;
+    how: string;
   };
 }
 

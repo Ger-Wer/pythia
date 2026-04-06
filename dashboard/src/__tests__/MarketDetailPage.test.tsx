@@ -90,15 +90,17 @@ describe("MarketDetailPage", () => {
       expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Вердикт Pythia")).toBeInTheDocument();
-    expect(screen.getByText("Почему Pythia расходится с рынком")).toBeInTheDocument();
+    expect(screen.getByText("Что думает Pythia")).toBeInTheDocument();
+    expect(screen.getByText("Почему расходится с рынком")).toBeInTheDocument();
     expect(screen.getByText("Что может сломать прогноз")).toBeInTheDocument();
-    expect(screen.getByText("Research brief")).toBeInTheDocument();
+    expect(screen.getByText("Что отслеживать дальше")).toBeInTheDocument();
+    expect(screen.getByText("Источники и исследовательская справка")).toBeInTheDocument();
     expect(
       screen.getByText("Pythia видит рынок заметно выше цены и считает, что рынок недооценивает проблемы Wolves."),
     ).toBeInTheDocument();
     expect(screen.getByText("03.04.2026, 11:16")).toBeInTheDocument();
     expect(screen.getByText("Wolves выглядят хуже двух прямых конкурентов по форме и составу.")).toBeInTheDocument();
+    expect(screen.getByText("Две победы подряд над соседями по таблице")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Добавить в избранное" }));
 

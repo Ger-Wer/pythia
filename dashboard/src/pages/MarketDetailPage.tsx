@@ -111,8 +111,8 @@ export function MarketDetailPage() {
         <section className="detail-metric-grid">
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Вердикт Pythia"
-              subtitle="Быстрая карточка того, как система оценивает рынок прямо сейчас."
+              title="Что думает Pythia"
+              subtitle="Короткий вывод по рынку: текущая оценка, уверенность и базовая частота."
               tooltip={TOOLTIP_CONTENT.marketVerdict}
             />
             <p className="detail-lead">
@@ -133,8 +133,8 @@ export function MarketDetailPage() {
 
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Почему Pythia расходится с рынком"
-              subtitle="Смысловое объяснение расхождения, а не просто цифра edge."
+              title="Почему расходится с рынком"
+              subtitle="Не просто цифра edge, а краткое объяснение, на чём держится расхождение."
               tooltip={TOOLTIP_CONTENT.marketDivergence}
             />
             <div className="detail-stack">
@@ -160,9 +160,9 @@ export function MarketDetailPage() {
           {details ? (
             <div className="detail-stack">
               <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
-              <p className="muted">
-                Дисквалифицирующий сигнал: {details.research.disconfirming_signal ?? "нет данных"}
-              </p>
+              <p className="muted">Что отслеживать дальше</p>
+              <p className="muted">Дисквалифицирующий сигнал</p>
+              <p>{details.research.disconfirming_signal ?? "нет данных"}</p>
               {!!details.research.second_order_effects?.length ? (
                 <>
                   <p className="muted">Вторичные эффекты:</p>
@@ -179,8 +179,8 @@ export function MarketDetailPage() {
 
         <section className="panel">
           <SectionHeader
-            title="Research brief"
-            subtitle="Сжатая исследовательская справка, собранная для финального решения."
+            title="Источники и исследовательская справка"
+            subtitle="Сжатый контекст и ссылки, к которым можно вернуться после основного вывода."
             tooltip={TOOLTIP_CONTENT.researchBrief}
           />
           {details ? (

@@ -234,6 +234,19 @@ a {
   color: var(--ink);
 }
 
+.info-tooltip-section {
+  display: grid;
+  gap: 2px;
+}
+
+.info-tooltip-heading {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .kpi-card {
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid var(--border);
@@ -271,6 +284,35 @@ a {
 
 .kpi-card-note {
   margin: 10px 0 0;
+}
+
+.attention-card-grid,
+.health-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.attention-card,
+.health-check-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.attention-card p,
+.health-check-card p {
+  margin: 0;
+}
+
+.health-check-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
 }
 
 .attention-list {
@@ -537,6 +579,12 @@ button:disabled {
   background: #fff;
   color: var(--accent);
   border: 1px solid var(--accent);
+}
+
+.ghost-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(37, 95, 74, 0.16);
 }
 
 .danger-btn {

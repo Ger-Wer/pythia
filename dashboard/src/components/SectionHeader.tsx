@@ -6,7 +6,9 @@ interface SectionHeaderProps {
   tooltip?: {
     label: string;
     title: string;
-    description: string;
+    what: string;
+    why: string;
+    how: string;
   };
 }
 
@@ -20,7 +22,9 @@ export function SectionHeader({ title, subtitle, tooltip }: SectionHeaderProps) 
             <InfoTooltip
               label={tooltip.label}
               title={tooltip.title}
-              description={tooltip.description}
+              what={tooltip.what}
+              why={tooltip.why}
+              how={tooltip.how}
             />
           ) : null}
         </div>

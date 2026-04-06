@@ -22,6 +22,7 @@ export interface LatestRunItem {
   edge?: number | null;
   volume?: number | null;
   end_date?: string | null;
+  operator_note?: string | null;
 }
 
 export interface ActionResponse {
