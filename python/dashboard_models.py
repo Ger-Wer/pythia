@@ -55,6 +55,8 @@ class OverviewResponse(BaseModel):
     watchlist_count: int
     latest_run: LatestRunSummary
     top_signals: list[dict[str, Any]]
+    attention_items: list[dict[str, Any]] = []
+    next_step: str = ""
     last_action: ActionResponse
     research_warning: str = ""
 

@@ -165,6 +165,12 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(len(overview["top_signals"]), 3)
             self.assertEqual(overview["last_action"]["action"], "forecast")
             self.assertEqual(overview["statuses"]["research"], "ON")
+            self.assertIn("next_step", overview)
+            self.assertTrue(overview["next_step"])
+            self.assertIn("attention_items", overview)
+            self.assertGreaterEqual(len(overview["attention_items"]), 1)
+            self.assertIn("title", overview["attention_items"][0])
+            self.assertIn("detail", overview["attention_items"][0])
 
     def test_get_overview_and_market_details_from_sqlite(self):
         with TemporaryDirectory() as temp_dir:

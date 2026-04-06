@@ -42,6 +42,13 @@ export interface OverviewResponse {
   watchlist_count: number;
   latest_run: LatestRunSummary;
   top_signals: LatestRunItem[];
+  attention_items: Array<{
+    title: string;
+    detail: string;
+    market_id?: string | null;
+    action_label?: string | null;
+  }>;
+  next_step: string;
   last_action: ActionResponse;
   research_warning: string;
 }

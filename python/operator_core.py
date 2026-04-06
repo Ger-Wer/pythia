@@ -11,6 +11,7 @@ from typing import Any, ContextManager
 from urllib.parse import quote
 
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
+LLM_PROVIDER_ENV_KEYS = ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY")
 
 
 class OperatorCore:
@@ -92,6 +93,54 @@ class OperatorCore:
         if ensure_parent:
             self.log_dir.mkdir(parents=True, exist_ok=True)
         return self.log_dir / "operator_action_status.json"
+
+    @staticmethod
+    def _env_value(key: str) -> str:
+        return os.getenv(key, "").strip()
+
+    @classmethod
+    def _has_any_env(cls, keys: tuple[str, ...]) -> bool:
+        return any(cls._env_value(key) for key in keys)
+
+    @staticmethod
+    def _component_check(component: str, status: str, detail: str) -> dict[str, str]:
+        return {
+            "component": component,
+            "status": status,
+            "detail": detail,
+        }
+
+    def _has_research_predictions(self, conn: sqlite3.Connection) -> bool:
+        if not self._predictions_table_exists(conn):
+            return False
+        if not self._has_column(conn, "dexter_p"):
+            return False
+        valid_filter = self._valid_where_clause(conn)
+        row = conn.execute(
+            f"""
+            SELECT 1
+            FROM predictions
+            WHERE dexter_p IS NOT NULL
+            {valid_filter}
+            LIMIT 1
+            """
+        ).fetchone()
+        return row is not None
+
+    @staticmethod
+    def _attention_item(
+        title: str,
+        detail: str,
+        *,
+        market_id: str | None = None,
+        action_label: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "title": title,
+            "detail": detail,
+            "market_id": market_id,
+            "action_label": action_label,
+        }
 
     @staticmethod
     def _parse_research_brief(payload: str | None) -> dict[str, Any]:
@@ -180,6 +229,8 @@ class OperatorCore:
                         "markets_processed": 0,
                     },
                     "top_signals": [],
+                    "attention_items": [],
+                    "next_step": "Сначала запустите прогнозный прогон и дождитесь первых сигналов.",
                     "last_action": self.get_last_action_summary(),
                     "research_warning": "",
                 }
@@ -205,11 +256,65 @@ class OperatorCore:
 
         latest_run = self.get_latest_run()
         health = self.get_health()
+        top_signals = latest_run["items"][:5]
+        overview_research_status = health["research_status"]
+        if any(item.get("research_probability") is not None for item in latest_run["items"]):
+            overview_research_status = "ON"
+
+        attention_items: list[dict[str, Any]] = []
+        if health["research_warning"]:
+            attention_items.append(
+                self._attention_item(
+                    "Research-слой требует внимания",
+                    health["research_warning"],
+                    action_label="Проверить статус",
+                )
+            )
+        if latest_ts is None or markets_processed == 0:
+            attention_items.append(
+                self._attention_item(
+                    "Нет свежего прогноза",
+                    "Последний forecast ещё не сформировал рабочую картину. Запустите прогнозный прогон.",
+                    action_label="Запустить прогноз",
+                )
+            )
+        elif top_signals:
+            top_signal = top_signals[0]
+            top_signal_edge = top_signal.get("edge")
+            if top_signal_edge is None:
+                edge_detail = "без рассчитанного расхождения"
+            else:
+                edge_detail = f"расхождение {float(top_signal_edge):+.1f} п.п."
+            attention_items.append(
+                self._attention_item(
+                    "Главный сигнал сейчас",
+                    f"{top_signal['question']} · {edge_detail}",
+                    market_id=top_signal["market_id"],
+                    action_label="Открыть разбор",
+                )
+            )
+        if self.get_watchlist_count() == 0 and top_signals:
+            attention_items.append(
+                self._attention_item(
+                    "Избранное пока пусто",
+                    "Добавьте хотя бы один рынок в избранное, чтобы быстро вернуться к нему после следующего прогона.",
+                    market_id=top_signals[0]["market_id"],
+                    action_label="Добавить в избранное",
+                )
+            )
+
+        next_step = "Проверьте здоровье системы и запустите первый прогноз."
+        if top_signals:
+            next_step = "Откройте главный сигнал и решите, добавлять ли его в избранное."
+        elif latest_ts:
+            next_step = "Откройте раздел «Сигналы» и проверьте, появились ли рынки для разбора."
+        elif health["research_warning"]:
+            next_step = "Сначала устраните ограничения research-слоя, затем перезапустите прогноз."
 
         return {
             "statuses": {
                 "system": health["system_status"],
-                "research": health["research_status"],
+                "research": overview_research_status,
             },
             "valid_predictions": valid_predictions,
             "resolved_predictions": resolved_predictions,
@@ -218,7 +323,9 @@ class OperatorCore:
                 "forecast_timestamp": latest_ts,
                 "markets_processed": markets_processed,
             },
-            "top_signals": latest_run["items"][:5],
+            "top_signals": top_signals,
+            "attention_items": attention_items[:3],
+            "next_step": next_step,
             "last_action": self.get_last_action_summary(),
             "research_warning": health["research_warning"],
         }
@@ -398,26 +505,89 @@ class OperatorCore:
     def get_health(self) -> dict[str, Any]:
         system_status = "ON"
         checks: list[dict[str, str]] = []
+        llm_configured = self._has_any_env(LLM_PROVIDER_ENV_KEYS)
+        exa_configured = bool(self._env_value("EXA_API_KEY"))
+        tavily_configured = bool(self._env_value("TAVILY_API_KEY"))
+        telegram_configured = bool(self._env_value("TELEGRAM_BOT_TOKEN") and self._env_value("TELEGRAM_CHAT_ID"))
+        scheduler_visible = self.log_dir.exists() or self._status_file_path().exists()
+        research_status = "ON"
+        research_warning = ""
+        has_historical_research = False
 
         try:
             with self._connect() as conn:
                 if self._predictions_table_exists(conn):
                     count = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
-                    checks.append({"component": "sqlite", "status": "ON", "detail": f"{count} predictions"})
+                    has_historical_research = self._has_research_predictions(conn)
+                    checks.append(self._component_check("sqlite", "ON", f"{count} predictions"))
                 else:
                     system_status = "DEGRADED"
-                    checks.append({"component": "sqlite", "status": "DEGRADED", "detail": "predictions table missing"})
+                    checks.append(self._component_check("sqlite", "DEGRADED", "predictions table missing"))
         except FileNotFoundError:
             system_status = "DEGRADED"
-            checks.append({"component": "sqlite", "status": "DEGRADED", "detail": "database file missing"})
+            checks.append(self._component_check("sqlite", "DEGRADED", "database file missing"))
         except sqlite3.Error as exc:
             system_status = "DEGRADED"
-            checks.append({"component": "sqlite", "status": "DEGRADED", "detail": str(exc)})
+            checks.append(self._component_check("sqlite", "DEGRADED", str(exc)))
+
+        llm_model = self._env_value("MODEL_SYNTHESIS") or self._env_value("MODEL_RESEARCH") or "model not set"
+        if llm_configured:
+            checks.append(self._component_check("llm", "ON", f"configured ({llm_model})"))
+        else:
+            checks.append(self._component_check("llm", "OFF", "API key missing for LLM backend"))
+
+        checks.append(
+            self._component_check(
+                "gamma",
+                "ON",
+                "Polymarket Gamma REST API is public and expected by the pipeline",
+            )
+        )
+        checks.append(
+            self._component_check(
+                "exa",
+                "ON" if exa_configured else "OFF",
+                "news search key configured" if exa_configured else "EXA_API_KEY missing",
+            )
+        )
+        checks.append(
+            self._component_check(
+                "tavily",
+                "ON" if tavily_configured else "OFF",
+                "fallback search key configured" if tavily_configured else "TAVILY_API_KEY missing",
+            )
+        )
+        checks.append(
+            self._component_check(
+                "scheduler",
+                "ON" if scheduler_visible else "DEGRADED",
+                "log directory/status files visible" if scheduler_visible else "scheduler artifacts not visible",
+            )
+        )
+        checks.append(
+            self._component_check(
+                "telegram",
+                "ON" if telegram_configured else "OFF",
+                "bot credentials configured" if telegram_configured else "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing",
+            )
+        )
+
+        if llm_configured and (exa_configured or tavily_configured):
+            research_status = "ON"
+        elif llm_configured:
+            research_status = "DEGRADED"
+            research_warning = "LLM доступен, но news-search выключен: research будет беднее без Exa/Tavily."
+        elif has_historical_research:
+            research_status = "DEGRADED"
+            research_warning = "В базе есть результаты Research+R1, но текущая runtime-конфигурация research неполная."
+        else:
+            research_status = "OFF"
+            research_warning = "Research-контур не сконфигурирован: не найден ключ LLM backend."
 
         return {
             "system_status": system_status,
-            "research_status": "ON",
-            "research_warning": "",
+            "research_status": research_status,
+            "research_warning": research_warning,
             "checks": checks,
         }
 

@@ -64,6 +64,8 @@ class DashboardApiTests(unittest.TestCase):
             self.assertEqual(health_res.json()["system_status"], "ON")
             self.assertEqual(logs_res.json()["latest_file"], "forecast_20260404.log")
             self.assertIn("summary", action_res.json())
+            components = {item["component"] for item in health_res.json()["checks"]}
+            self.assertTrue({"sqlite", "llm", "gamma", "exa", "tavily", "scheduler", "telegram"}.issubset(components))
 
     def test_login_and_overview_flow(self):
         with TemporaryDirectory() as temp_dir:
@@ -99,6 +101,8 @@ class DashboardApiTests(unittest.TestCase):
             overview_res = client.get("/api/overview")
             self.assertEqual(overview_res.status_code, 200)
             self.assertEqual(overview_res.json()["valid_predictions"], 1)
+            self.assertIn("next_step", overview_res.json())
+            self.assertIn("attention_items", overview_res.json())
 
     def test_market_details_and_watchlist_endpoints(self):
         with TemporaryDirectory() as temp_dir:
