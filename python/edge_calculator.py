@@ -53,6 +53,7 @@ def check_edge(db_path: str, min_samples: int = 50) -> dict:
         FROM predictions
         WHERE outcome IS NOT NULL AND outcome IN (0, 1)
         AND dexter_p IS NOT NULL AND naked_p IS NOT NULL
+        AND market_price IS NOT NULL
         """
         + valid_filter
     ).fetchall()

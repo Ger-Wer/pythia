@@ -17,6 +17,7 @@ from python.dashboard_models import (
     MarketDetailsResponse,
     MeResponse,
     OverviewResponse,
+    QualityResponse,
     WatchlistItemRequest,
     WatchlistResponse,
 )
@@ -90,6 +91,11 @@ def create_app(
     def health(request: Request) -> HealthResponse:
         require_session(request)
         return HealthResponse(**core.get_health())
+
+    @app.get("/api/quality", response_model=QualityResponse)
+    def quality(request: Request) -> QualityResponse:
+        require_session(request)
+        return QualityResponse(**core.get_quality())
 
     @app.get("/api/logs", response_model=LogsResponse)
     def logs(request: Request) -> LogsResponse:

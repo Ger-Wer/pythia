@@ -28,6 +28,7 @@ export function SignalList({
               <Link to={`/markets/${item.market_id}`} className="signal-link">
                 {shortenQuestion(item.question, 88)}
               </Link>
+              {item.operator_note ? <p className="signal-operator-note">Почему важно: {item.operator_note}</p> : null}
               <p className="muted signal-meta">
                 Рынок {formatPercent(item.market_price)} · Research+R1 {formatPercent(item.research_probability)} · Edge{" "}
                 {formatEdge(item.edge)}

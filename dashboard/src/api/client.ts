@@ -6,6 +6,7 @@ import type {
   MarketDetailsResponse,
   MeResponse,
   OverviewResponse,
+  QualityResponse,
   WatchlistResponse,
 } from "../types/api";
 
@@ -30,6 +31,7 @@ export const api = {
   me: () => request<MeResponse>("/api/auth/me"),
   overview: () => request<OverviewResponse>("/api/overview"),
   health: () => request<HealthResponse>("/api/health"),
+  quality: () => request<QualityResponse>("/api/quality"),
   logs: () => request<LogsResponse>("/api/logs"),
   latestRun: () => request<LatestRunResponse>("/api/runs/latest"),
   marketDetails: (marketId: string) => request<MarketDetailsResponse>(`/api/markets/${marketId}`),

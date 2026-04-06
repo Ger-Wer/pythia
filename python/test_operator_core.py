@@ -165,6 +165,78 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(len(overview["top_signals"]), 3)
             self.assertEqual(overview["last_action"]["action"], "forecast")
             self.assertEqual(overview["statuses"]["research"], "ON")
+            self.assertIn("next_step", overview)
+            self.assertTrue(overview["next_step"])
+            self.assertIn("attention_items", overview)
+            self.assertGreaterEqual(len(overview["attention_items"]), 1)
+            self.assertIn("title", overview["attention_items"][0])
+            self.assertIn("detail", overview["attention_items"][0])
+
+    def test_get_overview_daily_digest_is_ranked_and_deterministic(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("m1", "Will strongest lead?", "sports", 43.6, 65.0, 68.0, "medium", "2026-04-04T08:16:48Z", 1),
+                        ("m2", "Will mid signal follow?", "macro", 55.0, 44.0, 47.0, "low", "2026-04-04T08:16:48Z", 1),
+                        ("m3", "Will second-strongest hold?", "crypto", 31.0, 48.0, 44.0, "medium", "2026-04-04T08:16:48Z", 1),
+                        ("m4", "Will small edge stay last?", "other", 40.0, 45.0, 44.0, "low", "2026-04-04T08:16:48Z", 1),
+                    ],
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            overview_first = core.get_overview()
+            overview_second = core.get_overview()
+
+            self.assertEqual(overview_first["daily_digest"], overview_second["daily_digest"])
+            self.assertIn("headline", overview_first["daily_digest"])
+            self.assertIn("summary", overview_first["daily_digest"])
+            self.assertIn("items", overview_first["daily_digest"])
+            self.assertEqual([item["market_id"] for item in overview_first["top_signals"][:3]], ["m1", "m3", "m2"])
+            self.assertEqual([item["market_id"] for item in overview_first["daily_digest"]["items"]], ["m1", "m3", "m2"])
+            self.assertLessEqual(len(overview_first["daily_digest"]["items"]), 3)
+
+    def test_get_overview_daily_digest_empty_case_is_reasonable(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)):
+                pass
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir) / "logs")
+            overview = core.get_overview()
+
+            self.assertEqual(
+                overview["daily_digest"],
+                {
+                    "headline": "Сегодня Pythia пока не видит сильных сигналов в последнем прогоне.",
+                    "summary": "Сначала стоит запустить новый прогон, чтобы появились рынки для ручной проверки.",
+                    "items": [],
+                },
+            )
 
     def test_get_overview_and_market_details_from_sqlite(self):
         with TemporaryDirectory() as temp_dir:
@@ -341,6 +413,117 @@ class OperatorCoreTests(unittest.TestCase):
 
             self.assertEqual(health["system_status"], "DEGRADED")
             self.assertTrue(any(check["component"] == "sqlite" for check in health["checks"]))
+
+    def test_get_quality_reports_insufficient_data_honestly(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        forecast_timestamp, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("m1", "Will this resolve?", "Politics", 52.0, 55.0, 54.0, "2026-04-04T08:16:48Z", None, 1),
+                        ("m2", "Will this resolve too?", "Sports", 48.0, 51.0, 50.0, "2026-04-04T08:16:48Z", 1, 1),
+                    ],
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
+            quality = core.get_quality()
+
+            self.assertEqual(quality["resolved_predictions"], 1)
+            self.assertEqual(quality["minimum_needed"], 20)
+            self.assertEqual(quality["status"], "INSUFFICIENT_DATA")
+            self.assertEqual(quality["decision"], "COLLECT")
+            self.assertIsInstance(quality["summary"], str)
+            self.assertIn("нужно", quality["summary"].lower())
+            self.assertEqual(quality["metrics"]["brier_research"], None)
+            self.assertEqual(quality["metrics"]["brier_naked"], None)
+            self.assertEqual(quality["metrics"]["brier_market"], None)
+            self.assertEqual(quality["metrics"]["edge_research_vs_market"], None)
+            self.assertEqual(quality["metrics"]["edge_naked_vs_market"], None)
+            self.assertIsInstance(quality["category_breakdown"], list)
+            self.assertIsNone(quality["calibration_image"])
+            self.assertGreaterEqual(len(quality["glossary"]), 1)
+            self.assertEqual(quality["glossary"][0]["id"], "brier")
+
+    def test_get_quality_uses_real_log_dir_and_ignores_null_market_price_rows(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "db" / "pythia.db"
+            log_dir = Path(temp_dir) / "runtime" / "logs"
+            db_path.parent.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "calibration_20260406.png").write_bytes(b"png")
+
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                rows = []
+                for index in range(21):
+                    rows.append(
+                        (
+                            f"m{index + 1}",
+                            f"Will market {index + 1} resolve?",
+                            "Politics" if index < 11 else "Sports",
+                            None if index == 0 else (50.0 if index % 2 == 0 else 42.0),
+                            58.0 if index % 3 == 0 else 44.0,
+                            55.0 if index % 4 == 0 else 46.0,
+                            f"2026-04-04T08:16:{index:02d}Z",
+                            1 if index % 2 == 0 else 0,
+                            1,
+                        )
+                    )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        forecast_timestamp, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            quality = core.get_quality()
+
+            self.assertEqual(quality["status"], "COMPLETE")
+            self.assertEqual(quality["resolved_predictions"], 21)
+            self.assertIsNotNone(quality["metrics"]["brier_market"])
+            self.assertEqual(quality["calibration_image"], "logs/calibration_20260406.png")
+            self.assertGreaterEqual(len(quality["category_breakdown"]), 1)
 
     def test_get_last_action_summary_normalizes_partial_payload(self):
         with TemporaryDirectory() as temp_dir:

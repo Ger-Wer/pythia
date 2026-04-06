@@ -5,6 +5,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { MarketDetailPage } from "../pages/MarketDetailPage";
 import { OperationsPage } from "../pages/OperationsPage";
 import { OverviewPage } from "../pages/OverviewPage";
+import { QualityPage } from "../pages/QualityPage";
 import { WatchlistPage } from "../pages/WatchlistPage";
 
 export const router = createBrowserRouter([
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <OverviewPage /> },
       { path: "runs/latest", element: <LatestRunPage /> },
+      { path: "quality", element: <QualityPage /> },
       { path: "markets/:marketId", element: <MarketDetailPage /> },
       { path: "watchlist", element: <WatchlistPage /> },
       { path: "operations", element: <OperationsPage /> },

@@ -3,12 +3,15 @@ import { useEffect, useId, useRef, useState } from "react";
 interface InfoTooltipProps {
   label: string;
   title: string;
-  description: string;
+  what: string;
+  why: string;
+  how: string;
 }
 
 type ManualMode = "none" | "pinned" | "dismissed";
+const TOOLTIP_OPEN_EVENT = "pythia:tooltip-open";
 
-export function InfoTooltip({ label, title, description }: InfoTooltipProps) {
+export function InfoTooltip({ label, title, what, why, how }: InfoTooltipProps) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [manualMode, setManualMode] = useState<ManualMode>("none");
@@ -18,9 +21,27 @@ export function InfoTooltip({ label, title, description }: InfoTooltipProps) {
   const open = manualMode === "pinned" || (manualMode !== "dismissed" && (hovered || focused));
 
   useEffect(() => {
+    function handleTooltipOpen(event: Event) {
+      const customEvent = event as CustomEvent<string>;
+      if (customEvent.detail !== tooltipId) {
+        setManualMode("none");
+        setFocused(false);
+        setHovered(false);
+      }
+    }
+
+    window.addEventListener(TOOLTIP_OPEN_EVENT, handleTooltipOpen as EventListener);
+    return () => {
+      window.removeEventListener(TOOLTIP_OPEN_EVENT, handleTooltipOpen as EventListener);
+    };
+  }, [tooltipId]);
+
+  useEffect(() => {
     if (!open) {
       return undefined;
     }
+
+    window.dispatchEvent(new CustomEvent<string>(TOOLTIP_OPEN_EVENT, { detail: tooltipId }));
 
     function handlePointerDown(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
@@ -95,7 +116,18 @@ export function InfoTooltip({ label, title, description }: InfoTooltipProps) {
       {open ? (
         <span id={tooltipId} role="tooltip" className="info-tooltip-popover">
           <strong>{title}</strong>
-          <span>{description}</span>
+          <span className="info-tooltip-section">
+            <span className="info-tooltip-heading">Что это</span>
+            <span>{what}</span>
+          </span>
+          <span className="info-tooltip-section">
+            <span className="info-tooltip-heading">Почему важно</span>
+            <span>{why}</span>
+          </span>
+          <span className="info-tooltip-section">
+            <span className="info-tooltip-heading">Как читать</span>
+            <span>{how}</span>
+          </span>
         </span>
       ) : null}
     </span>

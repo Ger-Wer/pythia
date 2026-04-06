@@ -13,12 +13,18 @@ export function LatestRunPage() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [pendingMarketId, setPendingMarketId] = useState<string | null>(null);
+  const [onlyStrong, setOnlyStrong] = useState(false);
+  const [onlyWatched, setOnlyWatched] = useState(false);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
         const payload = await api.latestRun();
+        if (active) {
+          setData(payload);
+          setError(null);
+        }
         let initialWatchedIds = new Set<string>();
 
         try {
@@ -31,9 +37,7 @@ export function LatestRunPage() {
         }
 
         if (active) {
-          setData(payload);
           setWatchedIds(initialWatchedIds);
-          setError(null);
         }
       } catch {
         if (active) {
@@ -47,13 +51,28 @@ export function LatestRunPage() {
     };
   }, []);
 
-  const sortedItems = useMemo(
-    () =>
-      data?.items
-        ? [...data.items].sort((left, right) => Math.abs(right.edge ?? 0) - Math.abs(left.edge ?? 0))
-        : [],
-    [data],
-  );
+  const sortedItems = useMemo(() => {
+    if (!data?.items) {
+      return [];
+    }
+
+    const items = [...data.items]
+      .sort((left, right) => Math.abs(right.edge ?? 0) - Math.abs(left.edge ?? 0))
+      .map((item) => ({
+        ...item,
+        operator_note: buildOperatorNote(item, watchedIds.has(item.market_id)),
+      }));
+
+    return items.filter((item) => {
+      if (onlyStrong && Math.abs(item.edge ?? 0) < 10) {
+        return false;
+      }
+      if (onlyWatched && !watchedIds.has(item.market_id)) {
+        return false;
+      }
+      return true;
+    });
+  }, [data, onlyStrong, onlyWatched, watchedIds]);
 
   const strongSignals = useMemo(
     () => sortedItems.filter((item) => Math.abs(item.edge ?? 0) >= 10).length,
@@ -140,6 +159,22 @@ export function LatestRunPage() {
           subtitle="Откройте нужный рынок для подробного разбора или сразу добавьте его в избранное."
           tooltip={TOOLTIP_CONTENT.signalFeed}
         />
+        <div className="action-bar">
+          <button
+            type="button"
+            className={onlyStrong ? "ghost-btn is-active" : "ghost-btn"}
+            onClick={() => setOnlyStrong((current) => !current)}
+          >
+            Только сильные
+          </button>
+          <button
+            type="button"
+            className={onlyWatched ? "ghost-btn is-active" : "ghost-btn"}
+            onClick={() => setOnlyWatched((current) => !current)}
+          >
+            Только избранное
+          </button>
+        </div>
         {data ? (
           <SignalList
             items={sortedItems}
@@ -163,4 +198,18 @@ export function LatestRunPage() {
       </section>
     </main>
   );
+}
+
+function buildOperatorNote(item: LatestRunItem, isWatched: boolean): string {
+  const edge = Math.abs(item.edge ?? 0);
+  if (edge >= 15) {
+    return "сильное расхождение с рынком, стоит открыть разбор.";
+  }
+  if (isWatched) {
+    return "рынок уже в избранном, его удобно держать в ручном фокусе.";
+  }
+  if ((item.research_status ?? "ON") !== "ON") {
+    return "research ограничен, оценку стоит читать осторожнее.";
+  }
+  return "спокойный сигнал для быстрой сверки с рынком.";
 }

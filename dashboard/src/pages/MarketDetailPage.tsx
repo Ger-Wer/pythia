@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ProbabilityHistoryChart } from "../components/ProbabilityHistoryChart";
 import { SectionHeader } from "../components/SectionHeader";
 import { TimelinePanel } from "../components/TimelinePanel";
 import { TOOLTIP_CONTENT } from "../content/tooltips";
 import type { MarketDetailsResponse } from "../types/api";
-import { formatEdge, formatPercent } from "../utils/format";
+import { formatEdge, formatPercent, formatTimestamp } from "../utils/format";
 
 export function MarketDetailPage() {
   const { marketId } = useParams<{ marketId: string }>();
@@ -17,11 +18,13 @@ export function MarketDetailPage() {
 
   useEffect(() => {
     let active = true;
+
     async function load() {
       if (!marketId) {
         setError("market_id не указан.");
         return;
       }
+
       try {
         const payload = await api.marketDetails(marketId);
         let isWatched = payload.is_watched ?? false;
@@ -48,7 +51,9 @@ export function MarketDetailPage() {
         }
       }
     }
-    load();
+
+    void load();
+
     return () => {
       active = false;
     };
@@ -56,6 +61,7 @@ export function MarketDetailPage() {
 
   async function toggleWatch() {
     if (!details) return;
+
     setPending(true);
     try {
       if (watched) {
@@ -81,10 +87,29 @@ export function MarketDetailPage() {
       ? details.research_probability - details.market_price
       : null;
 
+  const transparency = details
+    ? {
+        facts:
+          details.transparency?.facts ??
+          [
+            ...(details.research.key_facts ?? []),
+            details.research.summary ?? "",
+            details.research.primary_driver ?? "",
+          ].filter((item): item is string => Boolean(item.trim())),
+        sources: details.transparency?.sources ?? details.research.sources ?? [],
+        falsifier:
+          details.transparency?.falsifier ??
+          details.research.disconfirming_signal ??
+          details.key_risk ??
+          "нет данных",
+        updated_at: details.transparency?.updated_at ?? details.last_updated ?? details.forecast_timestamp ?? null,
+      }
+    : null;
+
   return (
     <main className="page-grid">
       <section className="panel hero-panel">
-        <p className="eyebrow">Pythia Operator Console</p>
+        <p className="eyebrow">Операторская консоль Pythia</p>
         <h1>Разбор рынка</h1>
         {error ? <p className="warning-note">{error}</p> : null}
         {warning ? <p className="warning-note">{warning}</p> : null}
@@ -111,8 +136,8 @@ export function MarketDetailPage() {
         <section className="detail-metric-grid">
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Вердикт Pythia"
-              subtitle="Быстрая карточка того, как система оценивает рынок прямо сейчас."
+              title="Что думает Pythia"
+              subtitle="Короткий вывод по рынку: текущая оценка, уверенность и базовая частота."
               tooltip={TOOLTIP_CONTENT.marketVerdict}
             />
             <p className="detail-lead">
@@ -133,8 +158,8 @@ export function MarketDetailPage() {
 
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Почему Pythia расходится с рынком"
-              subtitle="Смысловое объяснение расхождения, а не просто цифра edge."
+              title="Почему расходится с рынком"
+              subtitle="Не просто цифра edge, а краткое объяснение, на чём держится расхождение."
               tooltip={TOOLTIP_CONTENT.marketDivergence}
             />
             <div className="detail-stack">
@@ -150,40 +175,119 @@ export function MarketDetailPage() {
         </section>
       ) : null}
 
-      <section className="page-grid">
+      {details ? (
         <section className="panel">
           <SectionHeader
-            title="Что может сломать прогноз"
-            subtitle="Главные поводы перепроверить рынок или ждать новых данных."
-            tooltip={TOOLTIP_CONTENT.keyRisk}
+            title="История оценки"
+            subtitle="Как менялись рынок, основной контур и baseline между прогонами."
+            tooltip={TOOLTIP_CONTENT.historyChart}
           />
-          {details ? (
+          <ProbabilityHistoryChart history={details.history} />
+        </section>
+      ) : null}
+
+      {details ? (
+        <section className="detail-metric-grid">
+          <section className="panel">
+            <SectionHeader
+              title="Что может сломать прогноз"
+              subtitle="Главные поводы перепроверить рынок или ждать новых данных."
+              tooltip={TOOLTIP_CONTENT.keyRisk}
+            />
             <div className="detail-stack">
               <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
-              <p className="muted">
-                Дисквалифицирующий сигнал: {details.research.disconfirming_signal ?? "нет данных"}
+              <p className="muted">Что может опровергнуть прогноз</p>
+              <p>{transparency?.falsifier ?? "нет данных"}</p>
+            </div>
+          </section>
+
+          <section className="panel">
+            <SectionHeader
+              title="Прозрачность вывода"
+              subtitle="Какие факты и источники лежат под текущим прогнозом."
+              tooltip={TOOLTIP_CONTENT.transparency}
+            />
+            <div className="transparency-grid">
+              <article className="transparency-card">
+                <p className="muted transparency-label">Какие факты использованы</p>
+                <ul className="attention-list">
+                  {transparency?.facts?.length ? (
+                    transparency.facts.map((fact) => <li key={fact}>{fact}</li>)
+                  ) : (
+                    <li>Нет данных</li>
+                  )}
+                </ul>
+              </article>
+
+              <article className="transparency-card">
+                <p className="muted transparency-label">Какие источники использованы</p>
+                <ul className="source-list">
+                  {transparency?.sources?.length ? (
+                    transparency.sources.map((source) => (
+                      <li key={source}>
+                        <a href={source} target="_blank" rel="noreferrer">
+                          {source}
+                        </a>
+                      </li>
+                    ))
+                  ) : (
+                    <li>Нет данных</li>
+                  )}
+                </ul>
+              </article>
+
+              <article className="transparency-card">
+                <p className="muted transparency-label">Что может опровергнуть прогноз</p>
+                <p>{transparency?.falsifier ?? "нет данных"}</p>
+              </article>
+
+              <article className="transparency-card">
+                <p className="muted transparency-label">Последнее обновление</p>
+                <p>{formatTimestamp(transparency?.updated_at)}</p>
+              </article>
+            </div>
+          </section>
+        </section>
+      ) : null}
+
+      {details ? (
+        <section className="detail-metric-grid">
+          <section className="panel">
+            <SectionHeader
+              title="Что отслеживать дальше"
+              subtitle="Короткий checklist после основного вывода."
+              tooltip={TOOLTIP_CONTENT.followUp}
+            />
+            <div className="detail-stack">
+              <p className="detail-lead">
+                {details.research.primary_driver ?? "Следующие сигналы помогут понять, сохраняется ли текущий тезис."}
               </p>
+              <p className="muted">Основной драйвер</p>
+              <p>{details.research.primary_driver ?? "нет данных"}</p>
               {!!details.research.second_order_effects?.length ? (
                 <>
-                  <p className="muted">Вторичные эффекты:</p>
+                  <p className="muted">Вторичные эффекты</p>
                   <ul className="attention-list">
                     {details.research.second_order_effects.map((effect) => (
                       <li key={effect}>{effect}</li>
                     ))}
                   </ul>
                 </>
-              ) : null}
+              ) : (
+                <>
+                  <p className="muted">Вторичные эффекты</p>
+                  <p className="muted">Вторичные эффекты пока не выделены.</p>
+                </>
+              )}
             </div>
-          ) : null}
-        </section>
+          </section>
 
-        <section className="panel">
-          <SectionHeader
-            title="Research brief"
-            subtitle="Сжатая исследовательская справка, собранная для финального решения."
-            tooltip={TOOLTIP_CONTENT.researchBrief}
-          />
-          {details ? (
+          <section className="panel">
+            <SectionHeader
+              title="Источники и исследовательская справка"
+              subtitle="Сжатый контекст и ссылки, к которым можно вернуться после основного вывода."
+              tooltip={TOOLTIP_CONTENT.researchBrief}
+            />
             <div className="detail-stack">
               <p className="detail-lead">{details.research.summary || "Краткая сводка пока отсутствует."}</p>
               {!!details.research.key_facts?.length ? (
@@ -211,9 +315,9 @@ export function MarketDetailPage() {
                 </>
               ) : null}
             </div>
-          ) : null}
+          </section>
         </section>
-      </section>
+      ) : null}
 
       <TimelinePanel history={details?.history} forecastTimestamp={details?.forecast_timestamp} endDate={details?.end_date} />
     </main>

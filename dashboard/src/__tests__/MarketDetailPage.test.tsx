@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
@@ -36,6 +36,7 @@ function marketDetailsPayload(overrides: Record<string, unknown> = {}) {
     volume: 28974,
     end_date: "2026-05-27T00:00:00Z",
     forecast_timestamp: "2026-04-04T08:16:48.766Z",
+    last_updated: "2026-04-05T09:00:00.000Z",
     history: [
       {
         forecast_timestamp: "2026-04-03T08:16:48.766Z",
@@ -57,6 +58,12 @@ function marketDetailsPayload(overrides: Record<string, unknown> = {}) {
       second_order_effects: ["Проблемы с созданием моментов"],
       disconfirming_signal: "Две победы подряд над соседями по таблице",
       sources: ["https://example.com/wolves"],
+    },
+    transparency: {
+      facts: ["Слабая форма", "Плохие xG-метрики", "Результаты Wolves в ближайших турах"],
+      sources: ["https://example.com/wolves"],
+      falsifier: "Две победы подряд над соседями по таблице",
+      updated_at: "2026-04-05T09:00:00.000Z",
     },
     ...overrides,
   };
@@ -90,15 +97,26 @@ describe("MarketDetailPage", () => {
       expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Вердикт Pythia")).toBeInTheDocument();
-    expect(screen.getByText("Почему Pythia расходится с рынком")).toBeInTheDocument();
+    expect(screen.getByText("Что думает Pythia")).toBeInTheDocument();
+    expect(screen.getByText("Почему расходится с рынком")).toBeInTheDocument();
+    expect(screen.getByText("История оценки")).toBeInTheDocument();
     expect(screen.getByText("Что может сломать прогноз")).toBeInTheDocument();
-    expect(screen.getByText("Research brief")).toBeInTheDocument();
+    expect(screen.getByText("Прозрачность вывода")).toBeInTheDocument();
+    expect(screen.getByText("Что отслеживать дальше")).toBeInTheDocument();
+    expect(screen.getByText("Источники и исследовательская справка")).toBeInTheDocument();
     expect(
       screen.getByText("Pythia видит рынок заметно выше цены и считает, что рынок недооценивает проблемы Wolves."),
     ).toBeInTheDocument();
     expect(screen.getByText("03.04.2026, 11:16")).toBeInTheDocument();
     expect(screen.getByText("Wolves выглядят хуже двух прямых конкурентов по форме и составу.")).toBeInTheDocument();
+    const transparencySection = screen.getByRole("heading", { name: "Прозрачность вывода" }).closest("section");
+    expect(transparencySection).not.toBeNull();
+    const transparency = within(transparencySection as HTMLElement);
+    expect(transparency.getByText("Две победы подряд над соседями по таблице")).toBeInTheDocument();
+    expect(transparency.getByText("Какие факты использованы")).toBeInTheDocument();
+    expect(transparency.getByText("Какие источники использованы")).toBeInTheDocument();
+    expect(transparency.getByText("Что может опровергнуть прогноз")).toBeInTheDocument();
+    expect(transparency.getByText("Последнее обновление")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Добавить в избранное" }));
 

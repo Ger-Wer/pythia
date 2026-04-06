@@ -88,6 +88,11 @@ a {
   gap: 16px;
 }
 
+.quality-hero {
+  background: linear-gradient(180deg, #f8fbf6 0%, #eef5e9 100%);
+  border-color: #cfd8c9;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -125,6 +130,28 @@ a {
   gap: 12px;
   margin-top: 14px;
   color: var(--muted);
+}
+
+.quality-summary {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  display: grid;
+  gap: 8px;
+}
+
+.quality-summary p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .status-pills {
@@ -174,10 +201,29 @@ a {
   vertical-align: top;
 }
 
+.quality-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quality-breakdown-table th,
+.quality-breakdown-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
 .action-bar {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .section-header {
@@ -234,6 +280,19 @@ a {
   color: var(--ink);
 }
 
+.info-tooltip-section {
+  display: grid;
+  gap: 2px;
+}
+
+.info-tooltip-heading {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .kpi-card {
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid var(--border);
@@ -271,6 +330,114 @@ a {
 
 .kpi-card-note {
   margin: 10px 0 0;
+}
+
+.attention-card-grid,
+.health-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.attention-card,
+.health-check-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.attention-card p,
+.health-check-card p {
+  margin: 0;
+}
+
+.daily-digest-card {
+  border: 1px solid rgba(37, 95, 74, 0.16);
+  background: linear-gradient(180deg, rgba(247, 251, 247, 0.96) 0%, rgba(255, 255, 255, 0.8) 100%);
+}
+
+.daily-digest-summary {
+  margin: 0 0 16px;
+  max-width: 72ch;
+  color: var(--ink);
+}
+
+.daily-digest-headline {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.daily-digest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.daily-digest-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.daily-digest-item-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.daily-digest-rank {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 95, 74, 0.1);
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.daily-digest-copy {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.daily-digest-copy strong {
+  font-size: 1rem;
+}
+
+.daily-digest-detail {
+  margin: 0;
+}
+
+.daily-digest-reason {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(37, 95, 74, 0.05);
+}
+
+.daily-digest-action {
+  justify-self: start;
+}
+
+.health-check-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
 }
 
 .attention-list {
@@ -444,6 +611,118 @@ a {
   min-height: 100%;
 }
 
+.probability-history-chart {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.probability-history-chart-frame {
+  border-radius: 18px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: linear-gradient(180deg, rgba(247, 251, 247, 0.96) 0%, rgba(255, 255, 255, 0.9) 100%);
+  padding: 12px;
+}
+
+.probability-history-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 640 / 240;
+}
+
+.probability-history-gridline {
+  stroke: rgba(23, 34, 30, 0.08);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.probability-history-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.probability-history-point {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.probability-history-point-last {
+  stroke-width: 2.5;
+}
+
+.probability-history-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.probability-history-meta {
+  display: grid;
+  gap: 10px;
+}
+
+.probability-history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.probability-history-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.probability-history-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.probability-history-legend-item strong {
+  font-weight: 700;
+}
+
+.probability-history-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.transparency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.transparency-card {
+  border-radius: 16px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.transparency-card p {
+  margin: 0;
+}
+
+.transparency-label {
+  font-weight: 600;
+}
+
 .detail-lead {
   margin: 0;
   font-size: 1rem;
@@ -539,6 +818,12 @@ button:disabled {
   border: 1px solid var(--accent);
 }
 
+.ghost-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(37, 95, 74, 0.16);
+}
+
 .danger-btn {
   background: var(--danger);
 }
@@ -593,6 +878,10 @@ input {
   .detail-metric-grid {
     grid-template-columns: 1fr;
   }
+
+  .transparency-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -622,6 +911,10 @@ input {
   }
 
   .timeline-list li {
+    flex-direction: column;
+  }
+
+  .probability-history-footnote {
     flex-direction: column;
   }
 }
