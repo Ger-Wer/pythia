@@ -1,9 +1,13 @@
-export interface OverviewResponse {
-  valid_predictions: number;
-  latest_run: {
-    forecast_timestamp: string | null;
-    markets_processed: number;
-  };
+export type StatusLevel = "ON" | "DEGRADED" | "OFF";
+
+export interface StatusSummary {
+  system: StatusLevel;
+  research: StatusLevel;
+}
+
+export interface LatestRunSummary {
+  forecast_timestamp: string | null;
+  markets_processed: number;
 }
 
 export interface LatestRunItem {
@@ -13,15 +17,57 @@ export interface LatestRunItem {
   market_price?: number | null;
   research_probability?: number | null;
   naked_probability?: number | null;
+  confidence?: string | null;
+  research_status?: StatusLevel | null;
   edge?: number | null;
   volume?: number | null;
   end_date?: string | null;
+}
+
+export interface ActionResponse {
+  action: string | null;
+  status: "success" | "failed" | "idle";
+  summary: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_seconds: number | null;
+  technical_log: string;
+  returncode: number | null;
+}
+
+export interface OverviewResponse {
+  statuses: StatusSummary;
+  valid_predictions: number;
+  resolved_predictions: number;
+  watchlist_count: number;
+  latest_run: LatestRunSummary;
+  top_signals: LatestRunItem[];
+  last_action: ActionResponse;
+  research_warning: string;
 }
 
 export interface LatestRunResponse {
   forecast_timestamp: string | null;
   markets_processed: number;
   items: LatestRunItem[];
+}
+
+export interface HealthCheckItem {
+  component: string;
+  status: StatusLevel;
+  detail: string;
+}
+
+export interface HealthResponse {
+  system_status: StatusLevel;
+  research_status: StatusLevel;
+  research_warning: string;
+  checks: HealthCheckItem[];
+}
+
+export interface LogsResponse {
+  latest_file: string | null;
+  excerpt: string;
 }
 
 export interface MarketDetailsResponse {
@@ -31,12 +77,20 @@ export interface MarketDetailsResponse {
   research_probability?: number | null;
   naked_probability?: number | null;
   confidence?: string | null;
+  verdict_summary?: string;
+  is_watched?: boolean;
   reasoning?: string | null;
   key_risk?: string | null;
   base_rate?: string | null;
   volume?: number | null;
   end_date?: string | null;
   forecast_timestamp?: string | null;
+  history?: Array<{
+    forecast_timestamp?: string | null;
+    market_price?: number | null;
+    research_probability?: number | null;
+    naked_probability?: number | null;
+  }>;
   research: {
     summary?: string;
     key_facts?: string[];
@@ -67,12 +121,4 @@ export interface WatchlistResponse {
 export interface MeResponse {
   authenticated: boolean;
   username: string | null;
-}
-
-export interface ActionResponse {
-  action: string;
-  returncode: number;
-  stdout: string;
-  stderr: string;
-  status: "success" | "failed";
 }

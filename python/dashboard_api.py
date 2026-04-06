@@ -9,8 +9,11 @@ from fastapi.staticfiles import StaticFiles
 
 from python.dashboard_auth import DashboardAuthConfig, build_serializer, verify_password
 from python.dashboard_models import (
+    ActionResponse,
+    HealthResponse,
     LatestRunResponse,
     LoginRequest,
+    LogsResponse,
     MarketDetailsResponse,
     MeResponse,
     OverviewResponse,
@@ -83,6 +86,16 @@ def create_app(
         require_session(request)
         return OverviewResponse(**core.get_overview())
 
+    @app.get("/api/health", response_model=HealthResponse)
+    def health(request: Request) -> HealthResponse:
+        require_session(request)
+        return HealthResponse(**core.get_health())
+
+    @app.get("/api/logs", response_model=LogsResponse)
+    def logs(request: Request) -> LogsResponse:
+        require_session(request)
+        return LogsResponse(**core.get_logs_summary())
+
     @app.get("/api/runs/latest", response_model=LatestRunResponse)
     def latest_run(request: Request) -> LatestRunResponse:
         require_session(request)
@@ -113,12 +126,12 @@ def create_app(
         core.remove_from_watchlist(market_id)
         return {"ok": True}
 
-    @app.post("/api/actions/{action}")
-    def run_action(action: str, request: Request) -> dict:
+    @app.post("/api/actions/{action}", response_model=ActionResponse)
+    def run_action(action: str, request: Request) -> ActionResponse:
         require_session(request)
         if action not in SAFE_ACTION_NAMES:
             raise HTTPException(status_code=404, detail="UNKNOWN_ACTION")
-        return core.run_safe_action(action)
+        return ActionResponse(**core.run_safe_action(action))
 
     resolved_static_dir: Path | None = None
     if static_dir is not None:

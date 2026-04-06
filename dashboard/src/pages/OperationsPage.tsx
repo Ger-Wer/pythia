@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { ActionBar } from "../components/ActionBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { SectionHeader } from "../components/SectionHeader";
 import { api } from "../api/client";
-import type { ActionResponse } from "../types/api";
+import type { ActionResponse, LogsResponse } from "../types/api";
+import { formatDuration, formatTimestamp } from "../utils/format";
 
 type ActionName = "forecast" | "resolve" | "weekly";
 
 export function OperationsPage() {
   const [busy, setBusy] = useState<ActionName | null>(null);
   const [status, setStatus] = useState<ActionResponse | null>(null);
+  const [logs, setLogs] = useState<LogsResponse | null>(null);
+  const [showLog, setShowLog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ActionName | null>(null);
 
@@ -19,9 +23,11 @@ export function OperationsPage() {
   async function runAction(action: ActionName) {
     setBusy(action);
     setError(null);
+    setShowLog(false);
     try {
       const result = await api.runAction(action);
       setStatus(result);
+      setLogs(null);
     } catch {
       setError(`Не удалось выполнить команду ${action}.`);
     } finally {
@@ -29,17 +35,43 @@ export function OperationsPage() {
     }
   }
 
+  async function revealLog() {
+    setShowLog(true);
+    if (status?.technical_log) {
+      return;
+    }
+    try {
+      const payload = await api.logs();
+      setLogs(payload);
+    } catch {
+      setError("Не удалось загрузить технический лог.");
+    }
+  }
+
   return (
     <main className="page-grid">
       <section className="panel">
-        <h1>Операторские действия</h1>
+        <SectionHeader
+          title="Операции"
+          subtitle="Запускайте редкие тяжёлые команды отсюда. Сначала показываем человеческий итог, лог скрыт вторым слоем."
+        />
         <ActionBar busyAction={busy} onRun={(action) => setConfirmAction(action)} />
         {status ? (
           <div className={status.status === "success" ? "status-box ok" : "status-box off"}>
-            <p>
-              Команда <strong>{status.action}</strong>: {status.status} (код {status.returncode})
+            <p className="status-box-title">
+              {status.action === "forecast" ? "Прогнозный прогон" : status.action === "resolve" ? "Проверка resolved" : "Weekly-отчёт"}
             </p>
-            <pre>{status.stdout || status.stderr || "Вывод пуст."}</pre>
+            <p>{status.summary}</p>
+            <div className="status-inline-meta">
+              <span>Статус: {status.status}</span>
+              <span>Код: {status.returncode ?? "n/a"}</span>
+              <span>Длительность: {formatDuration(status.duration_seconds)}</span>
+              <span>Завершено: {formatTimestamp(status.finished_at)}</span>
+            </div>
+            <button type="button" className="ghost-btn" onClick={revealLog}>
+              {showLog ? "Скрыть технический лог" : "Показать технический лог"}
+            </button>
+            {showLog ? <pre>{status.technical_log || logs?.excerpt || "Лог пока пуст."}</pre> : null}
           </div>
         ) : null}
         {error ? <p>{error}</p> : null}

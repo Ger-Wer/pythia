@@ -1,12 +1,11 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { SectionHeader } from "../components/SectionHeader";
 import { WatchlistPanel } from "../components/WatchlistPanel";
 import type { WatchlistItem } from "../types/api";
 
 export function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
-  const [marketId, setMarketId] = useState("");
-  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function loadWatchlist() {
@@ -34,23 +33,6 @@ export function WatchlistPage() {
     };
   }, []);
 
-  async function onAdd(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    if (!marketId.trim()) {
-      setError("Укажите market_id.");
-      return;
-    }
-    try {
-      await api.addWatchlist(marketId.trim(), note.trim());
-      setMarketId("");
-      setNote("");
-      await loadWatchlist();
-    } catch {
-      setError("Не удалось добавить элемент в watchlist.");
-    }
-  }
-
   async function onRemove(id: string) {
     setError(null);
     try {
@@ -64,14 +46,13 @@ export function WatchlistPage() {
   return (
     <main className="page-grid">
       <section className="panel">
-        <h1>Watchlist</h1>
-        <form onSubmit={onAdd} className="watchlist-form">
-          <label htmlFor="market-id">market_id</label>
-          <input id="market-id" value={marketId} onChange={(event) => setMarketId(event.target.value)} />
-          <label htmlFor="watch-note">Заметка</label>
-          <input id="watch-note" value={note} onChange={(event) => setNote(event.target.value)} />
-          <button type="submit">Добавить</button>
-        </form>
+        <SectionHeader
+          title="Избранное"
+          subtitle="Здесь нет ручного ввода market_id. Основной сценарий — смотреть уже отмеченные рынки и чистить список, когда фокус сменился."
+        />
+        <p className="muted">
+          Позже сюда добавятся быстрые действия из экранов “Сигналы” и “Разбор рынка”. Пока этот раздел работает как понятный список наблюдения.
+        </p>
         {error ? <p>{error}</p> : null}
       </section>
       <WatchlistPanel items={items} onRemove={onRemove} />
