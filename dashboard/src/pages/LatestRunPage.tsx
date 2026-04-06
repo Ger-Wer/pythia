@@ -21,6 +21,10 @@ export function LatestRunPage() {
     async function load() {
       try {
         const payload = await api.latestRun();
+        if (active) {
+          setData(payload);
+          setError(null);
+        }
         let initialWatchedIds = new Set<string>();
 
         try {
@@ -33,9 +37,7 @@ export function LatestRunPage() {
         }
 
         if (active) {
-          setData(payload);
           setWatchedIds(initialWatchedIds);
-          setError(null);
         }
       } catch {
         if (active) {
