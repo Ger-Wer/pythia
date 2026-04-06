@@ -400,6 +400,65 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertGreaterEqual(len(quality["glossary"]), 1)
             self.assertEqual(quality["glossary"][0]["id"], "brier")
 
+    def test_get_quality_uses_real_log_dir_and_ignores_null_market_price_rows(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "db" / "pythia.db"
+            log_dir = Path(temp_dir) / "runtime" / "logs"
+            db_path.parent.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "calibration_20260406.png").write_bytes(b"png")
+
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                rows = []
+                for index in range(21):
+                    rows.append(
+                        (
+                            f"m{index + 1}",
+                            f"Will market {index + 1} resolve?",
+                            "Politics" if index < 11 else "Sports",
+                            None if index == 0 else (50.0 if index % 2 == 0 else 42.0),
+                            58.0 if index % 3 == 0 else 44.0,
+                            55.0 if index % 4 == 0 else 46.0,
+                            f"2026-04-04T08:16:{index:02d}Z",
+                            1 if index % 2 == 0 else 0,
+                            1,
+                        )
+                    )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        forecast_timestamp, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            quality = core.get_quality()
+
+            self.assertEqual(quality["status"], "COMPLETE")
+            self.assertEqual(quality["resolved_predictions"], 21)
+            self.assertIsNotNone(quality["metrics"]["brier_market"])
+            self.assertEqual(quality["calibration_image"], "logs/calibration_20260406.png")
+            self.assertGreaterEqual(len(quality["category_breakdown"]), 1)
+
     def test_get_last_action_summary_normalizes_partial_payload(self):
         with TemporaryDirectory() as temp_dir:
             log_dir = Path(temp_dir) / "logs"

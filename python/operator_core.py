@@ -333,7 +333,7 @@ class OperatorCore:
         }
 
     def get_quality(self) -> dict[str, Any]:
-        return load_quality_snapshot(self.db_path)
+        return load_quality_snapshot(self.db_path, self.log_dir)
 
     def get_market_details(self, market_id: str) -> dict[str, Any]:
         with self._connect() as conn:
