@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InfoTooltip } from "../components/InfoTooltip";
+import { TOOLTIP_CONTENT } from "../content/tooltips";
 
 describe("InfoTooltip", () => {
   it("shows explanatory text after operator interaction", async () => {
@@ -108,5 +109,15 @@ describe("InfoTooltip", () => {
     await user.click(screen.getByRole("button", { name: "Что это? Второй" }));
     expect(screen.queryByText("Первый tooltip")).not.toBeInTheDocument();
     expect(screen.getByText("Второй tooltip")).toBeInTheDocument();
+  });
+
+  it("keeps every tooltip aligned to the what-why-how contract", () => {
+    for (const value of Object.values(TOOLTIP_CONTENT)) {
+      expect(value.label.trim().length).toBeGreaterThan(0);
+      expect(value.title.trim().length).toBeGreaterThan(0);
+      expect(value.what.trim().length).toBeGreaterThan(0);
+      expect(value.why.trim().length).toBeGreaterThan(0);
+      expect(value.how.trim().length).toBeGreaterThan(0);
+    }
   });
 });
