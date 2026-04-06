@@ -28,6 +28,21 @@ function formatDecision(decision: QualityResponse["decision"]): string {
   return exhaustiveCheck;
 }
 
+function formatDecisionNote(decision: QualityResponse["decision"], isComplete: boolean): string {
+  switch (decision) {
+    case "GO":
+      return isComplete ? "Сейчас можно переходить к разбору." : "Решение готово, но выборку ещё лучше добрать.";
+    case "COLLECT":
+      return "Пока собираем данные, чтобы решение было честным.";
+    case "PIVOT":
+      return "Лучше сместить фокус и донабрать нужную выборку.";
+    case "STOP":
+      return "Сейчас стоит остановиться и не делать выводы.";
+  }
+  const exhaustiveCheck: never = decision;
+  return exhaustiveCheck;
+}
+
 export function QualityKpiGrid({ data }: QualityKpiGridProps) {
   const { metrics } = data;
   const isComplete = data.status === "COMPLETE";
@@ -46,7 +61,7 @@ export function QualityKpiGrid({ data }: QualityKpiGridProps) {
       <KpiCard
         label="Решение"
         value={formatDecision(data.decision)}
-        note={`${data.decision} · ${isComplete ? "Можно переходить к разбору." : "Пока добираем решённые рынки."}`}
+        note={formatDecisionNote(data.decision, isComplete)}
         tone={isComplete ? "accent" : "warning"}
       />
       <KpiCard label="Brier" value={brierValue} note="исследование · базовая линия · рынок" />
