@@ -114,6 +114,7 @@ describe("QualityPage", () => {
     expect(screen.getByText("Оперативная сводка")).toBeInTheDocument();
     expect(screen.getByText(/Статус:\s*Данные готовы/)).toBeInTheDocument();
     expect(screen.getByText("Продолжать")).toBeInTheDocument();
+    expect(screen.getByText("Продолжать")).toHaveClass("is-compact");
     expect(screen.getByText("Сейчас можно переходить к разбору.")).toBeInTheDocument();
     expect(screen.getByText("Преимущество относительно рынка")).toBeInTheDocument();
     expect(screen.getByText("Решённые рынки")).toBeInTheDocument();

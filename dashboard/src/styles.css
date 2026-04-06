@@ -328,8 +328,17 @@ a {
   line-height: 1;
 }
 
+.kpi-card-value.is-compact {
+  font-size: 1.35rem;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
 .kpi-card-note {
   margin: 10px 0 0;
+  line-height: 1.45;
 }
 
 .attention-card-grid,

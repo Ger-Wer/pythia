@@ -5,6 +5,7 @@ interface KpiCardProps {
   value: string | number;
   note?: string;
   tone?: "default" | "accent" | "warning";
+  compact?: boolean;
   tooltip?: {
     label: string;
     title: string;
@@ -14,7 +15,7 @@ interface KpiCardProps {
   };
 }
 
-export function KpiCard({ label, value, note, tone = "default", tooltip }: KpiCardProps) {
+export function KpiCard({ label, value, note, tone = "default", compact = false, tooltip }: KpiCardProps) {
   return (
     <article className={`kpi-card kpi-card-${tone}`}>
       <div className="kpi-card-header">
@@ -29,7 +30,7 @@ export function KpiCard({ label, value, note, tone = "default", tooltip }: KpiCa
           />
         ) : null}
       </div>
-      <strong className="kpi-card-value">{value}</strong>
+      <strong className={`kpi-card-value${compact ? " is-compact" : ""}`}>{value}</strong>
       {note ? <p className="muted kpi-card-note">{note}</p> : null}
     </article>
   );

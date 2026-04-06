@@ -63,9 +63,15 @@ export function QualityKpiGrid({ data }: QualityKpiGridProps) {
         value={formatDecision(data.decision)}
         note={formatDecisionNote(data.decision, isComplete)}
         tone={isComplete ? "accent" : "warning"}
+        compact
       />
-      <KpiCard label="Brier" value={brierValue} note="исследование · базовая линия · рынок" />
-      <KpiCard label="Преимущество относительно рынка" value={edgeValue} note="исследование · базовая линия" />
+      <KpiCard label="Brier" value={brierValue} note="исследование · базовая линия · рынок" compact />
+      <KpiCard
+        label="Преимущество относительно рынка"
+        value={edgeValue}
+        note="исследование · базовая линия"
+        compact
+      />
       <KpiCard
         label="Решённые рынки"
         value={`${data.resolved_predictions} / ${data.minimum_needed}`}
