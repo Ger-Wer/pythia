@@ -10,7 +10,7 @@ export function MetricGlossaryPanel({ items }: MetricGlossaryPanelProps) {
     <section className="panel">
       <SectionHeader
         title="Как читать метрики"
-        subtitle="Короткий словарь помогает быстро сверить Brier, edge и логику решения без лишней аналитической свалки."
+        subtitle="Короткий словарь помогает быстро сверить Brier, преимущество и логику решения без лишней аналитической свалки."
       />
       {items.length ? (
         <div className="glossary-grid">

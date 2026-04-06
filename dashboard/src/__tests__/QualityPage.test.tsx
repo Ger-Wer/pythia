@@ -17,13 +17,23 @@ describe("QualityPage", () => {
     quality.mockReset();
   });
 
+  it("shows an error state when the quality request fails", async () => {
+    quality.mockRejectedValueOnce(new Error("network down"));
+
+    render(<QualityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Не удалось загрузить экран качества.")).toBeInTheDocument();
+    });
+  });
+
   it("shows an honest warning when there are not enough resolved markets", async () => {
     quality.mockResolvedValueOnce({
       resolved_predictions: 8,
       minimum_needed: 25,
       status: "INSUFFICIENT_DATA",
       decision: "COLLECT",
-      summary: "Сейчас недостаточно resolved-рынков, чтобы честно оценивать качество.",
+      summary: "Сейчас недостаточно решённых рынков, чтобы честно оценивать качество.",
       metrics: {
         brier_research: null,
         brier_naked: null,
@@ -46,10 +56,12 @@ describe("QualityPage", () => {
     render(<QualityPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/недостаточно resolved-рынков/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Качество" })).toBeInTheDocument();
     });
 
-    expect(screen.getByText("category breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Оперативная сводка")).toBeInTheDocument();
+    expect(screen.getByText("Решённые рынки")).toBeInTheDocument();
+    expect(screen.getByText("Разбивка по категориям")).toBeInTheDocument();
     expect(screen.getByText("macro")).toBeInTheDocument();
   });
 
@@ -59,7 +71,7 @@ describe("QualityPage", () => {
       minimum_needed: 25,
       status: "COMPLETE",
       decision: "GO",
-      summary: "Quality data is complete and ready for operator review.",
+      summary: "Экран качества готов для операторского просмотра.",
       metrics: {
         brier_research: 0.18,
         brier_naked: 0.2,
@@ -99,10 +111,40 @@ describe("QualityPage", () => {
       expect(screen.getByRole("heading", { name: "Качество" })).toBeInTheDocument();
     });
 
-    expect(screen.getAllByText("Brier").length).toBeGreaterThan(0);
-    expect(screen.getByText("edge vs market")).toBeInTheDocument();
-    expect(screen.getByText("решение")).toBeInTheDocument();
-    expect(screen.getByText("category breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Оперативная сводка")).toBeInTheDocument();
+    expect(screen.getByText(/Статус:\s*Данные готовы/)).toBeInTheDocument();
+    expect(screen.getByText("Продолжать")).toBeInTheDocument();
+    expect(screen.getByText("Преимущество относительно рынка")).toBeInTheDocument();
+    expect(screen.getByText("Решённые рынки")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Разбивка по категориям" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Как читать метрики" })).toBeInTheDocument();
+  });
+
+  it("shows the breakdown empty state when resolved markets exist but rows are empty", async () => {
+    quality.mockResolvedValueOnce({
+      resolved_predictions: 3,
+      minimum_needed: 25,
+      status: "INSUFFICIENT_DATA",
+      decision: "COLLECT",
+      summary: "Данные есть, но разбивка по категориям ещё не собрана.",
+      metrics: {
+        brier_research: null,
+        brier_naked: null,
+        brier_market: null,
+        edge_research_vs_market: null,
+        edge_naked_vs_market: null,
+      },
+      category_breakdown: [],
+      calibration_image: null,
+      glossary: [],
+    });
+
+    render(<QualityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Разбивка по категориям" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Разбивка по категориям пока не готова.")).toBeInTheDocument();
   });
 });

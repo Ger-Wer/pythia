@@ -16,30 +16,34 @@ export function CategoryBreakdownTable({ rows }: CategoryBreakdownTableProps) {
   return (
     <section className="panel">
       <SectionHeader
-        title="category breakdown"
+        title="Разбивка по категориям"
         subtitle="Смотрим, где качество сильнее, а где выборка пока тянет метрики вниз."
       />
       <div className="table-wrap">
-        <table className="quality-breakdown-table">
-          <thead>
-            <tr>
-              <th>Категория</th>
-              <th>Resolved</th>
-              <th>Brier research</th>
-              <th>Brier market</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.category}>
-                <td>{row.category}</td>
-                <td>{row.resolved}</td>
-                <td>{formatScore(row.brier_research)}</td>
-                <td>{formatScore(row.brier_market)}</td>
+        {rows.length ? (
+          <table className="quality-breakdown-table">
+            <thead>
+              <tr>
+                <th>Категория</th>
+                <th>Решённые</th>
+                <th>Brier по исследованию</th>
+                <th>Brier по рынку</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.category}>
+                  <td>{row.category}</td>
+                  <td>{row.resolved}</td>
+                  <td>{formatScore(row.brier_research)}</td>
+                  <td>{formatScore(row.brier_market)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted">Разбивка по категориям пока не готова.</p>
+        )}
       </div>
     </section>
   );
