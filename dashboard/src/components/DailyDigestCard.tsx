@@ -15,7 +15,7 @@ export function DailyDigestCard({ digest }: DailyDigestCardProps) {
       {digest.items.length ? (
         <ol className="daily-digest-list">
           {digest.items.slice(0, 3).map((item, index) => (
-            <li key={item.market_id} className="daily-digest-item">
+            <li key={`${item.market_id}-${index}`} className="daily-digest-item">
               <div className="daily-digest-item-top">
                 <span className="daily-digest-rank">{index + 1}</span>
                 <div className="daily-digest-copy">

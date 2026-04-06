@@ -25,15 +25,6 @@ vi.mock("../api/client", () => ({
           category: "sports",
         },
         {
-          market_id: "m2",
-          question: "Will Fed cut rates?",
-          market_price: 55,
-          research_probability: 44,
-          naked_probability: 47,
-          edge: -11,
-          category: "macro",
-        },
-        {
           market_id: "m3",
           question: "Will BTC hit 150k?",
           market_price: 31,
@@ -41,6 +32,15 @@ vi.mock("../api/client", () => ({
           naked_probability: 44,
           edge: 17,
           category: "crypto",
+        },
+        {
+          market_id: "m2",
+          question: "Will Fed cut rates?",
+          market_price: 55,
+          research_probability: 44,
+          naked_probability: 47,
+          edge: -11,
+          category: "macro",
         },
         {
           market_id: "m4",
@@ -67,26 +67,26 @@ vi.mock("../api/client", () => ({
         },
       ],
       daily_digest: {
-        headline: "Сегодня Pythia видит 2 сигнала, которые заметно расходятся с рынком.",
-        summary: "Главный фокус — рынки с двузначным edge и research=ON.",
+        headline: "Сегодня Pythia выделяет 2 самых сильных сигнала в последнем прогоне.",
+        summary: "Сначала смотрю на самые заметные расхождения, затем сверяю их с рынками из списка наблюдения.",
         items: [
           {
             market_id: "m1",
             title: "Burnley выглядит слишком слабым относительно цены",
             detail: "Рынок недооценивает риск последнего места.",
-            reason_why_it_matters: "Почему это важно: высокий edge совпадает с research=ON и подходит для ручного разбора.",
-          },
-          {
-            market_id: "m2",
-            title: "Fed cut rates пока не подтверждён рынком",
-            detail: "Сигнал смещается против базового ожидания.",
-            reason_why_it_matters: "Почему это важно: помогает быстро отсеять шум и сфокусироваться на рынке с противоречием.",
+            reason_why_it_matters: "Почему это важно: этот сигнал стоит открыть первым, потому что разрыв с ценой самый заметный.",
           },
           {
             market_id: "m3",
             title: "BTC остаётся заметно дешевле research-оценки",
             detail: "Расхождение уже заметно для дневного обзора.",
-            reason_why_it_matters: "Почему это важно: третий слот должен оставаться только за самыми сильными контрастами.",
+            reason_why_it_matters: "Почему это важно: этот рынок помогает быстро проверить, не прячется ли сильный перекос в цене.",
+          },
+          {
+            market_id: "m2",
+            title: "Fed cut rates пока не подтверждён рынком",
+            detail: "Сигнал смещается против базового ожидания.",
+            reason_why_it_matters: "Почему это важно: здесь лучше всего видно, где ожидания рынка расходятся с оценкой Pythia.",
           },
         ],
       },
@@ -149,20 +149,29 @@ describe("OverviewPage", () => {
     const digestHeading = screen.getByRole("heading", { name: "Главные сигналы дня" });
     const digestSection = digestHeading.closest("section");
     expect(digestSection).not.toBeNull();
-    expect(screen.getByText("Сегодня Pythia видит 2 сигнала, которые заметно расходятся с рынком.")).toBeInTheDocument();
-    expect(screen.getByText("Главный фокус — рынки с двузначным edge и research=ON.")).toBeInTheDocument();
+    expect(screen.getByText("Сегодня Pythia выделяет 2 самых сильных сигнала в последнем прогоне.")).toBeInTheDocument();
+    expect(screen.getByText("Сначала смотрю на самые заметные расхождения, затем сверяю их с рынками из списка наблюдения.")).toBeInTheDocument();
     expect(screen.getAllByText(/Почему это важно:/i)).toHaveLength(3);
     expect(digestSection).not.toBeNull();
-    expect(within(digestSection as HTMLElement).getAllByRole("link", { name: "Открыть разбор" })).toHaveLength(3);
+    const digestLinks = within(digestSection as HTMLElement).getAllByRole("link", { name: "Открыть разбор" });
+    expect(digestLinks).toHaveLength(3);
+    expect(digestLinks[0]).toHaveAttribute("href", "/markets/m1");
+    expect(digestLinks[1]).toHaveAttribute("href", "/markets/m3");
+    expect(digestLinks[2]).toHaveAttribute("href", "/markets/m2");
     expect(screen.getByText("Состояние системы")).toBeInTheDocument();
     expect(screen.getByText("sqlite")).toBeInTheDocument();
     expect(screen.getByText("llm")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Запустить прогноз" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Проверить resolved" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Обновить статус" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Will Burnley finish in last place/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Will Fed cut rates/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Will BTC hit 150k/i })).toBeInTheDocument();
+    const signalLinks = [
+      screen.getByRole("link", { name: /Will Burnley finish in last place/i }),
+      screen.getByRole("link", { name: /Will BTC hit 150k/i }),
+      screen.getByRole("link", { name: /Will Fed cut rates/i }),
+    ];
+    expect(signalLinks[0]).toHaveAttribute("href", "/markets/m1");
+    expect(signalLinks[1]).toHaveAttribute("href", "/markets/m3");
+    expect(signalLinks[2]).toHaveAttribute("href", "/markets/m2");
     expect(screen.queryByRole("link", { name: /Will this fourth signal/i })).not.toBeInTheDocument();
     expect(screen.getByText("Главный сигнал сейчас")).toBeInTheDocument();
     expect(screen.getByText("Tavily работает как fallback, Exa недоступен.")).toBeInTheDocument();

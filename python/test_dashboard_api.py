@@ -101,6 +101,10 @@ class DashboardApiTests(unittest.TestCase):
             overview_res = client.get("/api/overview")
             self.assertEqual(overview_res.status_code, 200)
             self.assertEqual(overview_res.json()["valid_predictions"], 1)
+            self.assertIn("daily_digest", overview_res.json())
+            self.assertIn("headline", overview_res.json()["daily_digest"])
+            self.assertIn("summary", overview_res.json()["daily_digest"])
+            self.assertIn("items", overview_res.json()["daily_digest"])
             self.assertIn("next_step", overview_res.json())
             self.assertIn("attention_items", overview_res.json())
 
