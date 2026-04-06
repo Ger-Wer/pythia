@@ -25,6 +25,19 @@ class LatestRunSummary(BaseModel):
     markets_processed: int
 
 
+class DailyDigestItem(BaseModel):
+    market_id: str
+    title: str
+    detail: str
+    reason_why_it_matters: str
+
+
+class DailyDigestResponse(BaseModel):
+    headline: str
+    summary: str
+    items: list[DailyDigestItem] = []
+
+
 class ActionResponse(BaseModel):
     action: str | None = None
     status: str
@@ -91,6 +104,7 @@ class OverviewResponse(BaseModel):
     latest_run: LatestRunSummary
     top_signals: list[dict[str, Any]]
     attention_items: list[dict[str, Any]] = []
+    daily_digest: DailyDigestResponse | None = None
     next_step: str = ""
     last_action: ActionResponse
     research_warning: str = ""

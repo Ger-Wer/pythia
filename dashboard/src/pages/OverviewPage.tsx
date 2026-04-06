@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ActionSummaryCard } from "../components/ActionSummaryCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DailyDigestCard } from "../components/DailyDigestCard";
 import { KpiCard } from "../components/KpiCard";
 import { SectionHeader } from "../components/SectionHeader";
 import { SignalList } from "../components/SignalList";
@@ -104,6 +105,8 @@ export function OverviewPage() {
             />
             <p className="detail-lead">{overview.next_step}</p>
           </section>
+
+          {overview.daily_digest ? <DailyDigestCard digest={overview.daily_digest} /> : null}
 
           <section className="panel">
             <SectionHeader

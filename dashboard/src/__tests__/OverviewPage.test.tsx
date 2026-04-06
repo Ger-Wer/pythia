@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { OverviewPage } from "../pages/OverviewPage";
@@ -66,6 +66,30 @@ vi.mock("../api/client", () => ({
           action_label: "Добавить в избранное",
         },
       ],
+      daily_digest: {
+        headline: "Сегодня Pythia видит 2 сигнала, которые заметно расходятся с рынком.",
+        summary: "Главный фокус — рынки с двузначным edge и research=ON.",
+        items: [
+          {
+            market_id: "m1",
+            title: "Burnley выглядит слишком слабым относительно цены",
+            detail: "Рынок недооценивает риск последнего места.",
+            reason_why_it_matters: "Почему это важно: высокий edge совпадает с research=ON и подходит для ручного разбора.",
+          },
+          {
+            market_id: "m2",
+            title: "Fed cut rates пока не подтверждён рынком",
+            detail: "Сигнал смещается против базового ожидания.",
+            reason_why_it_matters: "Почему это важно: помогает быстро отсеять шум и сфокусироваться на рынке с противоречием.",
+          },
+          {
+            market_id: "m3",
+            title: "BTC остаётся заметно дешевле research-оценки",
+            detail: "Расхождение уже заметно для дневного обзора.",
+            reason_why_it_matters: "Почему это важно: третий слот должен оставаться только за самыми сильными контрастами.",
+          },
+        ],
+      },
       next_step: "Откройте главный сигнал и решите, добавлять ли его в избранное.",
       last_action: {
         action: "forecast",
@@ -122,6 +146,14 @@ describe("OverviewPage", () => {
 
     expect(screen.getByText("Что делать сейчас")).toBeInTheDocument();
     expect(screen.getByText("Откройте главный сигнал и решите, добавлять ли его в избранное.")).toBeInTheDocument();
+    const digestHeading = screen.getByRole("heading", { name: "Главные сигналы дня" });
+    const digestSection = digestHeading.closest("section");
+    expect(digestSection).not.toBeNull();
+    expect(screen.getByText("Сегодня Pythia видит 2 сигнала, которые заметно расходятся с рынком.")).toBeInTheDocument();
+    expect(screen.getByText("Главный фокус — рынки с двузначным edge и research=ON.")).toBeInTheDocument();
+    expect(screen.getAllByText(/Почему это важно:/i)).toHaveLength(3);
+    expect(digestSection).not.toBeNull();
+    expect(within(digestSection as HTMLElement).getAllByRole("link", { name: "Открыть разбор" })).toHaveLength(3);
     expect(screen.getByText("Состояние системы")).toBeInTheDocument();
     expect(screen.getByText("sqlite")).toBeInTheDocument();
     expect(screen.getByText("llm")).toBeInTheDocument();

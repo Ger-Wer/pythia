@@ -10,6 +10,19 @@ export interface LatestRunSummary {
   markets_processed: number;
 }
 
+export interface DailyDigestItem {
+  market_id: string;
+  title: string;
+  detail: string;
+  reason_why_it_matters: string;
+}
+
+export interface DailyDigestResponse {
+  headline: string;
+  summary: string;
+  items: DailyDigestItem[];
+}
+
 export interface LatestRunItem {
   market_id: string;
   question: string;
@@ -84,6 +97,7 @@ export interface OverviewResponse {
     market_id?: string | null;
     action_label?: string | null;
   }>;
+  daily_digest: DailyDigestResponse | null;
   next_step: string;
   last_action: ActionResponse;
   research_warning: string;

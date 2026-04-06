@@ -169,6 +169,104 @@ class OperatorCore:
             return []
         return [str(item).strip() for item in value if str(item).strip()]
 
+    @staticmethod
+    def _signal_edge(signal: dict[str, Any]) -> float | None:
+        edge = signal.get("edge")
+        if edge is None:
+            market_price = signal.get("market_price")
+            if market_price is None:
+                return None
+            if signal.get("research_probability") is not None:
+                edge = float(signal["research_probability"]) - float(market_price)
+            elif signal.get("naked_probability") is not None:
+                edge = float(signal["naked_probability"]) - float(market_price)
+            else:
+                return None
+        try:
+            return float(edge)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _signal_edge_phrase(edge: float) -> str:
+        sign = "+" if edge > 0 else ""
+        return f"{sign}{edge:.1f} п.п."
+
+    @staticmethod
+    def _plural_signal_word(count: int) -> str:
+        if count % 10 == 1 and count % 100 != 11:
+            return "сигнал"
+        if count % 10 in {2, 3, 4} and count % 100 not in {12, 13, 14}:
+            return "сигнала"
+        return "сигналов"
+
+    @classmethod
+    def _build_daily_digest(
+        cls,
+        *,
+        top_signals: list[dict[str, Any]],
+        research_status: str,
+        watchlist_count: int,
+        markets_processed: int,
+    ) -> dict[str, Any]:
+        ranked_signals: list[tuple[float, dict[str, Any], float]] = []
+        for signal in top_signals:
+            edge = cls._signal_edge(signal)
+            if edge is None:
+                continue
+            ranked_signals.append((abs(edge), signal, edge))
+        ranked_signals.sort(key=lambda item: (-item[0], str(item[1].get("market_id", ""))))
+
+        headline_candidates = [entry for entry in ranked_signals if entry[0] >= 15]
+        headline_count = len(headline_candidates)
+        if headline_count:
+            headline = f"Сегодня Pythia видит {headline_count} {cls._plural_signal_word(headline_count)}, которые заметно расходятся с рынком."
+        elif ranked_signals:
+            headline = "Сегодня Pythia видит сигналы, но без двузначного edge."
+        else:
+            headline = "Сегодня Pythia пока не видит сигналов, которые заметно расходятся с рынком."
+
+        summary = (
+            "Главный фокус — рынки с двузначным edge и research=ON."
+            if research_status == "ON"
+            else "Главный фокус — самые сильные расхождения при ограниченном research."
+        )
+
+        items: list[dict[str, Any]] = []
+        for _abs_edge, signal, edge in ranked_signals[:3]:
+            signal_research_status = str(signal.get("research_status") or "DEGRADED")
+            if signal_research_status == "ON":
+                research_clause = "research=ON, поэтому сигнал стоит открыть в первую очередь"
+            elif research_status == "ON":
+                research_clause = "research доступен, но этот сигнал всё равно лучше перепроверить вручную"
+            else:
+                research_clause = "research сейчас ограничен, поэтому ручной разбор особенно полезен"
+            watchlist_clause = (
+                f"В избранном {watchlist_count} рынков, так что этот сигнал удобно сверить с ручным списком."
+                if watchlist_count
+                else "Избранное пока пусто, поэтому это хороший кандидат для ручного фокуса."
+            )
+            items.append(
+                {
+                    "market_id": str(signal["market_id"]),
+                    "title": str(signal["question"]),
+                    "detail": f"Рынок {('выше' if edge >= 0 else 'ниже')} рыночной цены на {abs(edge):.1f} п.п.",
+                    "reason_why_it_matters": (
+                        "Почему это важно: "
+                        f"последний прогон уже обработал {markets_processed} рынков, "
+                        f"это расхождение на {cls._signal_edge_phrase(edge)}; "
+                        f"{research_clause}. "
+                        f"{watchlist_clause}"
+                    ),
+                }
+            )
+
+        return {
+            "headline": headline,
+            "summary": summary,
+            "items": items,
+        }
+
     def resolve_market_reference(self, reference: str) -> str | None:
         reference = reference.strip()
         if not reference:
@@ -232,6 +330,11 @@ class OperatorCore:
                     },
                     "top_signals": [],
                     "attention_items": [],
+                    "daily_digest": {
+                        "headline": "Сегодня Pythia пока не видит сигналов, которые заметно расходятся с рынком.",
+                        "summary": "Сначала запустите прогнозный прогон, чтобы собрать первые рынки для разбора.",
+                        "items": [],
+                    },
                     "next_step": "Сначала запустите прогнозный прогон и дождитесь первых сигналов.",
                     "last_action": self.get_last_action_summary(),
                     "research_warning": "",
@@ -258,6 +361,7 @@ class OperatorCore:
 
         latest_run = self.get_latest_run()
         health = self.get_health()
+        watchlist_count = self.get_watchlist_count()
         top_signals = latest_run["items"][:5]
         overview_research_status = health["research_status"]
         if any(item.get("research_probability") is not None for item in latest_run["items"]):
@@ -295,7 +399,7 @@ class OperatorCore:
                     action_label="Открыть разбор",
                 )
             )
-        if self.get_watchlist_count() == 0 and top_signals:
+        if watchlist_count == 0 and top_signals:
             attention_items.append(
                 self._attention_item(
                     "Избранное пока пусто",
@@ -320,13 +424,19 @@ class OperatorCore:
             },
             "valid_predictions": valid_predictions,
             "resolved_predictions": resolved_predictions,
-            "watchlist_count": self.get_watchlist_count(),
+            "watchlist_count": watchlist_count,
             "latest_run": {
                 "forecast_timestamp": latest_ts,
                 "markets_processed": markets_processed,
             },
             "top_signals": top_signals,
             "attention_items": attention_items[:3],
+            "daily_digest": self._build_daily_digest(
+                top_signals=top_signals,
+                research_status=overview_research_status,
+                watchlist_count=watchlist_count,
+                markets_processed=markets_processed,
+            ),
             "next_step": next_step,
             "last_action": self.get_last_action_summary(),
             "research_warning": health["research_warning"],

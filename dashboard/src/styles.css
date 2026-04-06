@@ -354,6 +354,85 @@ a {
   margin: 0;
 }
 
+.daily-digest-card {
+  border: 1px solid rgba(37, 95, 74, 0.16);
+  background: linear-gradient(180deg, rgba(247, 251, 247, 0.96) 0%, rgba(255, 255, 255, 0.8) 100%);
+}
+
+.daily-digest-summary {
+  margin: 0 0 16px;
+  max-width: 72ch;
+  color: var(--ink);
+}
+
+.daily-digest-headline {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.daily-digest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.daily-digest-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.daily-digest-item-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.daily-digest-rank {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 95, 74, 0.1);
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.daily-digest-copy {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.daily-digest-copy strong {
+  font-size: 1rem;
+}
+
+.daily-digest-detail {
+  margin: 0;
+}
+
+.daily-digest-reason {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(37, 95, 74, 0.05);
+}
+
+.daily-digest-action {
+  justify-self: start;
+}
+
 .health-check-top {
   display: flex;
   justify-content: space-between;
