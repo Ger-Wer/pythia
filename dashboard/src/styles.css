@@ -88,6 +88,11 @@ a {
   gap: 16px;
 }
 
+.quality-hero {
+  background: linear-gradient(180deg, #f8fbf6 0%, #eef5e9 100%);
+  border-color: #cfd8c9;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -125,6 +130,28 @@ a {
   gap: 12px;
   margin-top: 14px;
   color: var(--muted);
+}
+
+.quality-summary {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  display: grid;
+  gap: 8px;
+}
+
+.quality-summary p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .status-pills {
@@ -174,10 +201,29 @@ a {
   vertical-align: top;
 }
 
+.quality-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quality-breakdown-table th,
+.quality-breakdown-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
 .action-bar {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .section-header {

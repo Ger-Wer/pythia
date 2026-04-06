@@ -5,6 +5,7 @@ import { api } from "../api/client";
 const NAV_ITEMS = [
   { to: "/", label: "Сводка" },
   { to: "/runs/latest", label: "Сигналы" },
+  { to: "/quality", label: "Качество" },
   { to: "/watchlist", label: "Избранное" },
   { to: "/operations", label: "Операции" },
 ];
