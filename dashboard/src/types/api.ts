@@ -36,7 +36,7 @@ export interface ActionResponse {
   returncode: number | null;
 }
 
-export interface QualityMetricGlossaryItem {
+export interface QualityGlossaryItem {
   id: string;
   label: string;
   what: string;
@@ -68,7 +68,7 @@ export interface QualityResponse {
   metrics: QualityMetricSummary;
   category_breakdown: QualityCategoryRow[];
   calibration_image: string | null;
-  glossary: QualityMetricGlossaryItem[];
+  glossary: QualityGlossaryItem[];
 }
 
 export interface OverviewResponse {
