@@ -36,6 +36,41 @@ export interface ActionResponse {
   returncode: number | null;
 }
 
+export interface QualityMetricGlossaryItem {
+  id: string;
+  label: string;
+  what: string;
+  why: string;
+  how: string;
+}
+
+export interface QualityMetricSummary {
+  brier_research: number | null;
+  brier_naked: number | null;
+  brier_market: number | null;
+  edge_research_vs_market: number | null;
+  edge_naked_vs_market: number | null;
+}
+
+export interface QualityCategoryRow {
+  category: string;
+  resolved: number;
+  brier_research?: number | null;
+  brier_market?: number | null;
+}
+
+export interface QualityResponse {
+  resolved_predictions: number;
+  minimum_needed: number;
+  status: "INSUFFICIENT_DATA" | "COMPLETE";
+  decision: "COLLECT" | "GO" | "PIVOT" | "STOP";
+  summary: string;
+  metrics: QualityMetricSummary;
+  category_breakdown: QualityCategoryRow[];
+  calibration_image: string | null;
+  glossary: QualityMetricGlossaryItem[];
+}
+
 export interface OverviewResponse {
   statuses: StatusSummary;
   valid_predictions: number;

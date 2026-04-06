@@ -348,6 +348,58 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(health["system_status"], "DEGRADED")
             self.assertTrue(any(check["component"] == "sqlite" for check in health["checks"]))
 
+    def test_get_quality_reports_insufficient_data_honestly(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        forecast_timestamp, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("m1", "Will this resolve?", "Politics", 52.0, 55.0, 54.0, "2026-04-04T08:16:48Z", None, 1),
+                        ("m2", "Will this resolve too?", "Sports", 48.0, 51.0, 50.0, "2026-04-04T08:16:48Z", 1, 1),
+                    ],
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir))
+            quality = core.get_quality()
+
+            self.assertEqual(quality["resolved_predictions"], 1)
+            self.assertEqual(quality["minimum_needed"], 20)
+            self.assertEqual(quality["status"], "INSUFFICIENT_DATA")
+            self.assertEqual(quality["decision"], "COLLECT")
+            self.assertIsInstance(quality["summary"], str)
+            self.assertIn("нужно", quality["summary"].lower())
+            self.assertEqual(quality["metrics"]["brier_research"], None)
+            self.assertEqual(quality["metrics"]["brier_naked"], None)
+            self.assertEqual(quality["metrics"]["brier_market"], None)
+            self.assertEqual(quality["metrics"]["edge_research_vs_market"], None)
+            self.assertEqual(quality["metrics"]["edge_naked_vs_market"], None)
+            self.assertIsInstance(quality["category_breakdown"], list)
+            self.assertIsNone(quality["calibration_image"])
+            self.assertGreaterEqual(len(quality["glossary"]), 1)
+            self.assertEqual(quality["glossary"][0]["id"], "brier")
+
     def test_get_last_action_summary_normalizes_partial_payload(self):
         with TemporaryDirectory() as temp_dir:
             log_dir = Path(temp_dir) / "logs"

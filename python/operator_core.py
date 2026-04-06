@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, ContextManager
 from urllib.parse import quote
 
+from python.quality_metrics import load_quality_snapshot
+
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
 LLM_PROVIDER_ENV_KEYS = ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY")
 
@@ -329,6 +331,9 @@ class OperatorCore:
             "last_action": self.get_last_action_summary(),
             "research_warning": health["research_warning"],
         }
+
+    def get_quality(self) -> dict[str, Any]:
+        return load_quality_snapshot(self.db_path)
 
     def get_market_details(self, market_id: str) -> dict[str, Any]:
         with self._connect() as conn:

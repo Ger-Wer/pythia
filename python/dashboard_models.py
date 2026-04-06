@@ -36,6 +36,41 @@ class ActionResponse(BaseModel):
     returncode: int | None = None
 
 
+class QualityMetricGlossaryItem(BaseModel):
+    id: str
+    label: str
+    what: str
+    why: str
+    how: str
+
+
+class QualityMetricSummary(BaseModel):
+    brier_research: float | None = None
+    brier_naked: float | None = None
+    brier_market: float | None = None
+    edge_research_vs_market: float | None = None
+    edge_naked_vs_market: float | None = None
+
+
+class QualityCategoryRow(BaseModel):
+    category: str
+    resolved: int
+    brier_research: float | None = None
+    brier_market: float | None = None
+
+
+class QualityResponse(BaseModel):
+    resolved_predictions: int
+    minimum_needed: int
+    status: Literal["INSUFFICIENT_DATA", "COMPLETE"]
+    decision: Literal["COLLECT", "GO", "PIVOT", "STOP"]
+    summary: str
+    metrics: QualityMetricSummary
+    category_breakdown: list[QualityCategoryRow] = []
+    calibration_image: str | None = None
+    glossary: list[QualityMetricGlossaryItem] = []
+
+
 class HealthResponse(BaseModel):
     system_status: Literal["ON", "DEGRADED", "OFF"]
     research_status: Literal["ON", "DEGRADED", "OFF"]

@@ -215,6 +215,83 @@ class DashboardApiTests(unittest.TestCase):
             self.assertEqual(remove_watch.status_code, 200)
             self.assertEqual(client.get("/api/watchlist").json()["items"], [])
 
+    def test_quality_endpoint_returns_complete_quality_payload(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            calibration_path = log_dir / "calibration_20260406.png"
+            calibration_path.write_bytes(b"png")
+
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                rows = []
+                for index in range(20):
+                    rows.append(
+                        (
+                            f"m{index + 1}",
+                            f"Will market {index + 1} resolve?",
+                            "Politics" if index < 10 else "Sports",
+                            50.0 if index % 2 == 0 else 42.0,
+                            58.0 if index % 3 == 0 else 44.0,
+                            55.0 if index % 4 == 0 else 46.0,
+                            f"2026-04-04T08:16:{index:02d}Z",
+                            1 if index % 2 == 0 else 0,
+                            1,
+                        )
+                    )
+                conn.executemany(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        forecast_timestamp, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+
+            app = create_app(
+                db_path=db_path,
+                log_dir=log_dir,
+                session_secret="test-secret",
+                dashboard_username="operator",
+                dashboard_password_hash="plain:secret-pass",
+            )
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            response = client.get("/api/quality")
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["resolved_predictions"], 20)
+            self.assertEqual(payload["minimum_needed"], 20)
+            self.assertEqual(payload["status"], "COMPLETE")
+            self.assertIn(payload["decision"], {"GO", "PIVOT", "STOP"})
+            self.assertIn("metrics", payload)
+            self.assertIn("brier_research", payload["metrics"])
+            self.assertIn("edge_research_vs_market", payload["metrics"])
+            self.assertGreaterEqual(len(payload["category_breakdown"]), 1)
+            self.assertIn("category", payload["category_breakdown"][0])
+            self.assertEqual(payload["calibration_image"], str(calibration_path.relative_to(Path(temp_dir))))
+            self.assertGreaterEqual(len(payload["glossary"]), 1)
+            self.assertEqual(payload["glossary"][0]["id"], "brier")
+
 
 if __name__ == "__main__":
     unittest.main()
