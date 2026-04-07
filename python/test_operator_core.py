@@ -7,10 +7,25 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from python.decision_store import create_manual_decision, ensure_decision_core_schema
 from python.operator_core import OperatorCore
 
 
 class OperatorCoreTests(unittest.TestCase):
+    def test_database_connections_enable_foreign_keys(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path):
+                pass
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir) / "logs")
+
+            with core._connect_rw() as conn:
+                self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+
+            with core._connect() as conn:
+                self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+
     def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
@@ -45,6 +60,35 @@ class OperatorCoreTests(unittest.TestCase):
                 os.chmod(db_path, 0o644)
 
             self.assertEqual(overview["watchlist_count"], 0)
+
+    def test_list_open_positions_stays_read_only_when_decision_core_already_exists(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                ensure_decision_core_schema(conn)
+                conn.commit()
+
+            os.chmod(db_path, 0o444)
+            os.chmod(temp_dir, 0o555)
+            try:
+                core = OperatorCore(db_path=db_path, log_dir=Path(temp_dir) / "logs")
+                positions = core.list_open_positions()
+            finally:
+                os.chmod(temp_dir, 0o755)
+                os.chmod(db_path, 0o644)
+
+            self.assertEqual(positions, [])
 
     def test_get_overview_includes_summary_first_contract(self):
         with TemporaryDirectory() as temp_dir:
@@ -910,6 +954,143 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(len(workspace["recent_decisions"]), 1)
             self.assertEqual(workspace["recent_decisions"][0]["decision_type"], "enter_yes")
             self.assertEqual(workspace["latest_postmortem"]["outcome_label"], "early_exit")
+
+    def test_get_market_workspace_bootstraps_decision_core_on_legacy_db(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        dexter_reasoning TEXT,
+                        dexter_key_risk TEXT,
+                        dexter_base_rate TEXT,
+                        research_brief_json TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        outcome INTEGER,
+                        volume REAL,
+                        end_date TEXT,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
+                        research_brief_json, forecast_timestamp, outcome, volume, end_date, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "legacy-workspace",
+                        "Will the workspace boot on a legacy DB?",
+                        "tests",
+                        45.0,
+                        55.0,
+                        48.0,
+                        "medium",
+                        "Legacy reasoning.",
+                        "Legacy risk.",
+                        "Legacy base rate.",
+                        json.dumps({"summary": "Legacy summary"}),
+                        "2026-04-07T06:00:00Z",
+                        None,
+                        1000.0,
+                        "2026-05-01T00:00:00Z",
+                        1,
+                    ),
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            workspace = core.get_market_workspace("legacy-workspace")
+
+            self.assertEqual(workspace["market"]["market_id"], "legacy-workspace")
+            self.assertIsNone(workspace["signal"])
+            self.assertEqual(workspace["open_positions"], [])
+            self.assertEqual(workspace["due_reviews"], [])
+            self.assertEqual(workspace["recent_decisions"], [])
+            self.assertIsNone(workspace["latest_postmortem"])
+
+    def test_create_manual_decision_is_atomic_when_open_position_validation_fails(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("atomic-market", "Will atomicity hold?", "2026-04-07T06:00:00Z", 1),
+                )
+                ensure_decision_core_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        prediction_id, market_id, question, forecast_timestamp, market_price,
+                        research_probability, naked_probability, best_probability, signal_edge,
+                        signal_strength, recommended_action, confidence, research_status,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "atomic-market",
+                        "Will atomicity hold?",
+                        "2026-04-07T06:00:00Z",
+                        51.0,
+                        60.0,
+                        55.0,
+                        60.0,
+                        9.0,
+                        9.0,
+                        "review",
+                        "medium",
+                        "ON",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+
+                with self.assertRaises(ValueError):
+                    create_manual_decision(
+                        conn,
+                        signal_id=1,
+                        decision_type="watch",
+                        decision_reason="Trying to open an invalid position.",
+                        operator_confidence="medium",
+                        confirmation_criteria=None,
+                        invalidation_criteria=None,
+                        open_position=True,
+                        review_due_at=None,
+                    )
+
+                decision_count = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
+                position_count = conn.execute("SELECT COUNT(*) FROM positions").fetchone()[0]
+
+            self.assertEqual(decision_count, 0)
+            self.assertEqual(position_count, 0)
 
 
 if __name__ == "__main__":

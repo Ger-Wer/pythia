@@ -14,6 +14,7 @@ from python.decision_store import (
     close_position_manually,
     complete_review,
     create_manual_decision,
+    ensure_decision_core_schema,
     get_decision_core_counts,
     get_market_workspace as load_market_workspace,
     list_due_reviews as load_due_reviews,
@@ -23,6 +24,7 @@ from python.quality_metrics import load_quality_snapshot
 
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
 LLM_PROVIDER_ENV_KEYS = ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY")
+DECISION_CORE_TABLES = ("signals", "books", "decisions", "positions", "position_events", "reviews", "postmortems")
 
 
 class OperatorCore:
@@ -34,11 +36,24 @@ class OperatorCore:
         if not self.db_path.exists():
             raise FileNotFoundError(self.db_path)
         db_uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
-        return closing(sqlite3.connect(db_uri, uri=True))
+        conn = sqlite3.connect(db_uri, uri=True)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return closing(conn)
 
     def _connect_rw(self) -> ContextManager[sqlite3.Connection]:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        return closing(sqlite3.connect(self.db_path))
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return closing(conn)
+
+    def _ensure_decision_core_schema_rw(self) -> None:
+        if self.db_path.exists():
+            with self._connect() as conn:
+                if all(self._table_exists(conn, table_name) for table_name in DECISION_CORE_TABLES):
+                    return
+
+        with self._connect_rw() as conn:
+            ensure_decision_core_schema(conn)
 
     def predictions_table_exists(self) -> bool:
         with self._connect() as conn:
@@ -463,6 +478,7 @@ class OperatorCore:
 
     def get_market_workspace(self, market_id: str) -> dict[str, Any]:
         market = self.get_market_details(market_id)
+        self._ensure_decision_core_schema_rw()
         with self._connect() as conn:
             workspace = load_market_workspace(conn, market_id)
         return {
@@ -475,10 +491,12 @@ class OperatorCore:
         }
 
     def list_open_positions(self) -> list[dict[str, Any]]:
+        self._ensure_decision_core_schema_rw()
         with self._connect() as conn:
             return load_open_positions(conn)
 
     def list_due_reviews(self) -> list[dict[str, Any]]:
+        self._ensure_decision_core_schema_rw()
         with self._connect() as conn:
             return load_due_reviews(conn)
 

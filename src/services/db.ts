@@ -150,7 +150,7 @@ export function initDb(): Database {
 
 export function insertPrediction(db: Database, data: PredictionRow): void {
   const stmt = db.query(`
-    INSERT OR REPLACE INTO predictions (
+    INSERT INTO predictions (
       market_id,
       question,
       category,
@@ -189,6 +189,23 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       @api_cost_usd,
       @is_valid
     )
+    ON CONFLICT(market_id, forecast_timestamp) DO UPDATE SET
+      question = excluded.question,
+      category = excluded.category,
+      volume = excluded.volume,
+      created_at = excluded.created_at,
+      end_date = excluded.end_date,
+      market_price = excluded.market_price,
+      dexter_p = excluded.dexter_p,
+      dexter_confidence = excluded.dexter_confidence,
+      dexter_reasoning = excluded.dexter_reasoning,
+      dexter_key_risk = excluded.dexter_key_risk,
+      dexter_base_rate = excluded.dexter_base_rate,
+      naked_p = excluded.naked_p,
+      naked_reasoning = excluded.naked_reasoning,
+      research_brief_json = excluded.research_brief_json,
+      api_cost_usd = excluded.api_cost_usd,
+      is_valid = excluded.is_valid
   `);
 
   stmt.run({

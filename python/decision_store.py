@@ -414,30 +414,16 @@ def create_manual_decision(
     created_at = created_at or utc_now_iso()
     due_at = review_due_at or _review_due_at(created_at, None)
 
-    conn.execute(
-        """
-        INSERT INTO decisions (
-            signal_id, book_id, market_id, actor_type, decision_type, decision_reason,
-            operator_confidence, confirmation_criteria, invalidation_criteria,
-            review_due_at, status, created_at
-        ) VALUES (?, ?, ?, 'operator', ?, ?, ?, ?, ?, ?, 'active', ?)
-        """,
-        (
-            signal_id,
-            int(book["id"]),
-            str(signal["market_id"]),
-            decision_type,
-            decision_reason,
-            operator_confidence,
-            confirmation_criteria,
-            invalidation_criteria,
-            due_at,
-            created_at,
-        ),
-    )
-    decision_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
-
+    book_id = int(book["id"])
+    market_id = str(signal["market_id"])
     position_id: int | None = None
+    side: str | None = None
+    entry_yes_price: float | None = None
+    entry_cost_per_contract: float | None = None
+    notional_usd: float | None = None
+    size_contracts: float | None = None
+    thesis_cycle_number: int | None = None
+
     if open_position:
         if decision_type not in {"enter_yes", "enter_no"}:
             raise ValueError("open_position requires enter_yes or enter_no decision")
@@ -450,12 +436,12 @@ def create_manual_decision(
             WHERE market_id = ? AND book_id = ? AND mode = 'operator' AND status = 'open'
             LIMIT 1
             """,
-            (signal["market_id"], int(book["id"])),
+            (market_id, book_id),
         )
         if existing:
             raise ValueError("operator position already open for this market")
 
-        open_exposure = _open_exposure_notional(conn, int(book["id"]))
+        open_exposure = _open_exposure_notional(conn, book_id)
         risk_budget = float(book["current_balance"]) * float(book["max_risk_per_trade_pct"])
         remaining_exposure = float(book["current_balance"]) * float(book["max_total_exposure_pct"]) - open_exposure
         notional_usd = min(risk_budget, remaining_exposure)
@@ -469,56 +455,88 @@ def create_manual_decision(
             raise ValueError("invalid entry cost per contract")
 
         size_contracts = notional_usd / entry_cost_per_contract
-        thesis_cycle_number = _next_thesis_cycle(conn, int(book["id"]), str(signal["market_id"]))
+        thesis_cycle_number = _next_thesis_cycle(conn, book_id, market_id)
+
+    conn.execute("SAVEPOINT manual_decision")
+    try:
         conn.execute(
             """
-            INSERT INTO positions (
-                book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
-                entry_yes_price, entry_cost_per_contract, entry_zone_min, entry_zone_max,
-                size_contracts, notional_usd, review_due_at, opened_at, thesis_cycle_number
-            ) VALUES (?, ?, ?, ?, 'operator', ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO decisions (
+                signal_id, book_id, market_id, actor_type, decision_type, decision_reason,
+                operator_confidence, confirmation_criteria, invalidation_criteria,
+                review_due_at, status, created_at
+            ) VALUES (?, ?, ?, 'operator', ?, ?, ?, ?, ?, ?, 'active', ?)
             """,
             (
-                int(book["id"]),
-                str(signal["market_id"]),
                 signal_id,
-                decision_id,
-                side,
-                entry_yes_price,
-                entry_cost_per_contract,
-                signal.get("entry_zone_min"),
-                signal.get("entry_zone_max"),
-                size_contracts,
-                notional_usd,
+                book_id,
+                market_id,
+                decision_type,
+                decision_reason,
+                operator_confidence,
+                confirmation_criteria,
+                invalidation_criteria,
                 due_at,
                 created_at,
-                thesis_cycle_number,
             ),
         )
-        position_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
-        conn.execute(
+        decision_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+        if open_position:
+            conn.execute(
+                """
+                INSERT INTO positions (
+                    book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
+                    entry_yes_price, entry_cost_per_contract, entry_zone_min, entry_zone_max,
+                    size_contracts, notional_usd, review_due_at, opened_at, thesis_cycle_number
+                ) VALUES (?, ?, ?, ?, 'operator', ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    book_id,
+                    market_id,
+                    signal_id,
+                    decision_id,
+                    side,
+                    entry_yes_price,
+                    entry_cost_per_contract,
+                    signal.get("entry_zone_min"),
+                    signal.get("entry_zone_max"),
+                    size_contracts,
+                    notional_usd,
+                    due_at,
+                    created_at,
+                    thesis_cycle_number,
+                ),
+            )
+            position_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+            conn.execute(
             """
             INSERT INTO position_events (
                 position_id, decision_id, event_type, event_note,
                 market_price, research_probability, created_at, payload_json
             ) VALUES (?, ?, 'opened', ?, ?, ?, ?, ?)
             """,
-            (
-                position_id,
-                decision_id,
-                "Operator paper position opened from manual decision.",
-                signal.get("market_price"),
-                signal.get("research_probability"),
-                created_at,
-                json.dumps(
-                    {
-                        "decision_type": decision_type,
-                        "notional_usd": notional_usd,
-                    },
-                    ensure_ascii=False,
+                (
+                    position_id,
+                    decision_id,
+                    "Operator paper position opened from manual decision.",
+                    signal.get("market_price"),
+                    signal.get("research_probability"),
+                    created_at,
+                    json.dumps(
+                        {
+                            "decision_type": decision_type,
+                            "notional_usd": notional_usd,
+                        },
+                        ensure_ascii=False,
+                    ),
                 ),
-            ),
-        )
+            )
+        conn.execute("RELEASE SAVEPOINT manual_decision")
+    except Exception:
+        conn.execute("ROLLBACK TO SAVEPOINT manual_decision")
+        conn.execute("RELEASE SAVEPOINT manual_decision")
+        raise
 
     conn.commit()
     return {

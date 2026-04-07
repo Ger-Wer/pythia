@@ -26,6 +26,12 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def open_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
 def prediction_columns(conn: sqlite3.Connection) -> set[str]:
     return {
         str(row[1])
@@ -209,6 +215,19 @@ def _payout_per_contract(side: str, outcome: int) -> float:
     return 0.0
 
 
+def _classify_entry_error(position: dict[str, Any], forecast_error: int) -> int:
+    if forecast_error != 0:
+        return 0
+
+    pnl_percent_raw = position.get("pnl_percent")
+    try:
+        pnl_percent = float(pnl_percent_raw)
+    except (TypeError, ValueError):
+        return 0
+
+    return 1 if pnl_percent <= 10.0 else 0
+
+
 def _upsert_resolution_postmortem(
     conn: sqlite3.Connection,
     position: dict[str, Any],
@@ -218,7 +237,7 @@ def _upsert_resolution_postmortem(
 ) -> None:
     outcome_label = "yes" if outcome == 1 else "no"
     forecast_error = 0 if _payout_per_contract(str(position["side"]), outcome) == 1.0 else 1
-    entry_error = 0 if forecast_error == 0 else 0
+    entry_error = _classify_entry_error(position, forecast_error)
 
     existing = conn.execute(
         """
@@ -259,7 +278,12 @@ def _upsert_resolution_postmortem(
             pnl_usd = COALESCE(postmortems.pnl_usd, excluded.pnl_usd),
             pnl_percent = COALESCE(postmortems.pnl_percent, excluded.pnl_percent),
             forecast_error = excluded.forecast_error,
-            entry_error = COALESCE(postmortems.entry_error, excluded.entry_error),
+            entry_error = CASE
+                WHEN postmortems.system_note LIKE 'Position resolved via resolved outcome %'
+                  OR postmortems.system_note LIKE '%Resolution backfilled after resolved outcome %'
+                THEN excluded.entry_error
+                ELSE COALESCE(postmortems.entry_error, excluded.entry_error)
+            END,
             timing_error = COALESCE(postmortems.timing_error, excluded.timing_error),
             management_error = COALESCE(postmortems.management_error, excluded.management_error),
             discipline_error = COALESCE(postmortems.discipline_error, excluded.discipline_error),
@@ -410,7 +434,7 @@ def summarize_market(conn: sqlite3.Connection, market_id: str) -> tuple[str, flo
 
 
 def main() -> None:
-    conn = sqlite3.connect(DB_PATH)
+    conn = open_connection(DB_PATH)
     table_exists = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'"
     ).fetchone()

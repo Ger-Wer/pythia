@@ -298,3 +298,117 @@ test('initDb creates decision-core tables and seeds default books', async () => 
     db.close();
   }
 });
+
+test('insertPrediction updates an existing prediction without deleting decision-core rows', async () => {
+  const { initDb, insertPrediction } = await dbModulePromise;
+
+  const forecastedAt = fixedUtcNoonToday().toISOString();
+  const db = initDb();
+  try {
+    insertPrediction(db, {
+      market_id: 'market-upsert',
+      question: 'Will the prediction row update in place?',
+      category: 'tests',
+      volume: 1_000,
+      created_at: forecastedAt,
+      end_date: new Date(Date.parse(forecastedAt) + 86_400_000).toISOString(),
+      market_price: 52,
+      dexter_p: 67,
+      dexter_confidence: 'medium',
+      dexter_reasoning: 'Initial reasoning.',
+      dexter_key_risk: 'Initial risk.',
+      naked_p: 55,
+      naked_reasoning: 'Initial baseline.',
+      forecast_timestamp: forecastedAt,
+      api_cost_usd: 0.1,
+    });
+
+    const predictionId = (db
+      .query(
+        `
+          SELECT id
+          FROM predictions
+          WHERE market_id = ?1 AND forecast_timestamp = ?2
+        `,
+      )
+      .get('market-upsert', forecastedAt) as { id: number }).id;
+
+    db.run(
+      `
+        INSERT INTO signals (
+          prediction_id, market_id, question, forecast_timestamp, market_price,
+          research_probability, naked_probability, best_probability, signal_edge,
+          signal_strength, recommended_action, thesis_summary, confidence,
+          research_status, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+      `,
+      [
+        predictionId,
+        'market-upsert',
+        'Will the prediction row update in place?',
+        forecastedAt,
+        52,
+        67,
+        55,
+        67,
+        15,
+        15,
+        'enter_yes',
+        'Strong thesis.',
+        'medium',
+        'ON',
+        forecastedAt,
+        forecastedAt,
+      ],
+    );
+
+    insertPrediction(db, {
+      market_id: 'market-upsert',
+      question: 'Will the prediction row update in place?',
+      category: 'tests',
+      volume: 2_000,
+      created_at: forecastedAt,
+      end_date: new Date(Date.parse(forecastedAt) + 86_400_000).toISOString(),
+      market_price: 49,
+      dexter_p: 61,
+      dexter_confidence: 'high',
+      dexter_reasoning: 'Updated reasoning.',
+      dexter_key_risk: 'Updated risk.',
+      naked_p: 51,
+      naked_reasoning: 'Updated baseline.',
+      forecast_timestamp: forecastedAt,
+      api_cost_usd: 0.2,
+    });
+
+    const predictionRow = db
+      .query(
+        `
+          SELECT id, market_price, dexter_p, volume
+          FROM predictions
+          WHERE market_id = ?1 AND forecast_timestamp = ?2
+        `,
+      )
+      .get('market-upsert', forecastedAt) as
+      | { id: number; market_price: number; dexter_p: number; volume: number }
+      | null;
+    const signalRow = db
+      .query(
+        `
+          SELECT prediction_id
+          FROM signals
+          WHERE market_id = ?1
+          LIMIT 1
+        `,
+      )
+      .get('market-upsert') as { prediction_id: number } | null;
+
+    expect(predictionRow).not.toBeNull();
+    expect(predictionRow?.id).toBe(predictionId);
+    expect(predictionRow?.market_price).toBe(49);
+    expect(predictionRow?.dexter_p).toBe(61);
+    expect(predictionRow?.volume).toBe(2_000);
+    expect(signalRow?.prediction_id).toBe(predictionId);
+  } finally {
+    db.close();
+  }
+});

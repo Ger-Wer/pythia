@@ -303,6 +303,241 @@ class ResolutionCheckerTests(unittest.TestCase):
             self.assertEqual(postmortem[2], 1)
             self.assertIn("resolved", postmortem[3])
 
+    def test_settle_positions_for_resolution_flags_expensive_winning_entry(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path) as conn:
+                self._create_predictions_schema(conn)
+                ensure_decision_core_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, market_price, dexter_p, naked_p, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, NULL, 1)
+                    """,
+                    ("market-c", "Will market-c resolve YES?", 95.0, 97.0, 96.0),
+                )
+                prediction_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                book_id = int(conn.execute("SELECT id FROM books WHERE name = 'shadow_default'").fetchone()[0])
+
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        prediction_id, market_id, question, forecast_timestamp, market_price,
+                        research_probability, naked_probability, best_probability, signal_edge,
+                        signal_strength, recommended_action, entry_zone_min, entry_zone_max,
+                        thesis_summary, confidence, research_status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        prediction_id,
+                        "market-c",
+                        "Will market-c resolve YES?",
+                        "2026-04-07T06:00:00Z",
+                        95.0,
+                        97.0,
+                        96.0,
+                        97.0,
+                        2.0,
+                        2.0,
+                        "review",
+                        95.0,
+                        95.0,
+                        "Thin winning edge at an expensive price.",
+                        "medium",
+                        "ON",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                signal_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                conn.execute(
+                    """
+                    INSERT INTO decisions (
+                        signal_id, book_id, market_id, actor_type, decision_type,
+                        decision_reason, review_due_at, status, created_at
+                    ) VALUES (?, ?, ?, 'shadow_engine', 'enter_yes', ?, ?, 'active', ?)
+                    """,
+                    (
+                        signal_id,
+                        book_id,
+                        "market-c",
+                        "Auto-opened expensive YES position",
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                decision_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                conn.execute(
+                    """
+                    INSERT INTO positions (
+                        book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
+                        entry_yes_price, entry_cost_per_contract, entry_zone_min, entry_zone_max,
+                        size_contracts, notional_usd, review_due_at, opened_at, thesis_cycle_number
+                    ) VALUES (?, ?, ?, ?, 'shadow', 'yes', 'open', ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    """,
+                    (
+                        book_id,
+                        "market-c",
+                        signal_id,
+                        decision_id,
+                        95.0,
+                        0.95,
+                        95.0,
+                        95.0,
+                        100.0,
+                        95.0,
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                position_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+                resolution_checker.update_resolved_market(conn, "market-c", 1, "2026-04-09T06:00:00Z")
+                resolution_checker.settle_positions_for_resolution(conn, "market-c", 1, "2026-04-09T06:00:00Z")
+
+                postmortem = conn.execute(
+                    """
+                    SELECT forecast_error, entry_error, timing_error
+                    FROM postmortems
+                    WHERE position_id = ?
+                    """,
+                    (position_id,),
+                ).fetchone()
+
+            self.assertEqual(postmortem[0], 0)
+            self.assertEqual(postmortem[1], 1)
+            self.assertEqual(postmortem[2], 0)
+
+    def test_settle_positions_for_resolution_recomputes_resolution_generated_entry_error(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            with sqlite3.connect(db_path) as conn:
+                self._create_predictions_schema(conn)
+                ensure_decision_core_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, question, market_price, dexter_p, naked_p, outcome, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, NULL, 1)
+                    """,
+                    ("market-d", "Will market-d resolve YES?", 95.0, 97.0, 96.0),
+                )
+                prediction_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                book_id = int(conn.execute("SELECT id FROM books WHERE name = 'shadow_default'").fetchone()[0])
+
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        prediction_id, market_id, question, forecast_timestamp, market_price,
+                        research_probability, naked_probability, best_probability, signal_edge,
+                        signal_strength, recommended_action, thesis_summary, confidence,
+                        research_status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        prediction_id,
+                        "market-d",
+                        "Will market-d resolve YES?",
+                        "2026-04-07T06:00:00Z",
+                        95.0,
+                        97.0,
+                        96.0,
+                        97.0,
+                        2.0,
+                        2.0,
+                        "review",
+                        "Thin winning edge at an expensive price.",
+                        "medium",
+                        "ON",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                signal_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                conn.execute(
+                    """
+                    INSERT INTO decisions (
+                        signal_id, book_id, market_id, actor_type, decision_type,
+                        decision_reason, review_due_at, status, created_at
+                    ) VALUES (?, ?, ?, 'shadow_engine', 'enter_yes', ?, ?, 'active', ?)
+                    """,
+                    (
+                        signal_id,
+                        book_id,
+                        "market-d",
+                        "Auto-opened expensive YES position",
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                decision_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+                conn.execute(
+                    """
+                    INSERT INTO positions (
+                        id, book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
+                        entry_yes_price, entry_cost_per_contract, size_contracts, notional_usd,
+                        review_due_at, opened_at, closed_at, closed_yes_price, close_reason,
+                        thesis_cycle_number, pnl_usd, pnl_percent
+                    ) VALUES (?, ?, ?, ?, ?, 'shadow', 'yes', 'closed', ?, ?, ?, ?, ?, ?, ?, ?, 'resolved', 1, ?, ?)
+                    """,
+                    (
+                        1,
+                        book_id,
+                        "market-d",
+                        signal_id,
+                        decision_id,
+                        95.0,
+                        0.95,
+                        100.0,
+                        95.0,
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-09T06:00:00Z",
+                        100.0,
+                        5.0,
+                        5.2631578947368425,
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO postmortems (
+                        position_id, market_id, outcome_label, pnl_usd, pnl_percent,
+                        forecast_error, entry_error, timing_error, management_error,
+                        discipline_error, operator_note, system_note, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "market-d",
+                        "yes",
+                        5.0,
+                        5.2631578947368425,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        None,
+                        "Position resolved via resolved outcome yes.",
+                        "2026-04-09T06:00:00Z",
+                        "2026-04-09T06:00:00Z",
+                    ),
+                )
+
+                resolution_checker.settle_positions_for_resolution(conn, "market-d", 1, "2026-04-09T06:30:00Z")
+
+                postmortem = conn.execute(
+                    """
+                    SELECT entry_error, system_note
+                    FROM postmortems
+                    WHERE position_id = 1
+                    """
+                ).fetchone()
+
+            self.assertEqual(postmortem[0], 1)
+            self.assertIn("Resolution backfilled", postmortem[1])
+
     def test_fetch_market_marks_repeated_422_as_invalid(self):
         response = requests.Response()
         response.status_code = 422
@@ -317,6 +552,15 @@ class ResolutionCheckerTests(unittest.TestCase):
 
         self.assertIsNone(market)
         self.assertTrue(should_invalidate)
+
+    def test_open_connection_enables_foreign_keys(self):
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "pythia.db"
+            conn = resolution_checker.open_connection(str(db_path))
+            try:
+                self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+            finally:
+                conn.close()
 
     def test_mark_market_invalid_sets_is_valid_zero(self):
         with TemporaryDirectory() as temp_dir:

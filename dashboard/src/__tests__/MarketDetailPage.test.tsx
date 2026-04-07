@@ -143,9 +143,7 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
 
     expect(screen.getByText("Что думает Pythia")).toBeInTheDocument();
     expect(screen.getByText("Почему расходится с рынком")).toBeInTheDocument();
@@ -197,9 +195,7 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
 
     expect(screen.getByText("Не удалось загрузить статус избранного. Разбор доступен без него.")).toBeInTheDocument();
     expect(screen.getByText("Объём рынка: $0")).toBeInTheDocument();
@@ -230,9 +226,7 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
 
     const link = screen.getByRole("link", { name: "exa.ai / library / sports / premier-league — 2025-05-25" });
     expect(link).toHaveAttribute(
@@ -325,9 +319,7 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
-    });
+    expect(await screen.findByLabelText("Причина решения")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Причина решения"), "Открываю operator paper position по сильному сигналу.");
     await user.click(screen.getByRole("button", { name: "Открыть operator YES" }));
