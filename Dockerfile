@@ -48,6 +48,7 @@ RUN python -m venv /app/python/venv \
     && /app/python/venv/bin/pip install --no-cache-dir -r /app/python/requirements.txt
 
 COPY src /app/src
+COPY sql /app/sql
 COPY python /app/python
 COPY scripts /app/scripts
 COPY --from=dashboard-builder /frontend/dist /app/dashboard_dist
