@@ -162,6 +162,58 @@ export function seedOpenOperatorPosition(
   runStatements(
     db,
     `
+      CREATE TABLE IF NOT EXISTS books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        mode TEXT NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USDC',
+        starting_balance REAL NOT NULL,
+        current_balance REAL NOT NULL,
+        max_risk_per_trade_pct REAL NOT NULL,
+        max_total_exposure_pct REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS signals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prediction_id INTEGER NOT NULL UNIQUE,
+        market_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        forecast_timestamp TEXT NOT NULL,
+        market_price REAL,
+        research_probability REAL,
+        naked_probability REAL,
+        best_probability REAL,
+        signal_edge REAL,
+        signal_strength REAL,
+        recommended_action TEXT NOT NULL,
+        entry_zone_min REAL,
+        entry_zone_max REAL,
+        thesis_summary TEXT,
+        primary_driver TEXT,
+        disconfirming_signal TEXT,
+        confidence TEXT,
+        research_status TEXT NOT NULL DEFAULT 'DEGRADED',
+        status TEXT NOT NULL DEFAULT 'new',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        signal_id INTEGER NOT NULL,
+        book_id INTEGER,
+        market_id TEXT NOT NULL,
+        actor_type TEXT NOT NULL,
+        decision_type TEXT NOT NULL,
+        decision_reason TEXT NOT NULL,
+        operator_confidence TEXT,
+        confirmation_criteria TEXT,
+        invalidation_criteria TEXT,
+        review_due_at TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS positions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER NOT NULL,
@@ -181,6 +233,18 @@ export function seedOpenOperatorPosition(
       )
     `,
   );
+
+  db.query(
+    `
+      INSERT OR IGNORE INTO books (
+        name, mode, currency, starting_balance, current_balance,
+        max_risk_per_trade_pct, max_total_exposure_pct, status, created_at, updated_at
+      ) VALUES (
+        'operator_default', 'operator', 'USDC', 10000, 10000,
+        0.02, 0.20, 'active', '2026-04-07T06:00:00.000Z', '2026-04-07T06:00:00.000Z'
+      )
+    `,
+  ).run();
 
   const prediction = db
     .query(

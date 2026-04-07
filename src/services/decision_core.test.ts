@@ -2,7 +2,12 @@ import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createTestDatabase, seedOpenOperatorPosition, seedWatchDossier } from './test_database';
+import {
+  createTestDatabase,
+  seedOpenOperatorPosition,
+  seedPrediction,
+  seedWatchDossier,
+} from './test_database';
 
 const tempDir = mkdtempSync(path.join(os.tmpdir(), 'pythia-decision-core-test-'));
 const dbPath = path.join(tempDir, 'pythia.db');
