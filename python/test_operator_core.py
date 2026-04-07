@@ -9,9 +9,41 @@ from unittest.mock import patch
 
 from python.decision_store import create_manual_decision, ensure_decision_core_schema
 from python.operator_core import OperatorCore
+from python.test_support import seed_prediction, temp_db
 
 
 class OperatorCoreTests(unittest.TestCase):
+    def test_shared_python_fixture_helpers_seed_predictions(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="fixture-market",
+                question="Will shared fixtures work?",
+                market_price=41.0,
+                dexter_p=57.0,
+                naked_p=49.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-07T06:00:00Z",
+            )
+
+            with closing(sqlite3.connect(db_path)) as conn:
+                row = conn.execute(
+                    """
+                    SELECT market_id, question, market_price, dexter_p, naked_p, forecast_timestamp
+                    FROM predictions
+                    WHERE market_id = ?
+                    """,
+                    ("fixture-market",),
+                ).fetchone()
+
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], "fixture-market")
+            self.assertEqual(row[1], "Will shared fixtures work?")
+            self.assertEqual(row[2], 41.0)
+            self.assertEqual(row[3], 57.0)
+            self.assertEqual(row[4], 49.0)
+            self.assertEqual(row[5], "2026-04-07T06:00:00Z")
+
     def test_database_connections_enable_foreign_keys(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"

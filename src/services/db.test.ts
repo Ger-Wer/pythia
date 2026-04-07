@@ -3,6 +3,7 @@ import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createTestDatabase, seedPrediction } from './test_database';
 
 const tempDir = mkdtempSync(path.join(os.tmpdir(), 'pythia-db-test-'));
 const dbPath = path.join(tempDir, 'pythia.db');
@@ -294,6 +295,53 @@ test('initDb creates decision-core tables and seeds default books', async () => 
         status: 'active',
       },
     ]);
+  } finally {
+    db.close();
+  }
+});
+
+test('shared test database helpers seed predictions consistently', () => {
+  const db = createTestDatabase();
+  try {
+    seedPrediction(db, {
+      market_id: 'fixture-market',
+      question: 'Will fixture helpers work?',
+      market_price: 42,
+      dexter_p: 55,
+      naked_p: 47,
+      dexter_confidence: 'medium',
+      forecast_timestamp: '2026-04-07T06:00:00.000Z',
+      end_date: '2026-05-07T06:00:00.000Z',
+    });
+
+    const row = db
+      .query(
+        `
+          SELECT market_id, question, market_price, dexter_p, naked_p, dexter_confidence, forecast_timestamp
+          FROM predictions
+          WHERE market_id = ?1
+        `,
+      )
+      .get('fixture-market') as
+      | {
+          market_id: string;
+          question: string;
+          market_price: number;
+          dexter_p: number;
+          naked_p: number;
+          dexter_confidence: string;
+          forecast_timestamp: string;
+        }
+      | null;
+
+    expect(row).not.toBeNull();
+    expect(row?.market_id).toBe('fixture-market');
+    expect(row?.question).toBe('Will fixture helpers work?');
+    expect(row?.market_price).toBe(42);
+    expect(row?.dexter_p).toBe(55);
+    expect(row?.naked_p).toBe(47);
+    expect(row?.dexter_confidence).toBe('medium');
+    expect(row?.forecast_timestamp).toBe('2026-04-07T06:00:00.000Z');
   } finally {
     db.close();
   }

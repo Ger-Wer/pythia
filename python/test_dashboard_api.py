@@ -8,9 +8,29 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from python.dashboard_api import create_app
+from python.test_support import create_test_app, seed_prediction, temp_db
 
 
 class DashboardApiTests(unittest.TestCase):
+    def test_shared_dashboard_fixture_helpers_create_app_and_seed_predictions(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="fixture-api-market",
+                question="Will API fixtures work?",
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-07T06:00:00Z",
+            )
+
+            app = create_test_app(db_path=db_path)
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            overview = client.get("/api/overview")
+
+            self.assertEqual(overview.status_code, 200)
+            self.assertEqual(overview.json()["valid_predictions"], 1)
+
     def test_dashboard_api_returns_health_logs_and_human_action_summary(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
