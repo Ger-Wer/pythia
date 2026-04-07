@@ -37,14 +37,13 @@ test('initDb creates schema and stores unresolved predictions', async () => {
     getTodayCost,
     getUnresolved,
     initDb,
-    insertPrediction,
   } = await dbModulePromise;
 
   const forecastedAt = fixedUtcNoonToday();
   const db = initDb();
 
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-init',
       question: 'Will the db smoke test pass?',
       category: 'tests',
@@ -82,7 +81,6 @@ test('initDb creates schema and stores unresolved predictions', async () => {
 test('updateOutcome stores outcome timestamps and brier scores', async () => {
   const {
     initDb,
-    insertPrediction,
     updateOutcome,
   } = await dbModulePromise;
 
@@ -90,7 +88,7 @@ test('updateOutcome stores outcome timestamps and brier scores', async () => {
   const resolvedAt = new Date(forecastedAt.getTime() + 30 * 3_600_000).toISOString();
   const db = initDb();
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-brier',
       question: 'Will outcome update work?',
       category: 'tests',

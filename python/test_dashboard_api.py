@@ -88,32 +88,16 @@ class DashboardApiTests(unittest.TestCase):
             self.assertTrue({"sqlite", "llm", "gamma", "exa", "tavily", "scheduler", "telegram"}.issubset(components))
 
     def test_login_and_overview_flow(self):
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "pythia.db"
-            with closing(sqlite3.connect(db_path)) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE predictions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        market_id TEXT NOT NULL,
-                        question TEXT NOT NULL,
-                        forecast_timestamp TEXT NOT NULL,
-                        is_valid INTEGER DEFAULT 1
-                    )
-                    """
-                )
-                conn.execute(
-                    "INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid) VALUES (?, ?, ?, ?)",
-                    ("m1", "Will example happen?", "2026-04-04T08:16:48.766Z", 1),
-                )
-
-            app = create_app(
-                db_path=db_path,
-                log_dir=Path(temp_dir),
-                session_secret="test-secret",
-                dashboard_username="operator",
-                dashboard_password_hash="plain:secret-pass",
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="m1",
+                question="Will example happen?",
+                forecast_timestamp="2026-04-04T08:16:48.766Z",
+                end_date="2026-05-01T00:00:00Z",
             )
+
+            app = create_test_app(db_path=db_path)
             client = TestClient(app)
 
             login_res = client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})

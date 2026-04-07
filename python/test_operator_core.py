@@ -59,29 +59,16 @@ class OperatorCoreTests(unittest.TestCase):
                 self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
 
     def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "pythia.db"
-            with closing(sqlite3.connect(db_path)) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE predictions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        market_id TEXT NOT NULL,
-                        question TEXT NOT NULL,
-                        forecast_timestamp TEXT NOT NULL,
-                        is_valid INTEGER DEFAULT 1
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    ("m1", "Will this work read-only?", "2026-04-04T08:16:48Z", 1),
-                )
-                conn.commit()
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="m1",
+                question="Will this work read-only?",
+                forecast_timestamp="2026-04-04T08:16:48Z",
+                end_date="2026-05-01T00:00:00Z",
+            )
 
+            temp_dir = str(Path(db_path).parent)
             os.chmod(db_path, 0o444)
             os.chmod(temp_dir, 0o555)
             try:

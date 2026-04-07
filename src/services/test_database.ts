@@ -28,10 +28,12 @@ export function createTestDatabase(): Database {
         dexter_key_risk TEXT,
         dexter_base_rate TEXT,
         research_brief_json TEXT,
+        naked_reasoning TEXT,
         volume REAL,
         created_at TEXT,
         end_date TEXT,
         forecast_timestamp TEXT NOT NULL,
+        api_cost_usd REAL DEFAULT 0,
         is_valid INTEGER DEFAULT 1
       )
     `,
@@ -53,10 +55,12 @@ export function seedPrediction(
     dexter_key_risk?: string | null;
     dexter_base_rate?: string | null;
     research_brief_json?: string | null;
+    naked_reasoning?: string | null;
     volume?: number | null;
     created_at?: string | null;
     forecast_timestamp: string;
     end_date?: string | null;
+    api_cost_usd?: number | null;
     is_valid?: number;
   },
 ): void {
@@ -65,8 +69,8 @@ export function seedPrediction(
       INSERT INTO predictions (
         market_id, question, category, market_price, dexter_p, naked_p,
         dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
-        research_brief_json, volume, created_at, end_date, forecast_timestamp, is_valid
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+        research_brief_json, naked_reasoning, volume, created_at, end_date, forecast_timestamp, api_cost_usd, is_valid
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
     `,
   ).run(
     input.market_id,
@@ -80,10 +84,12 @@ export function seedPrediction(
     input.dexter_key_risk ?? '',
     input.dexter_base_rate ?? '',
     input.research_brief_json ?? '{}',
+    input.naked_reasoning ?? '',
     input.volume ?? null,
     input.created_at ?? input.forecast_timestamp,
     input.end_date ?? null,
     input.forecast_timestamp,
+    input.api_cost_usd ?? 0,
     input.is_valid ?? 1,
   );
 }

@@ -29,10 +29,12 @@ def seed_prediction(
     dexter_key_risk: str = "",
     dexter_base_rate: str = "",
     research_brief_json: str = "{}",
+    naked_reasoning: str = "",
     volume: float | None = None,
     created_at: str | None = None,
     forecast_timestamp: str,
     end_date: str | None,
+    api_cost_usd: float | None = 0,
     is_valid: int = 1,
 ) -> None:
     with sqlite3.connect(db_path) as conn:
@@ -51,10 +53,12 @@ def seed_prediction(
                 dexter_key_risk TEXT,
                 dexter_base_rate TEXT,
                 research_brief_json TEXT,
+                naked_reasoning TEXT,
                 volume REAL,
                 created_at TEXT,
                 end_date TEXT,
                 forecast_timestamp TEXT NOT NULL,
+                api_cost_usd REAL DEFAULT 0,
                 is_valid INTEGER DEFAULT 1
             )
             """
@@ -64,8 +68,8 @@ def seed_prediction(
             INSERT INTO predictions (
                 market_id, question, category, market_price, dexter_p, naked_p,
                 dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
-                research_brief_json, volume, created_at, end_date, forecast_timestamp, is_valid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                research_brief_json, naked_reasoning, volume, created_at, end_date, forecast_timestamp, api_cost_usd, is_valid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 market_id,
@@ -79,10 +83,12 @@ def seed_prediction(
                 dexter_key_risk,
                 dexter_base_rate,
                 research_brief_json,
+                naked_reasoning,
                 volume,
                 created_at or forecast_timestamp,
                 end_date,
                 forecast_timestamp,
+                api_cost_usd,
                 is_valid,
             ),
         )

@@ -89,14 +89,14 @@ test('shared test database helpers seed dossier and open position scaffolding', 
 });
 
 test('syncDecisionCoreForForecastRun creates signals and auto-opens a shadow position for a strong research signal', async () => {
-  const { initDb, insertPrediction } = await dbModulePromise;
+  const { initDb } = await dbModulePromise;
   const { syncDecisionCoreForForecastRun } = await decisionCoreModulePromise;
 
   const db = initDb();
   const forecastTimestamp = '2026-04-07T06:00:00.000Z';
 
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-open',
       question: 'Will Arsenal finish in 2nd place?',
       category: 'sports',
@@ -227,7 +227,7 @@ test('syncDecisionCoreForForecastRun creates signals and auto-opens a shadow pos
 });
 
 test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_break when the refreshed signal invalidates it', async () => {
-  const { initDb, insertPrediction } = await dbModulePromise;
+  const { initDb } = await dbModulePromise;
   const { syncDecisionCoreForForecastRun } = await decisionCoreModulePromise;
 
   const db = initDb();
@@ -235,7 +235,7 @@ test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_bre
   const secondForecast = '2026-04-08T06:00:00.000Z';
 
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-break',
       question: 'Will Example Market stay strong?',
       category: 'tests',
@@ -264,7 +264,7 @@ test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_bre
 
     syncDecisionCoreForForecastRun(db, firstForecast);
 
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-break',
       question: 'Will Example Market stay strong?',
       category: 'tests',
