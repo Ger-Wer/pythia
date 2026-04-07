@@ -24,6 +24,10 @@ DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
 LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 
+def dashboard_base_url() -> str:
+    return os.getenv("DASHBOARD_PUBLIC_BASE_URL", "").rstrip("/")
+
+
 def prediction_columns(conn: sqlite3.Connection) -> set[str]:
     return {
         str(row[1])
@@ -38,38 +42,56 @@ def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
     return f" AND {prefix}is_valid = 1"
 
 
-def send_message(text: str):
+def send_message(text: str) -> bool:
     if not BOT_TOKEN or not CHAT_ID:
         print(f"Telegram не настроен. Сообщение: {text}")
-        return
+        return False
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(
-        url,
-        json={
-            "chat_id": CHAT_ID,
-            "text": text,
-            "parse_mode": "Markdown",
-        },
-        timeout=20,
-    )
-
-
-def send_photo(path: str, caption: str = ""):
-    if not BOT_TOKEN or not CHAT_ID:
-        print(f"Telegram не настроен. Изображение: {path}")
-        return
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    with open(path, "rb") as handle:
-        requests.post(
+    try:
+        response = requests.post(
             url,
-            data={
+            json={
                 "chat_id": CHAT_ID,
-                "caption": caption,
+                "text": text,
                 "parse_mode": "Markdown",
             },
-            files={"photo": handle},
-            timeout=60,
+            timeout=20,
         )
+    except requests.RequestException as error:
+        print(f"Telegram sendMessage failed: {error}")
+        return False
+
+    if not response.ok:
+        print(f"Telegram sendMessage failed: HTTP {response.status_code} {response.text}")
+        return False
+    return True
+
+
+def send_photo(path: str, caption: str = "") -> bool:
+    if not BOT_TOKEN or not CHAT_ID:
+        print(f"Telegram не настроен. Изображение: {path}")
+        return False
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    with open(path, "rb") as handle:
+        try:
+            response = requests.post(
+                url,
+                data={
+                    "chat_id": CHAT_ID,
+                    "caption": caption,
+                    "parse_mode": "Markdown",
+                },
+                files={"photo": handle},
+                timeout=60,
+            )
+        except requests.RequestException as error:
+            print(f"Telegram sendPhoto failed: {error}")
+            return False
+
+    if not response.ok:
+        print(f"Telegram sendPhoto failed: HTTP {response.status_code} {response.text}")
+        return False
+    return True
 
 
 def weekly_report():
@@ -160,7 +182,9 @@ def watch_updates(limit: int = 10):
 
     delivered_ids: list[int] = []
     for item in pending:
-        send_message(
+        market_id = item.get("market_id")
+        market_link = f"{dashboard_base_url()}/markets/{market_id}" if dashboard_base_url() and market_id else ""
+        sent = send_message(
             "\n".join(
                 [
                     "👀 *Watchlist update*",
@@ -168,10 +192,12 @@ def watch_updates(limit: int = 10):
                     f"Статус: {item.get('status_label')}",
                     f"Почему: {item.get('reason_summary')}",
                     f"Действие: {item.get('action_summary')}",
+                    *( [f"Открыть разбор: {market_link}"] if market_link else [] ),
                 ]
             )
         )
-        delivered_ids.append(int(item["id"]))
+        if sent:
+            delivered_ids.append(int(item["id"]))
 
     if delivered_ids:
         mark_watch_updates_delivered(conn, delivered_ids)

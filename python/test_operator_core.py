@@ -823,6 +823,7 @@ class OperatorCoreTests(unittest.TestCase):
 
             core.remove_from_watchlist("572834")
             self.assertEqual(core.list_watchlist(), [])
+            self.assertEqual(core.list_watch_dossiers(), [])
 
     def test_workspace_and_overview_include_decision_core_entities(self):
         with TemporaryDirectory() as temp_dir:

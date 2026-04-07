@@ -110,7 +110,7 @@ export function countRefreshTargets(db: Database): number {
       `
         SELECT COUNT(*) as count
         FROM watch_dossiers
-        WHERE status = 'active'
+        WHERE status IN ('active', 'active_error')
       `,
     )
     .get() as { count: number } | null;
@@ -153,7 +153,7 @@ export function collectRefreshTargets(db: Database): RefreshTarget[] {
             ELSE 0
           END AS has_open_position
         FROM watch_dossiers d
-        WHERE d.status = 'active'
+        WHERE d.status IN ('active', 'active_error')
         ORDER BY has_open_position DESC, d.updated_at DESC, d.market_id ASC
       `,
     )
@@ -246,7 +246,8 @@ function updateDossierAfterMonitoring(
   db.query(
     `
       UPDATE watch_dossiers
-      SET updated_at = ?2,
+      SET status = 'active',
+          updated_at = ?2,
           last_refresh_at = ?2,
           current_market_price = ?3,
           current_research_probability = ?4,
@@ -284,7 +285,8 @@ function applyDeepReviewResult(
   db.query(
     `
       UPDATE watch_dossiers
-      SET updated_at = ?2,
+      SET status = 'active',
+          updated_at = ?2,
           last_deep_review_at = ?2,
           next_review_due_at = COALESCE(?3, next_review_due_at),
           thesis_state = COALESCE(?4, thesis_state),
@@ -388,6 +390,23 @@ function appendRunError(db: Database, runId: number, marketId: string, error: un
   ).run(runId, nextSummary);
 }
 
+function markDossierRefreshError(db: Database, dossier: RefreshTarget, error: unknown): void {
+  const message = safeErrorMessage(error);
+  db.query(
+    `
+      UPDATE watch_dossiers
+      SET status = 'active_error',
+          updated_at = ?2,
+          last_refresh_at = ?2,
+          thesis_state = 'review_required',
+          last_status_label = 'техническая ошибка',
+          last_reason_summary = ?3,
+          last_action_summary = 'Повторить refresh или открыть рынок вручную.'
+      WHERE id = ?1
+    `,
+  ).run(dossier.id, nowIso(), message);
+}
+
 export async function runWatchlistRefresh(
   db: Database,
   deps: RefreshDependencies,
@@ -468,6 +487,7 @@ export async function runWatchlistRefresh(
     } catch (error) {
       hadErrors = true;
       appendRunError(db, runId, dossier.market_id, error);
+      markDossierRefreshError(db, dossier, error);
     }
   }
 

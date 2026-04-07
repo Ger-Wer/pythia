@@ -222,6 +222,7 @@ class DashboardApiTests(unittest.TestCase):
             remove_watch = client.delete("/api/watchlist/572833")
             self.assertEqual(remove_watch.status_code, 200)
             self.assertEqual(client.get("/api/watchlist").json()["items"], [])
+            self.assertEqual(client.get("/api/watchlist/dossiers").json()["items"], [])
 
     def test_watchlist_dossier_and_update_endpoints(self):
         with temp_db() as db_path:

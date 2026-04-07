@@ -209,13 +209,12 @@ async function monitorWithLlm(
   };
 }
 
-function buildHeuristicMonitoringResult(
+export function buildHeuristicMonitoringResult(
   input: MonitoringInput,
   triggerFlags: Record<string, boolean>,
 ): MonitoringResult {
   const previousMarketPrice = input.dossier.current_market_price;
   const currentMarketPrice = input.current.marketPrice;
-  const previousProbability = input.dossier.current_research_probability;
   const priceDelta =
     previousMarketPrice !== null && currentMarketPrice !== null
       ? currentMarketPrice - previousMarketPrice
@@ -223,6 +222,9 @@ function buildHeuristicMonitoringResult(
   const dueReview = Boolean(triggerFlags.dueReview);
   const largePriceMove = Boolean(triggerFlags.largePriceMove);
   const hasNews = Boolean(triggerFlags.hasNews);
+  const nextProbability = input.current.researchProbability ?? input.current.nakedProbability;
+  const previousComparableProbability =
+    input.dossier.current_research_probability ?? input.dossier.current_naked_probability;
 
   if (!dueReview && !largePriceMove && !hasNews) {
     return {
@@ -240,20 +242,22 @@ function buildHeuristicMonitoringResult(
   const thesisState =
     dueReview
       ? 'review_required'
-      : classifyThesisState(previousProbability, previousProbability, currentMarketPrice);
+      : classifyThesisState(previousComparableProbability, nextProbability, currentMarketPrice);
+
+  const normalizedThesisState = thesisState === 'intact' ? 'review_required' : thesisState;
 
   const statusLabel =
-    thesisState === 'broken'
+    normalizedThesisState === 'broken'
       ? 'thesis break'
-      : thesisState === 'weakened'
+      : normalizedThesisState === 'weakened'
         ? 'тезис ослаб'
-        : thesisState === 'strengthened'
+        : normalizedThesisState === 'strengthened'
           ? 'тезис усилился'
           : 'нужен review';
 
   return {
-    monitoringStatus: thesisState === 'review_required' ? 'review_required' : thesisState,
-    thesisState,
+    monitoringStatus: normalizedThesisState === 'review_required' ? 'review_required' : normalizedThesisState,
+    thesisState: normalizedThesisState,
     statusLabel,
     reasonSummary:
       dueReview
@@ -263,7 +267,7 @@ function buildHeuristicMonitoringResult(
     shouldDeepReview: dueReview || largePriceMove || hasNews,
     triggerFlags,
     operatorFacing: {
-      severity: thesisState === 'broken' ? 'critical' : 'review',
+      severity: normalizedThesisState === 'broken' ? 'critical' : normalizedThesisState === 'weakened' ? 'warning' : 'review',
       statusLabel,
       reasonSummary:
         dueReview

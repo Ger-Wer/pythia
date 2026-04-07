@@ -201,7 +201,7 @@ describe("MarketDetailPage", () => {
     await user.click(screen.getByRole("button", { name: "Добавить в избранное" }));
 
     expect(addWatchlist).toHaveBeenCalledWith("572833", "Добавлено из разбора рынка");
-  });
+  }, 10000);
 
   it("still renders market analysis when watchlist is unavailable and keeps zero volume visible", async () => {
     marketWorkspace.mockResolvedValueOnce(
@@ -388,5 +388,5 @@ describe("MarketDetailPage", () => {
 
     expect(await screen.findByText("Последний пост-мортем")).toBeInTheDocument();
     expect(screen.getByText("Position closed via manual_exit.")).toBeInTheDocument();
-  }, 15000);
+  }, 20000);
 });

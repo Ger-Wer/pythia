@@ -427,8 +427,9 @@ def list_watch_dossiers(conn: sqlite3.Connection) -> list[dict[str, Any]]:
                       AND COALESCE(p.is_valid, 1) = 1
                     ORDER BY p.forecast_timestamp DESC, p.id DESC
                     LIMIT 1
-                ) AS question
+            ) AS question
             FROM watch_dossiers d
+            WHERE d.status IN ('active', 'active_error')
             ORDER BY d.updated_at DESC, d.market_id ASC
             """,
         )
@@ -473,6 +474,7 @@ def get_watch_dossier(conn: sqlite3.Connection, market_id: str) -> dict[str, Any
             ) AS question
         FROM watch_dossiers d
         WHERE d.market_id = ?
+          AND d.status IN ('active', 'active_error')
         LIMIT 1
         """,
         (market_id,),
@@ -510,6 +512,7 @@ def list_watch_updates(conn: sqlite3.Connection, *, limit: int = 20) -> list[dic
             ) AS question
         FROM watch_updates u
         JOIN watch_dossiers d ON d.id = u.watch_dossier_id
+        WHERE d.status IN ('active', 'active_error')
         ORDER BY u.created_at DESC, u.id DESC
         LIMIT ?
         """,
@@ -553,6 +556,7 @@ def list_watch_updates_for_market(
         FROM watch_updates u
         JOIN watch_dossiers d ON d.id = u.watch_dossier_id
         WHERE d.market_id = ?
+          AND d.status IN ('active', 'active_error')
         ORDER BY u.created_at DESC, u.id DESC
         LIMIT ?
         """,
@@ -585,6 +589,7 @@ def list_pending_watch_updates(conn: sqlite3.Connection, *, limit: int = 10) -> 
         FROM watch_updates u
         JOIN watch_dossiers d ON d.id = u.watch_dossier_id
         WHERE u.delivered_to_telegram_at IS NULL
+          AND d.status IN ('active', 'active_error')
         ORDER BY u.created_at ASC, u.id ASC
         LIMIT ?
         """,
@@ -610,6 +615,29 @@ def mark_watch_updates_delivered(
         WHERE id IN ({placeholders})
         """,
         (timestamp, *update_ids),
+    )
+    conn.commit()
+    return int(cursor.rowcount or 0)
+
+
+def deactivate_watch_dossier(
+    conn: sqlite3.Connection,
+    market_id: str,
+    *,
+    deactivated_at: str | None = None,
+) -> int:
+    if not _table_exists(conn, "watch_dossiers"):
+        return 0
+
+    timestamp = deactivated_at or utc_now_iso()
+    cursor = conn.execute(
+        """
+        UPDATE watch_dossiers
+        SET status = 'closed',
+            updated_at = ?
+        WHERE market_id = ?
+        """,
+        (timestamp, market_id),
     )
     conn.commit()
     return int(cursor.rowcount or 0)

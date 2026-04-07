@@ -134,10 +134,10 @@
 - [x] Decision Journal + Shadow Trading Core внедрён
 - [x] Workspace и базовые decision-сущности уже заведены в систему
 - [ ] Превратить `Избранное` в автономный контур сопровождения
-- [ ] Вынести `watchlist refresh` в отдельный runtime-цикл
-- [ ] Сделать `monitoring mode` для watchlist-рынков
-- [ ] Включить `deep review` только по триггерам
-- [ ] Перестроить `Разбор рынка` из fact-dump в decision workspace
+- [x] Вынести `watchlist refresh` в отдельный runtime-цикл
+- [x] Сделать `monitoring mode` для watchlist-рынков
+- [x] Включить `deep review` только по триггерам
+- [x] Перестроить `Разбор рынка` из fact-dump в dossier-first workspace
 - [ ] Сделать `Сводку` и `Избранное` главными экранами работы оператора
 
 ## Дорожная карта по фазам
@@ -162,16 +162,16 @@
 
 ### Phase 2 — Autonomous Watchlist Engine
 
-- [ ] `watch dossier`
-- [ ] `initial thesis snapshot`
-- [ ] автоматический `review deadline`
-- [ ] отдельный `watchlist refresh` каждые `4-6` часов
-- [ ] мониторинг цены по watchlist-рынкам
-- [ ] мониторинг новых внешних фактов
-- [ ] monitoring LLM mode
-- [ ] deep review triggers
-- [ ] thesis-strength delta
-- [ ] thesis-break detection
+- [x] `watch dossier`
+- [x] `initial thesis snapshot`
+- [x] автоматический `review deadline`
+- [x] отдельный `watchlist refresh` каждые `4-6` часов
+- [x] мониторинг цены по watchlist-рынкам
+- [x] мониторинг новых внешних фактов
+- [x] monitoring LLM mode
+- [x] deep review triggers
+- [x] thesis-strength delta
+- [x] thesis-break detection
 - [ ] watchlist attention items
 
 ### Phase 3 — Operator Workflow Redesign
@@ -256,6 +256,6 @@
 
 Следующий главный workstream:
 
-- [ ] спроектировать и внедрить `Autonomous Watchlist Engine`
+- [ ] довести `Autonomous Watchlist Engine` до production rollout и связать его с дальнейшим `attention engine`
 
 Именно он переведёт Pythia из состояния `умный прогнозный интерфейс` в состояние `живой аналитический операторский комбайн`.

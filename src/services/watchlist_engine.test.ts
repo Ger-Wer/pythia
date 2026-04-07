@@ -241,3 +241,71 @@ test('applies deep review results and creates operator-facing update', async () 
   expect(update?.action_summary).toBe('Открыть разбор и проверить позицию.');
   expect(update?.delivered_to_dashboard_at).not.toBeNull();
 });
+
+test('marks dossier with technical error state when refresh of one market fails', async () => {
+  const { runWatchlistRefresh } = await watchlistEngineModule;
+
+  const db = createTestDatabase();
+  ensureDecisionCoreSchema(db);
+  ensureWatchlistEngineSchema(db);
+  seedPrediction(db, {
+    market_id: 'error-market',
+    question: 'Will one broken market avoid killing the run?',
+    market_price: 44,
+    dexter_p: 57,
+    naked_p: 52,
+    forecast_timestamp: '2026-04-07T06:00:00.000Z',
+    end_date: '2026-05-01T12:00:00.000Z',
+  });
+  seedWatchDossier(db, {
+    market_id: 'error-market',
+    current_market_price: 44,
+    current_research_probability: 57,
+    current_naked_probability: 52,
+    current_confidence: 'medium',
+    current_research_status: 'ON',
+    current_thesis_summary: 'Следим за рынком.',
+  });
+
+  const result = await runWatchlistRefresh(db, {
+    fetchMarketSnapshot: async () => {
+      throw new Error('Gamma timeout');
+    },
+    fetchNewsDigest: async () => ({ hits: [], summary: 'Нет данных' }),
+    monitorThesis: async () => {
+      throw new Error('unexpected');
+    },
+    deepReview: async () => {
+      throw new Error('unexpected');
+    },
+  });
+
+  const dossier = db
+    .query(
+      `
+        SELECT status, thesis_state, last_status_label, last_reason_summary, last_action_summary
+        FROM watch_dossiers
+        WHERE market_id = 'error-market'
+      `,
+    )
+    .get() as Record<string, string | null> | null;
+
+  const run = db
+    .query(
+      `
+        SELECT status, error_summary
+        FROM watch_refresh_runs
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+    )
+    .get() as Record<string, string | null> | null;
+
+  expect(result.marketsChecked).toBe(0);
+  expect(dossier?.status).toBe('active_error');
+  expect(dossier?.thesis_state).toBe('review_required');
+  expect(dossier?.last_status_label).toBe('техническая ошибка');
+  expect(dossier?.last_action_summary).toBe('Повторить refresh или открыть рынок вручную.');
+  expect(run?.status).toBe('partial_success');
+  expect(run?.error_summary).toContain('Gamma timeout');
+});

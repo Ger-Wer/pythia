@@ -23,6 +23,7 @@ from python.decision_store import (
 from python.quality_metrics import load_quality_snapshot
 from python.watchlist_store import (
     bootstrap_watch_dossier,
+    deactivate_watch_dossier,
     get_watch_dossier as load_watch_dossier,
     list_watch_updates_for_market as load_watch_updates_for_market,
     ensure_watchlist_engine_schema,
@@ -1003,7 +1004,10 @@ class OperatorCore:
     def remove_from_watchlist(self, market_id: str) -> None:
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
-            conn.execute("DELETE FROM watchlist WHERE market_id = ?", (str(market_id).strip(),))
+            ensure_watchlist_engine_schema(conn)
+            normalized_market_id = str(market_id).strip()
+            conn.execute("DELETE FROM watchlist WHERE market_id = ?", (normalized_market_id,))
+            deactivate_watch_dossier(conn, normalized_market_id)
             conn.commit()
 
     def list_watch_dossiers(self) -> list[dict[str, Any]]:
