@@ -703,6 +703,214 @@ class OperatorCoreTests(unittest.TestCase):
             core.remove_from_watchlist("572834")
             self.assertEqual(core.list_watchlist(), [])
 
+    def test_workspace_and_overview_include_decision_core_entities(self):
+        with TemporaryDirectory() as temp_dir:
+            from python.decision_store import ensure_decision_core_schema
+
+            db_path = Path(temp_dir) / "pythia.db"
+            log_dir = Path(temp_dir) / "logs"
+            log_dir.mkdir()
+
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        dexter_reasoning TEXT,
+                        dexter_key_risk TEXT,
+                        dexter_base_rate TEXT,
+                        research_brief_json TEXT,
+                        volume REAL,
+                        end_date TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        id, market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
+                        research_brief_json, volume, end_date, forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "market-workspace",
+                        "Will Arsenal finish in 2nd place?",
+                        "sports",
+                        12.0,
+                        30.0,
+                        35.0,
+                        "medium",
+                        "Арсенал выглядит сильнее рынка.",
+                        "Поздний спад формы.",
+                        "Исторически около 16%.",
+                        '{"summary":"Арсенал в хорошей форме","primary_driver":"Результаты последних матчей Арсенала и его позиция в таблице","second_order_effects":["Осечки конкурентов"],"disconfirming_signal":"Поражение в ключевом матче","sources":["https://example.com/arsenal"]}',
+                        54066914,
+                        "2026-05-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                        1,
+                    ),
+                )
+                ensure_decision_core_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        prediction_id, market_id, question, forecast_timestamp, market_price,
+                        research_probability, naked_probability, best_probability, signal_edge,
+                        signal_strength, recommended_action, entry_zone_min, entry_zone_max,
+                        thesis_summary, primary_driver, disconfirming_signal, confidence,
+                        research_status, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "market-workspace",
+                        "Will Arsenal finish in 2nd place?",
+                        "2026-04-07T06:00:00Z",
+                        12.0,
+                        30.0,
+                        35.0,
+                        30.0,
+                        18.0,
+                        18.0,
+                        "enter_yes",
+                        12.0,
+                        28.0,
+                        "Арсенал выглядит сильнее рынка.",
+                        "Результаты последних матчей Арсенала и его позиция в таблице",
+                        "Поражение в ключевом матче",
+                        "medium",
+                        "ON",
+                        "new",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO decisions (
+                        id, signal_id, book_id, market_id, actor_type, decision_type, decision_reason,
+                        operator_confidence, confirmation_criteria, invalidation_criteria,
+                        review_due_at, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        1,
+                        2,
+                        "market-workspace",
+                        "operator",
+                        "enter_yes",
+                        "Хочу отслеживать рынок как operator paper trade.",
+                        "medium",
+                        "Арсенал удерживает форму",
+                        "Поражение в ключевом матче",
+                        "2026-04-08T06:00:00Z",
+                        "active",
+                        "2026-04-07T06:30:00Z",
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO positions (
+                        id, book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
+                        entry_yes_price, entry_cost_per_contract, entry_zone_min, entry_zone_max,
+                        size_contracts, notional_usd, review_due_at, opened_at, thesis_cycle_number
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        2,
+                        "market-workspace",
+                        1,
+                        1,
+                        "operator",
+                        "yes",
+                        "open",
+                        12.0,
+                        0.12,
+                        12.0,
+                        28.0,
+                        1666.6667,
+                        200.0,
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-07T06:30:00Z",
+                        1,
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO reviews (
+                        id, position_id, market_id, review_type, due_at, status,
+                        review_note, resolved_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        1,
+                        "market-workspace",
+                        "time_review",
+                        "2026-04-08T06:00:00Z",
+                        "due",
+                        "Нужно проверить тезис после следующего прогона.",
+                        None,
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-08T06:00:00Z",
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO postmortems (
+                        position_id, market_id, outcome_label, pnl_usd, pnl_percent,
+                        forecast_error, entry_error, timing_error, management_error,
+                        discipline_error, operator_note, system_note, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "market-workspace",
+                        "early_exit",
+                        18.5,
+                        9.25,
+                        0,
+                        0,
+                        1,
+                        0,
+                        0,
+                        "Закрыл рано после слома тезиса.",
+                        "Position closed via thesis_break.",
+                        "2026-04-08T06:00:00Z",
+                        "2026-04-08T06:00:00Z",
+                    ),
+                )
+
+            core = OperatorCore(db_path=db_path, log_dir=log_dir)
+            overview = core.get_overview()
+            workspace = core.get_market_workspace("market-workspace")
+
+            self.assertEqual(overview["open_shadow_positions"], 0)
+            self.assertEqual(overview["open_operator_positions"], 1)
+            self.assertEqual(overview["due_reviews_count"], 1)
+
+            self.assertEqual(workspace["signal"]["recommended_action"], "enter_yes")
+            self.assertEqual(len(workspace["open_positions"]), 1)
+            self.assertEqual(workspace["open_positions"][0]["mode"], "operator")
+            self.assertEqual(len(workspace["due_reviews"]), 1)
+            self.assertEqual(workspace["due_reviews"][0]["status"], "due")
+            self.assertEqual(len(workspace["recent_decisions"]), 1)
+            self.assertEqual(workspace["recent_decisions"][0]["decision_type"], "enter_yes")
+            self.assertEqual(workspace["latest_postmortem"]["outcome_label"], "early_exit")
+
 
 if __name__ == "__main__":
     unittest.main()

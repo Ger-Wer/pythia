@@ -14,10 +14,19 @@ from python.dashboard_models import (
     LatestRunResponse,
     LoginRequest,
     LogsResponse,
+    DueReviewsResponse,
+    ManualDecisionRequest,
+    ManualDecisionResponse,
     MarketDetailsResponse,
+    MarketWorkspaceResponse,
     MeResponse,
+    OpenPositionsResponse,
     OverviewResponse,
+    PositionCloseRequest,
+    PositionCloseResponse,
     QualityResponse,
+    ReviewCompleteRequest,
+    ReviewCompleteResponse,
     WatchlistItemRequest,
     WatchlistResponse,
 )
@@ -114,6 +123,62 @@ def create_app(
             return MarketDetailsResponse(**core.get_market_details(market_id))
         except LookupError as exc:
             raise HTTPException(status_code=404, detail="MARKET_NOT_FOUND") from exc
+
+    @app.get("/api/markets/{market_id}/workspace", response_model=MarketWorkspaceResponse)
+    def market_workspace(market_id: str, request: Request) -> MarketWorkspaceResponse:
+        require_session(request)
+        try:
+            return MarketWorkspaceResponse(**core.get_market_workspace(market_id))
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="MARKET_NOT_FOUND") from exc
+
+    @app.get("/api/positions/open", response_model=OpenPositionsResponse)
+    def open_positions(request: Request) -> OpenPositionsResponse:
+        require_session(request)
+        return OpenPositionsResponse(items=core.list_open_positions())
+
+    @app.get("/api/reviews/due", response_model=DueReviewsResponse)
+    def due_reviews(request: Request) -> DueReviewsResponse:
+        require_session(request)
+        return DueReviewsResponse(items=core.list_due_reviews())
+
+    @app.post("/api/decisions", response_model=ManualDecisionResponse)
+    def decisions_create(body: ManualDecisionRequest, request: Request) -> ManualDecisionResponse:
+        require_session(request)
+        try:
+            payload = core.create_manual_decision(
+                signal_id=body.signal_id,
+                decision_type=body.decision_type,
+                decision_reason=body.decision_reason,
+                operator_confidence=body.operator_confidence,
+                confirmation_criteria=body.confirmation_criteria,
+                invalidation_criteria=body.invalidation_criteria,
+                open_position=body.open_position,
+                review_due_at=body.review_due_at,
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="SIGNAL_NOT_FOUND") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return ManualDecisionResponse(**payload)
+
+    @app.post("/api/positions/{position_id}/close", response_model=PositionCloseResponse)
+    def positions_close(position_id: int, body: PositionCloseRequest, request: Request) -> PositionCloseResponse:
+        require_session(request)
+        try:
+            payload = core.close_position_manually(position_id, body.note)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="POSITION_NOT_FOUND") from exc
+        return PositionCloseResponse(**payload)
+
+    @app.post("/api/reviews/{review_id}/complete", response_model=ReviewCompleteResponse)
+    def reviews_complete(review_id: int, body: ReviewCompleteRequest, request: Request) -> ReviewCompleteResponse:
+        require_session(request)
+        try:
+            payload = core.complete_review(review_id, body.note)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="REVIEW_NOT_FOUND") from exc
+        return ReviewCompleteResponse(**payload)
 
     @app.get("/api/watchlist", response_model=WatchlistResponse)
     def watchlist(request: Request) -> WatchlistResponse:

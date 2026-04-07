@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from python.decision_store import ensure_decision_core_schema
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
@@ -30,6 +31,24 @@ def prediction_columns(conn: sqlite3.Connection) -> set[str]:
         str(row[1])
         for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
     }
+
+
+def table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
+def fetchall_dicts(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    cursor = conn.execute(sql, params)
+    rows = cursor.fetchall()
+    columns = [str(description[0]) for description in cursor.description or []]
+    return [
+        {columns[index]: row[index] for index in range(len(columns))}
+        for row in rows
+    ]
 
 
 def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
@@ -177,6 +196,194 @@ def update_resolved_market(conn: sqlite3.Connection, market_id: str, outcome: in
         )
 
 
+def _resolved_yes_price(outcome: int) -> float:
+    return 100.0 if outcome == 1 else 0.0
+
+
+def _payout_per_contract(side: str, outcome: int) -> float:
+    normalized = side.lower()
+    if normalized == "yes" and outcome == 1:
+        return 1.0
+    if normalized == "no" and outcome == 0:
+        return 1.0
+    return 0.0
+
+
+def _upsert_resolution_postmortem(
+    conn: sqlite3.Connection,
+    position: dict[str, Any],
+    *,
+    outcome: int,
+    resolved_at: str,
+) -> None:
+    outcome_label = "yes" if outcome == 1 else "no"
+    forecast_error = 0 if _payout_per_contract(str(position["side"]), outcome) == 1.0 else 1
+    entry_error = 0 if forecast_error == 0 else 0
+
+    existing = conn.execute(
+        """
+        SELECT timing_error, management_error, discipline_error, operator_note, system_note
+        FROM postmortems
+        WHERE position_id = ?
+        LIMIT 1
+        """,
+        (position["id"],),
+    ).fetchone()
+    existing_timing = existing[0] if existing else None
+    existing_management = existing[1] if existing else None
+    existing_discipline = existing[2] if existing else None
+    existing_operator_note = existing[3] if existing else None
+    existing_system_note = existing[4] if existing else None
+
+    if existing_timing is not None:
+        timing_error = existing_timing
+    elif position.get("close_reason") == "resolved" or position.get("status") == "open":
+        timing_error = 0
+    else:
+        timing_error = 1
+    management_error = existing_management if existing_management is not None else 0
+    discipline_error = existing_discipline if existing_discipline is not None else 0
+    system_note = f"Position resolved via resolved outcome {outcome_label}."
+    if existing_system_note:
+        system_note = f"{existing_system_note} Resolution backfilled after resolved outcome {outcome_label}."
+
+    conn.execute(
+        """
+        INSERT INTO postmortems (
+            position_id, market_id, outcome_label, pnl_usd, pnl_percent,
+            forecast_error, entry_error, timing_error, management_error,
+            discipline_error, operator_note, system_note, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(position_id) DO UPDATE SET
+            outcome_label = excluded.outcome_label,
+            pnl_usd = COALESCE(postmortems.pnl_usd, excluded.pnl_usd),
+            pnl_percent = COALESCE(postmortems.pnl_percent, excluded.pnl_percent),
+            forecast_error = excluded.forecast_error,
+            entry_error = COALESCE(postmortems.entry_error, excluded.entry_error),
+            timing_error = COALESCE(postmortems.timing_error, excluded.timing_error),
+            management_error = COALESCE(postmortems.management_error, excluded.management_error),
+            discipline_error = COALESCE(postmortems.discipline_error, excluded.discipline_error),
+            operator_note = COALESCE(postmortems.operator_note, excluded.operator_note),
+            system_note = excluded.system_note,
+            updated_at = excluded.updated_at
+        """,
+        (
+            position["id"],
+            position["market_id"],
+            outcome_label,
+            position.get("pnl_usd"),
+            position.get("pnl_percent"),
+            forecast_error,
+            entry_error,
+            timing_error,
+            management_error,
+            discipline_error,
+            existing_operator_note,
+            system_note,
+            resolved_at,
+            resolved_at,
+        ),
+    )
+
+
+def settle_positions_for_resolution(conn: sqlite3.Connection, market_id: str, outcome: int, resolved_at: str) -> None:
+    if outcome not in (0, 1):
+        return
+    if not table_exists(conn, "positions"):
+        return
+
+    ensure_decision_core_schema(conn)
+
+    positions = fetchall_dicts(
+        conn,
+        """
+        SELECT
+            id, book_id, market_id, side, status, entry_cost_per_contract,
+            size_contracts, notional_usd, review_due_at, close_reason,
+            pnl_usd, pnl_percent
+        FROM positions
+        WHERE market_id = ?
+        ORDER BY id ASC
+        """,
+        (market_id,),
+    )
+    if not positions:
+        return
+
+    resolved_yes_price = _resolved_yes_price(outcome)
+
+    for position in positions:
+        if position["status"] == "open":
+            payout = _payout_per_contract(str(position["side"]), outcome)
+            size_contracts = float(position["size_contracts"] or 0)
+            entry_cost_per_contract = float(position["entry_cost_per_contract"] or 0)
+            notional_usd = float(position["notional_usd"] or 0)
+            pnl_usd = size_contracts * (payout - entry_cost_per_contract)
+            pnl_percent = 0.0 if notional_usd == 0 else (pnl_usd / notional_usd) * 100
+
+            conn.execute(
+                """
+                UPDATE positions
+                SET status = 'closed',
+                    closed_at = ?,
+                    closed_yes_price = ?,
+                    close_reason = 'resolved',
+                    pnl_usd = ?,
+                    pnl_percent = ?
+                WHERE id = ?
+                """,
+                (resolved_at, resolved_yes_price, pnl_usd, pnl_percent, position["id"]),
+            )
+            conn.execute(
+                """
+                UPDATE books
+                SET current_balance = current_balance + ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (pnl_usd, resolved_at, position["book_id"]),
+            )
+            conn.execute(
+                """
+                UPDATE reviews
+                SET status = 'cancelled',
+                    resolved_at = ?,
+                    updated_at = ?
+                WHERE position_id = ? AND status IN ('due', 'scheduled')
+                """,
+                (resolved_at, resolved_at, position["id"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO position_events (
+                    position_id, decision_id, event_type, event_note,
+                    market_price, research_probability, created_at, payload_json
+                ) VALUES (?, NULL, 'closed', ?, ?, NULL, ?, ?)
+                """,
+                (
+                    position["id"],
+                    f"Position resolved with outcome {'YES' if outcome == 1 else 'NO'}.",
+                    resolved_yes_price,
+                    resolved_at,
+                    json.dumps(
+                        {
+                            "close_reason": "resolved",
+                            "outcome": outcome,
+                            "pnl_usd": pnl_usd,
+                            "pnl_percent": pnl_percent,
+                        },
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+            position["status"] = "closed"
+            position["close_reason"] = "resolved"
+            position["pnl_usd"] = pnl_usd
+            position["pnl_percent"] = pnl_percent
+
+        _upsert_resolution_postmortem(conn, position, outcome=outcome, resolved_at=resolved_at)
+
+
 def summarize_market(conn: sqlite3.Connection, market_id: str) -> tuple[str, float] | None:
     filter_suffix = valid_filter(conn)
     row = conn.execute(
@@ -236,6 +443,7 @@ def main() -> None:
             continue
 
         update_resolved_market(conn, str(market_id), outcome, resolved_at)
+        settle_positions_for_resolution(conn, str(market_id), outcome, resolved_at)
         if outcome in (0, 1):
             resolved_today.append(str(market_id))
         else:

@@ -370,6 +370,152 @@ class DashboardApiTests(unittest.TestCase):
             self.assertIsNone(payload["metrics"]["brier_research"])
             self.assertIsNone(payload["metrics"]["edge_research_vs_market"])
 
+    def test_workspace_and_manual_position_endpoints(self):
+        with TemporaryDirectory() as temp_dir:
+            from python.decision_store import ensure_decision_core_schema
+
+            db_path = Path(temp_dir) / "pythia.db"
+            with closing(sqlite3.connect(db_path)) as conn, conn:
+                conn.execute(
+                    """
+                    CREATE TABLE predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        category TEXT,
+                        market_price REAL,
+                        dexter_p REAL,
+                        naked_p REAL,
+                        dexter_confidence TEXT,
+                        dexter_reasoning TEXT,
+                        dexter_key_risk TEXT,
+                        dexter_base_rate TEXT,
+                        research_brief_json TEXT,
+                        volume REAL,
+                        end_date TEXT,
+                        forecast_timestamp TEXT NOT NULL,
+                        is_valid INTEGER DEFAULT 1
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        id, market_id, question, category, market_price, dexter_p, naked_p,
+                        dexter_confidence, dexter_reasoning, dexter_key_risk, dexter_base_rate,
+                        research_brief_json, volume, end_date, forecast_timestamp, is_valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "market-api-workspace",
+                        "Will Example operator workflow pass?",
+                        "tests",
+                        22.0,
+                        41.0,
+                        38.0,
+                        "medium",
+                        "Pythia likes the setup.",
+                        "Momentum may reverse.",
+                        "Base rate exists.",
+                        '{"summary":"Operator summary","primary_driver":"Strong catalyst","second_order_effects":["Secondary support"],"disconfirming_signal":"Catalyst fades","sources":["https://example.com/operator"]}',
+                        12345,
+                        "2026-05-01T00:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                        1,
+                    ),
+                )
+                ensure_decision_core_schema(conn)
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        id, prediction_id, market_id, question, forecast_timestamp, market_price,
+                        research_probability, naked_probability, best_probability, signal_edge,
+                        signal_strength, recommended_action, entry_zone_min, entry_zone_max,
+                        thesis_summary, primary_driver, disconfirming_signal, confidence,
+                        research_status, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        1,
+                        "market-api-workspace",
+                        "Will Example operator workflow pass?",
+                        "2026-04-07T06:00:00Z",
+                        22.0,
+                        41.0,
+                        38.0,
+                        41.0,
+                        19.0,
+                        19.0,
+                        "enter_yes",
+                        22.0,
+                        39.0,
+                        "Operator summary",
+                        "Strong catalyst",
+                        "Catalyst fades",
+                        "medium",
+                        "ON",
+                        "new",
+                        "2026-04-07T06:00:00Z",
+                        "2026-04-07T06:00:00Z",
+                    ),
+                )
+
+            app = create_app(
+                db_path=db_path,
+                log_dir=Path(temp_dir),
+                session_secret="test-secret",
+                dashboard_username="operator",
+                dashboard_password_hash="plain:secret-pass",
+            )
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            workspace_before = client.get("/api/markets/market-api-workspace/workspace")
+            self.assertEqual(workspace_before.status_code, 200)
+            self.assertEqual(workspace_before.json()["signal"]["recommended_action"], "enter_yes")
+            self.assertEqual(workspace_before.json()["open_positions"], [])
+
+            create_decision = client.post(
+                "/api/decisions",
+                json={
+                    "signal_id": 1,
+                    "decision_type": "enter_yes",
+                    "decision_reason": "Открываю operator paper position по сильному сигналу.",
+                    "operator_confidence": "medium",
+                    "confirmation_criteria": "Сигнал подтверждается следующим прогоном.",
+                    "invalidation_criteria": "Сигнал пропадает или рынок резко уходит против.",
+                    "open_position": True,
+                },
+            )
+            self.assertEqual(create_decision.status_code, 200)
+            create_payload = create_decision.json()
+            self.assertTrue(create_payload["ok"])
+            self.assertIsNotNone(create_payload["decision_id"])
+            self.assertIsNotNone(create_payload["position_id"])
+
+            open_positions = client.get("/api/positions/open")
+            self.assertEqual(open_positions.status_code, 200)
+            self.assertEqual(len(open_positions.json()["items"]), 1)
+            self.assertEqual(open_positions.json()["items"][0]["mode"], "operator")
+
+            workspace_after = client.get("/api/markets/market-api-workspace/workspace")
+            self.assertEqual(len(workspace_after.json()["recent_decisions"]), 1)
+            self.assertEqual(len(workspace_after.json()["open_positions"]), 1)
+
+            position_id = create_payload["position_id"]
+            close_position = client.post(
+                f"/api/positions/{position_id}/close",
+                json={"note": "Закрываю operator paper position вручную."},
+            )
+            self.assertEqual(close_position.status_code, 200)
+            self.assertEqual(close_position.json()["status"], "closed")
+
+            review_due = client.get("/api/reviews/due")
+            self.assertEqual(review_due.status_code, 200)
+            self.assertEqual(review_due.json()["items"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

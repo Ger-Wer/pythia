@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Database as BunDatabase } from 'bun:sqlite';
 import { CONFIG } from '../config';
+import { ensureDecisionCoreSchema } from './decision_core';
 
 export type Database = BunDatabase;
 
@@ -137,10 +138,12 @@ export function initDb(): Database {
     create: true,
     strict: true,
   });
+  db.run('PRAGMA foreign_keys = ON;');
   db.run('PRAGMA journal_mode = WAL;');
   db.run(BASE_TABLE_SQL);
   ensurePredictionMigrations(db);
   ensurePredictionIndexes(db);
+  ensureDecisionCoreSchema(db);
 
   return db;
 }

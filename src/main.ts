@@ -6,6 +6,7 @@ import {
   CostLimitError,
   CostTracker,
 } from './services/cost_tracker';
+import { syncDecisionCoreForForecastRun } from './services/decision_core';
 import { initDb, insertPrediction } from './services/db';
 import type { Database } from './services/db';
 import {
@@ -255,6 +256,8 @@ async function main(): Promise<void> {
       errors += 1;
     }
   }
+
+  syncDecisionCoreForForecastRun(db, startedAt);
 
   log(`${processed} markets processed, total cost: $${costTracker.getSessionCost().toFixed(4)}`);
 

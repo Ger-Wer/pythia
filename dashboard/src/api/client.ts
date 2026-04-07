@@ -1,12 +1,18 @@
 import type {
   ActionResponse,
+  DueReviewsResponse,
   HealthResponse,
   LatestRunResponse,
   LogsResponse,
-  MarketDetailsResponse,
+  ManualDecisionInput,
+  ManualDecisionResponse,
+  MarketWorkspaceResponse,
   MeResponse,
+  OpenPositionsResponse,
   OverviewResponse,
+  PositionCloseResponse,
   QualityResponse,
+  ReviewCompleteResponse,
   WatchlistResponse,
 } from "../types/api";
 
@@ -34,7 +40,9 @@ export const api = {
   quality: () => request<QualityResponse>("/api/quality"),
   logs: () => request<LogsResponse>("/api/logs"),
   latestRun: () => request<LatestRunResponse>("/api/runs/latest"),
-  marketDetails: (marketId: string) => request<MarketDetailsResponse>(`/api/markets/${marketId}`),
+  marketWorkspace: (marketId: string) => request<MarketWorkspaceResponse>(`/api/markets/${marketId}/workspace`),
+  openPositions: () => request<OpenPositionsResponse>("/api/positions/open"),
+  dueReviews: () => request<DueReviewsResponse>("/api/reviews/due"),
   watchlist: () => request<WatchlistResponse>("/api/watchlist"),
   login: (username: string, password: string) =>
     request<{ ok: boolean }>("/api/auth/login", {
@@ -44,6 +52,21 @@ export const api = {
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   runAction: (action: "forecast" | "resolve" | "weekly") =>
     request<ActionResponse>(`/api/actions/${action}`, { method: "POST" }),
+  createManualDecision: (payload: ManualDecisionInput) =>
+    request<ManualDecisionResponse>("/api/decisions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  closePosition: (positionId: number, note: string) =>
+    request<PositionCloseResponse>(`/api/positions/${positionId}/close`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  completeReview: (reviewId: number, note: string) =>
+    request<ReviewCompleteResponse>(`/api/reviews/${reviewId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
   addWatchlist: (marketId: string, note: string) =>
     request<{ ok: boolean }>("/api/watchlist", {
       method: "POST",

@@ -767,6 +767,46 @@ a {
   margin: 0;
 }
 
+.decision-form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field span {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.workspace-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.workspace-card p {
+  margin: 0;
+}
+
+.workspace-note {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 95, 74, 0.12);
+  background: rgba(37, 95, 74, 0.05);
+}
+
 .source-list {
   margin: 0;
   padding-left: 18px;
@@ -871,6 +911,19 @@ input {
   border-radius: 8px;
   border: 1px solid var(--border);
   margin-top: 4px;
+}
+
+select,
+textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 4px;
+  font: inherit;
+  resize: vertical;
+  background: #fff;
+  color: var(--ink);
 }
 
 .login-shell {

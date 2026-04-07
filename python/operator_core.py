@@ -10,6 +10,15 @@ from pathlib import Path
 from typing import Any, ContextManager
 from urllib.parse import quote
 
+from python.decision_store import (
+    close_position_manually,
+    complete_review,
+    create_manual_decision,
+    get_decision_core_counts,
+    get_market_workspace as load_market_workspace,
+    list_due_reviews as load_due_reviews,
+    list_open_positions as load_open_positions,
+)
 from python.quality_metrics import load_quality_snapshot
 
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
@@ -322,6 +331,9 @@ class OperatorCore:
                     "valid_predictions": 0,
                     "resolved_predictions": 0,
                     "watchlist_count": 0,
+                    "open_shadow_positions": 0,
+                    "open_operator_positions": 0,
+                    "due_reviews_count": 0,
                     "latest_run": {
                         "forecast_timestamp": None,
                         "markets_processed": 0,
@@ -360,6 +372,8 @@ class OperatorCore:
         latest_run = self.get_latest_run()
         health = self.get_health()
         watchlist_count = self.get_watchlist_count()
+        with self._connect() as conn:
+            decision_counts = get_decision_core_counts(conn)
         ranked_signals = sorted(latest_run["items"], key=self._overview_signal_sort_key)
         top_signals = ranked_signals[:5]
         overview_research_status = health["research_status"]
@@ -424,6 +438,9 @@ class OperatorCore:
             "valid_predictions": valid_predictions,
             "resolved_predictions": resolved_predictions,
             "watchlist_count": watchlist_count,
+            "open_shadow_positions": decision_counts["open_shadow_positions"],
+            "open_operator_positions": decision_counts["open_operator_positions"],
+            "due_reviews_count": decision_counts["due_reviews_count"],
             "latest_run": {
                 "forecast_timestamp": latest_ts,
                 "markets_processed": markets_processed,
@@ -443,6 +460,60 @@ class OperatorCore:
 
     def get_quality(self) -> dict[str, Any]:
         return load_quality_snapshot(self.db_path, self.log_dir)
+
+    def get_market_workspace(self, market_id: str) -> dict[str, Any]:
+        market = self.get_market_details(market_id)
+        with self._connect() as conn:
+            workspace = load_market_workspace(conn, market_id)
+        return {
+            "market": market,
+            "signal": workspace["signal"],
+            "open_positions": workspace["open_positions"],
+            "due_reviews": workspace["due_reviews"],
+            "recent_decisions": workspace["recent_decisions"],
+            "latest_postmortem": workspace["latest_postmortem"],
+        }
+
+    def list_open_positions(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return load_open_positions(conn)
+
+    def list_due_reviews(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return load_due_reviews(conn)
+
+    def create_manual_decision(
+        self,
+        *,
+        signal_id: int,
+        decision_type: str,
+        decision_reason: str,
+        operator_confidence: str | None,
+        confirmation_criteria: str | None,
+        invalidation_criteria: str | None,
+        open_position: bool,
+        review_due_at: str | None,
+    ) -> dict[str, Any]:
+        with self._connect_rw() as conn:
+            return create_manual_decision(
+                conn,
+                signal_id=signal_id,
+                decision_type=decision_type,
+                decision_reason=decision_reason,
+                operator_confidence=operator_confidence,
+                confirmation_criteria=confirmation_criteria,
+                invalidation_criteria=invalidation_criteria,
+                open_position=open_position,
+                review_due_at=review_due_at,
+            )
+
+    def close_position_manually(self, position_id: int, note: str = "") -> dict[str, Any]:
+        with self._connect_rw() as conn:
+            return close_position_manually(conn, position_id, note)
+
+    def complete_review(self, review_id: int, note: str = "") -> dict[str, Any]:
+        with self._connect_rw() as conn:
+            return complete_review(conn, review_id, note)
 
     def get_market_details(self, market_id: str) -> dict[str, Any]:
         with self._connect() as conn:

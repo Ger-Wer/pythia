@@ -177,10 +177,24 @@ export function OverviewPage() {
               tooltip={TOOLTIP_CONTENT.watchlist}
             />
             <KpiCard
-              label="Сигналов сейчас"
-              value={overview.top_signals.length}
-              note="Наиболее заметные расхождения с рынком."
-              tone={overview.top_signals.length > 0 ? "warning" : "default"}
+              label="Shadow позиции"
+              value={overview.open_shadow_positions}
+              note="Автоматические paper-позиции по сильным сигналам."
+              tone={overview.open_shadow_positions > 0 ? "warning" : "default"}
+              tooltip={TOOLTIP_CONTENT.strongSignals}
+            />
+            <KpiCard
+              label="Operator позиции"
+              value={overview.open_operator_positions}
+              note="Ручные paper-позиции, открытые оператором."
+              tone={overview.open_operator_positions > 0 ? "accent" : "default"}
+              tooltip={TOOLTIP_CONTENT.watchlist}
+            />
+            <KpiCard
+              label="Review к действию"
+              value={overview.due_reviews_count}
+              note="Просроченные review, которые стоит закрыть вручную."
+              tone={overview.due_reviews_count > 0 ? "warning" : "default"}
               tooltip={TOOLTIP_CONTENT.strongSignals}
             />
           </section>

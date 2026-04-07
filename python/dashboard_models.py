@@ -101,6 +101,9 @@ class OverviewResponse(BaseModel):
     valid_predictions: int
     resolved_predictions: int
     watchlist_count: int
+    open_shadow_positions: int = 0
+    open_operator_positions: int = 0
+    due_reviews_count: int = 0
     latest_run: LatestRunSummary
     top_signals: list[dict[str, Any]]
     attention_items: list[dict[str, Any]] = []
@@ -158,3 +161,62 @@ class WatchlistItemRequest(BaseModel):
 
 class WatchlistResponse(BaseModel):
     items: list[dict[str, Any]]
+
+
+class MarketWorkspaceResponse(BaseModel):
+    market: dict[str, Any]
+    signal: dict[str, Any] | None = None
+    open_positions: list[dict[str, Any]] = Field(default_factory=list)
+    due_reviews: list[dict[str, Any]] = Field(default_factory=list)
+    recent_decisions: list[dict[str, Any]] = Field(default_factory=list)
+    latest_postmortem: dict[str, Any] | None = None
+
+
+class OpenPositionsResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
+class DueReviewsResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
+class ManualDecisionRequest(BaseModel):
+    signal_id: int
+    decision_type: str
+    decision_reason: str
+    operator_confidence: str | None = None
+    confirmation_criteria: str | None = None
+    invalidation_criteria: str | None = None
+    open_position: bool = False
+    review_due_at: str | None = None
+
+
+class ManualDecisionResponse(BaseModel):
+    ok: bool
+    decision_id: int
+    position_id: int | None = None
+    market_id: str
+
+
+class PositionCloseRequest(BaseModel):
+    note: str = ""
+
+
+class PositionCloseResponse(BaseModel):
+    position_id: int
+    status: str
+    close_reason: str | None = None
+    closed_yes_price: float | None = None
+    pnl_usd: float | None = None
+    pnl_percent: float | None = None
+
+
+class ReviewCompleteRequest(BaseModel):
+    note: str = ""
+
+
+class ReviewCompleteResponse(BaseModel):
+    ok: bool
+    review_id: int
+    status: str
+    market_id: str

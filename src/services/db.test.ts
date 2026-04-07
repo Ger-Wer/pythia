@@ -227,3 +227,74 @@ test('initDb migrates legacy schema and backfills validity metadata', async () =
     migrated.close();
   }
 });
+
+test('initDb creates decision-core tables and seeds default books', async () => {
+  const { initDb } = await dbModulePromise;
+
+  const db = initDb();
+  try {
+    const tables = (
+      db.query(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table'
+          ORDER BY name ASC
+        `,
+      )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name);
+
+    expect(tables).toContain('signals');
+    expect(tables).toContain('books');
+    expect(tables).toContain('decisions');
+    expect(tables).toContain('positions');
+    expect(tables).toContain('position_events');
+    expect(tables).toContain('reviews');
+    expect(tables).toContain('postmortems');
+
+    const books = db
+      .query(
+        `
+          SELECT name, mode, currency, starting_balance, current_balance, max_risk_per_trade_pct, max_total_exposure_pct, status
+          FROM books
+          ORDER BY name ASC
+        `,
+      )
+      .all() as Array<{
+      name: string;
+      mode: string;
+      currency: string;
+      starting_balance: number;
+      current_balance: number;
+      max_risk_per_trade_pct: number;
+      max_total_exposure_pct: number;
+      status: string;
+    }>;
+
+    expect(books).toEqual([
+      {
+        name: 'operator_default',
+        mode: 'operator',
+        currency: 'USDC',
+        starting_balance: 10_000,
+        current_balance: 10_000,
+        max_risk_per_trade_pct: 0.02,
+        max_total_exposure_pct: 0.2,
+        status: 'active',
+      },
+      {
+        name: 'shadow_default',
+        mode: 'shadow',
+        currency: 'USDC',
+        starting_balance: 10_000,
+        current_balance: 10_000,
+        max_risk_per_trade_pct: 0.02,
+        max_total_exposure_pct: 0.2,
+        status: 'active',
+      },
+    ]);
+  } finally {
+    db.close();
+  }
+});
