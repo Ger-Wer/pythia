@@ -163,6 +163,14 @@ class WatchlistResponse(BaseModel):
     items: list[dict[str, Any]]
 
 
+class WatchDossiersResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
+class WatchUpdatesResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
 class MarketWorkspaceResponse(BaseModel):
     market: dict[str, Any]
     signal: dict[str, Any] | None = None
@@ -170,6 +178,8 @@ class MarketWorkspaceResponse(BaseModel):
     due_reviews: list[dict[str, Any]] = Field(default_factory=list)
     recent_decisions: list[dict[str, Any]] = Field(default_factory=list)
     latest_postmortem: dict[str, Any] | None = None
+    watch_dossier: dict[str, Any] | None = None
+    watch_updates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class OpenPositionsResponse(BaseModel):

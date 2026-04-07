@@ -8,9 +8,29 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from python.dashboard_api import create_app
+from python.test_support import create_test_app, seed_prediction, seed_watch_update, temp_db
 
 
 class DashboardApiTests(unittest.TestCase):
+    def test_shared_dashboard_fixture_helpers_create_app_and_seed_predictions(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="fixture-api-market",
+                question="Will API fixtures work?",
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-07T06:00:00Z",
+            )
+
+            app = create_test_app(db_path=db_path)
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            overview = client.get("/api/overview")
+
+            self.assertEqual(overview.status_code, 200)
+            self.assertEqual(overview.json()["valid_predictions"], 1)
+
     def test_dashboard_api_returns_health_logs_and_human_action_summary(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
@@ -68,32 +88,16 @@ class DashboardApiTests(unittest.TestCase):
             self.assertTrue({"sqlite", "llm", "gamma", "exa", "tavily", "scheduler", "telegram"}.issubset(components))
 
     def test_login_and_overview_flow(self):
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "pythia.db"
-            with closing(sqlite3.connect(db_path)) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE predictions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        market_id TEXT NOT NULL,
-                        question TEXT NOT NULL,
-                        forecast_timestamp TEXT NOT NULL,
-                        is_valid INTEGER DEFAULT 1
-                    )
-                    """
-                )
-                conn.execute(
-                    "INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid) VALUES (?, ?, ?, ?)",
-                    ("m1", "Will example happen?", "2026-04-04T08:16:48.766Z", 1),
-                )
-
-            app = create_app(
-                db_path=db_path,
-                log_dir=Path(temp_dir),
-                session_secret="test-secret",
-                dashboard_username="operator",
-                dashboard_password_hash="plain:secret-pass",
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="m1",
+                question="Will example happen?",
+                forecast_timestamp="2026-04-04T08:16:48.766Z",
+                end_date="2026-05-01T00:00:00Z",
             )
+
+            app = create_test_app(db_path=db_path)
             client = TestClient(app)
 
             login_res = client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
@@ -218,6 +222,42 @@ class DashboardApiTests(unittest.TestCase):
             remove_watch = client.delete("/api/watchlist/572833")
             self.assertEqual(remove_watch.status_code, 200)
             self.assertEqual(client.get("/api/watchlist").json()["items"], [])
+            self.assertEqual(client.get("/api/watchlist/dossiers").json()["items"], [])
+
+    def test_watchlist_dossier_and_update_endpoints(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-99",
+                question="Will Burnley finish in last place?",
+                market_price=43.6,
+                dexter_p=65.0,
+                naked_p=68.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="watch-99",
+                status_label="тезис ослаб",
+                reason_summary="Рынок ушёл против тезиса.",
+                action_summary="Открыть review",
+            )
+            app = create_test_app(db_path)
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            dossiers = client.get("/api/watchlist/dossiers")
+            self.assertEqual(dossiers.status_code, 200)
+            self.assertEqual(len(dossiers.json()["items"]), 1)
+            self.assertEqual(dossiers.json()["items"][0]["market_id"], "watch-99")
+            self.assertEqual(dossiers.json()["items"][0]["question"], "Will Burnley finish in last place?")
+
+            updates = client.get("/api/watchlist/updates")
+            self.assertEqual(updates.status_code, 200)
+            self.assertEqual(len(updates.json()["items"]), 1)
+            self.assertEqual(updates.json()["items"][0]["market_id"], "watch-99")
+            self.assertEqual(updates.json()["items"][0]["status_label"], "тезис ослаб")
 
     def test_quality_endpoint_returns_complete_quality_payload(self):
         with TemporaryDirectory() as temp_dir:
@@ -476,6 +516,8 @@ class DashboardApiTests(unittest.TestCase):
             self.assertEqual(workspace_before.status_code, 200)
             self.assertEqual(workspace_before.json()["signal"]["recommended_action"], "enter_yes")
             self.assertEqual(workspace_before.json()["open_positions"], [])
+            self.assertIsNone(workspace_before.json()["watch_dossier"])
+            self.assertEqual(workspace_before.json()["watch_updates"], [])
 
             create_decision = client.post(
                 "/api/decisions",

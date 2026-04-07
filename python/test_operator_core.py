@@ -9,9 +9,41 @@ from unittest.mock import patch
 
 from python.decision_store import create_manual_decision, ensure_decision_core_schema
 from python.operator_core import OperatorCore
+from python.test_support import seed_prediction, seed_watch_update, temp_db
 
 
 class OperatorCoreTests(unittest.TestCase):
+    def test_shared_python_fixture_helpers_seed_predictions(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="fixture-market",
+                question="Will shared fixtures work?",
+                market_price=41.0,
+                dexter_p=57.0,
+                naked_p=49.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-07T06:00:00Z",
+            )
+
+            with closing(sqlite3.connect(db_path)) as conn:
+                row = conn.execute(
+                    """
+                    SELECT market_id, question, market_price, dexter_p, naked_p, forecast_timestamp
+                    FROM predictions
+                    WHERE market_id = ?
+                    """,
+                    ("fixture-market",),
+                ).fetchone()
+
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], "fixture-market")
+            self.assertEqual(row[1], "Will shared fixtures work?")
+            self.assertEqual(row[2], 41.0)
+            self.assertEqual(row[3], 57.0)
+            self.assertEqual(row[4], 49.0)
+            self.assertEqual(row[5], "2026-04-07T06:00:00Z")
+
     def test_database_connections_enable_foreign_keys(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"
@@ -26,30 +58,75 @@ class OperatorCoreTests(unittest.TestCase):
             with core._connect() as conn:
                 self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
 
-    def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "pythia.db"
-            with closing(sqlite3.connect(db_path)) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE predictions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        market_id TEXT NOT NULL,
-                        question TEXT NOT NULL,
-                        forecast_timestamp TEXT NOT NULL,
-                        is_valid INTEGER DEFAULT 1
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    INSERT INTO predictions (market_id, question, forecast_timestamp, is_valid)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    ("m1", "Will this work read-only?", "2026-04-04T08:16:48Z", 1),
-                )
-                conn.commit()
+    def test_add_to_watchlist_creates_dossier_from_fresh_prediction(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-1",
+                question="Will Arsenal finish in 2nd place?",
+                market_price=12.0,
+                dexter_p=30.0,
+                naked_p=35.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
 
+            core.add_to_watchlist("watch-1", "Следить внимательно")
+
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute(
+                    """
+                    SELECT market_id, freshness_policy, thesis_state, current_market_price,
+                           current_research_probability, current_thesis_summary
+                    FROM watch_dossiers
+                    WHERE market_id = 'watch-1'
+                    """
+                ).fetchone()
+
+            self.assertEqual(row[0], "watch-1")
+            self.assertEqual(row[1], "normal_24h")
+            self.assertEqual(row[2], "intact")
+            self.assertEqual(row[3], 12.0)
+            self.assertEqual(row[4], 30.0)
+            self.assertTrue(row[5])
+
+    def test_add_to_watchlist_marks_pending_deep_review_for_stale_snapshot(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-2",
+                question="Will stale snapshot be reused?",
+                forecast_timestamp="2026-04-05T00:00:00Z",
+                end_date="2026-04-20T12:00:00Z",
+            )
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+
+            core.add_to_watchlist("watch-2", "Нужен автопересмотр")
+
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute(
+                    """
+                    SELECT initial_snapshot_state, thesis_state
+                    FROM watch_dossiers
+                    WHERE market_id = 'watch-2'
+                    """
+                ).fetchone()
+
+            self.assertEqual(row[0], "pending_deep_review")
+            self.assertEqual(row[1], "review_required")
+
+    def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="m1",
+                question="Will this work read-only?",
+                forecast_timestamp="2026-04-04T08:16:48Z",
+                end_date="2026-05-01T00:00:00Z",
+            )
+
+            temp_dir = str(Path(db_path).parent)
             os.chmod(db_path, 0o444)
             os.chmod(temp_dir, 0o555)
             try:
@@ -746,6 +823,7 @@ class OperatorCoreTests(unittest.TestCase):
 
             core.remove_from_watchlist("572834")
             self.assertEqual(core.list_watchlist(), [])
+            self.assertEqual(core.list_watch_dossiers(), [])
 
     def test_workspace_and_overview_include_decision_core_entities(self):
         with TemporaryDirectory() as temp_dir:
@@ -954,6 +1032,36 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(len(workspace["recent_decisions"]), 1)
             self.assertEqual(workspace["recent_decisions"][0]["decision_type"], "enter_yes")
             self.assertEqual(workspace["latest_postmortem"]["outcome_label"], "early_exit")
+            self.assertIsNone(workspace["watch_dossier"])
+            self.assertEqual(workspace["watch_updates"], [])
+
+    def test_market_workspace_includes_watch_dossier_and_updates(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-workspace",
+                question="Will watch workspace include dossier?",
+                market_price=22.0,
+                dexter_p=37.0,
+                naked_p=31.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="watch-workspace",
+                status_label="тезис ослаб",
+                reason_summary="Рынок ушёл против тезиса.",
+                action_summary="Открыть разбор рынка",
+            )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+            workspace = core.get_market_workspace("watch-workspace")
+
+            self.assertIsNotNone(workspace["watch_dossier"])
+            self.assertEqual(workspace["watch_dossier"]["market_id"], "watch-workspace")
+            self.assertEqual(workspace["watch_updates"][0]["status_label"], "тезис ослаб")
+            self.assertEqual(workspace["watch_updates"][0]["action_summary"], "Открыть разбор рынка")
 
     def test_get_market_workspace_bootstraps_decision_core_on_legacy_db(self):
         with TemporaryDirectory() as temp_dir:

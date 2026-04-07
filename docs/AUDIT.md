@@ -1,18 +1,20 @@
 # Аудит Pythia
 
-Дата актуализации: 2026-04-06
+Дата актуализации: 2026-04-07
 
 ## 1. Назначение системы
 
-Pythia — это автономная batch-система прогнозной аналитики для prediction markets на Polymarket.
+Pythia — это автономная forecast + decision система для prediction markets на Polymarket.
 
 Система:
 
 - ежедневно выбирает подходящие бинарные рынки;
+- каждые 6 часов обновляет рынки из `Избранного` отдельным `watchlist refresh`-контуром;
 - строит по ним два прогноза:
   - `Naked R1` как baseline без полноценного research;
   - `Research+R1` как основной прогнозный контур с поиском новостей и финальным synthesis;
 - сохраняет прогнозы и метаданные в SQLite;
+- ведёт paper/shadow lifecycle через `decision core`;
 - отслеживает resolved-маркеты;
 - считает Brier score и edge;
 - отдаёт операторские данные в dashboard и отправляет алерты/отчёты в Telegram.
@@ -48,7 +50,7 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
 - `pythia-scheduler`
   - основной long-running контейнер;
   - запускает `supercronic`;
-  - выполняет `forecast`, `resolution checker` и weekly jobs по расписанию.
+  - выполняет `forecast`, `watchlist refresh`, `watch alerts`, `resolution checker` и weekly jobs по расписанию.
 - `pythia-telegram`
   - polling-бот;
   - принимает операторские команды только от одного разрешённого Telegram user ID;
@@ -62,7 +64,7 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
 
 ### Технологический стек
 
-- TypeScript / Bun — оркестрация прогноза;
+- TypeScript / Bun — оркестрация прогноза и отдельного `watchlist engine`;
 - Python 3.11 — операторский слой, аналитика, resolution checker;
 - SQLite — локальное хранилище;
 - Groq OpenAI-compatible API — LLM backend на текущем production;
@@ -70,6 +72,16 @@ Pythia размещена на хосте `amper` в Docker-first конфигу
 - Tavily — fallback news search provider;
 - Telegram Bot API — операторские команды и алерты.
 - FastAPI + React/Vite — dashboard-слой оператора.
+
+### Дополнительные runtime-контуры
+
+- `decision core`
+  - отдельный слой `signals / decisions / positions / reviews / postmortems`;
+  - питает paper/shadow lifecycle и workspace рынка.
+- `watchlist engine`
+  - отдельный слой `watch_dossiers / watch_refresh_runs / watch_refresh_snapshots / watch_updates`;
+  - отвечает за сопровождение рынков из `Избранного`;
+  - делает дешёвую monitoring-проверку каждые 6 часов и запускает `deep review` только по триггерам.
 
 ### Production-модели на 2026-03-29
 
@@ -195,6 +207,28 @@ Research brief включает:
 
 Если отклонение от рынка по любой ветке превышает порог, Pythia отправляет Telegram alert.
 
+## 5A. Поток данных: Autonomous Watchlist Engine
+
+После добавления рынка в `Избранное` система:
+
+- создаёт `watch dossier`;
+- пытается переиспользовать свежий forecast snapshot;
+- если snapshot устарел, помечает рынок как `pending_deep_review`;
+- ставит первый `review deadline`.
+
+Каждый `watchlist refresh`:
+
+- берёт рынки из `Избранного` и открытые paper-позиции;
+- подтягивает текущую цену Polymarket;
+- делает дешёвую monitoring-проверку через news API + LLM monitoring mode;
+- пишет технический `watch_refresh_snapshot`;
+- при значимом изменении создаёт краткий `watch_update`:
+  - что изменилось;
+  - почему;
+  - что делать оператору.
+
+Telegram получает только `watch_updates`, а не raw research dump.
+
 ## 6. Resolution flow
 
 Python-скрипт `resolution_checker.py`:
@@ -254,9 +288,24 @@ Telegram-бот остаётся как fallback-канал и канал але
 - `Качество` - отдельный trust-экран: resolved-выборка, Brier, edge vs market, breakdown по категориям и glossary для интерпретации метрик;
 - `Главные сигналы дня` - commentary-layer поверх последнего прогона, который помогает начать с 3 наиболее важных рынков, а не с сырого списка;
 - `Сигналы` - операторский список рынков последнего прогона, отсортированный по полезности для разбора;
-- `Разбор рынка` - narrative-представление reasoning, edge, key risk, истории оценки и transparency-layer;
-- `Избранное` - рабочий список приоритетных рынков без необходимости помнить `market_id`;
+- `Разбор рынка` - dossier-first workspace: сначала состояние тезиса, последнее изменение и следующее действие, а тяжёлый анализ и источники скрыты во второй слой;
+- `Избранное` - board по `watch dossier` и `watch updates`, а не список `market_id`;
 - `Действия` - запуск whitelisted сценариев с human-summary-first результатом и отдельным доступом к техническому логу.
+
+Telegram-бот теперь играет две роли:
+
+- fallback-канал команд;
+- delivery-канал для `watch_updates`.
+
+## 8A. Текущее ограничение
+
+`Watchlist engine` уже создаёт dossier, snapshots и updates, но ещё не является полноценным `attention engine`.
+
+Это означает:
+
+- единая сущность `attention_item` ещё не заведена;
+- triage в Telegram пока простой, а не полноценный inbox;
+- `watch_updates` пока являются предшественником будущего alert/attention-слоя.
 
 На уровне UX это означает:
 
@@ -402,16 +451,18 @@ Health-ответ агрегирует проблемы и показывает 
 
 ## 16. Краткий вывод для внешнего аудитора
 
-Pythia на текущем этапе — это не торговая система и не LLM-агент общего назначения, а изолированная Docker-first batch-платформа прогнозной аналитики.
+Pythia на текущем этапе — это не торговая система и не LLM-агент общего назначения, а изолированная Docker-first система прогнозной аналитики и сопровождения тезисов.
 
 Её production-ядро состоит из:
 
 - рыночного отбора с дедупликацией и diversity-контролем;
 - baseline-прогноза;
 - отдельного research-контура `Research+R1`;
+- `decision core` для paper/shadow lifecycle;
+- `watchlist engine` для follow-up по рынкам из `Избранного`;
 - SQLite-хранилища;
 - Python-аналитики для resolved markets;
 - web-dashboard как основного интерфейса;
-- Telegram-оператора как канала алертов и fallback-управления.
+- Telegram-оператора как канала алертов, `watch updates` и fallback-управления.
 
 Dexter как внешний фреймворк в production не используется. Любые упоминания `dexter_*` в БД и коде относятся к legacy-схеме имени основного research-контура, а не к живому Dexter runtime.

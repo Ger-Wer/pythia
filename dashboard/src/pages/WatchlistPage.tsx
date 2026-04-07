@@ -1,29 +1,33 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { WatchDossierCard } from "../components/WatchDossierCard";
+import { WatchUpdateFeed } from "../components/WatchUpdateFeed";
 import { SectionHeader } from "../components/SectionHeader";
-import { WatchlistPanel } from "../components/WatchlistPanel";
-import type { WatchlistItem } from "../types/api";
+import type { WatchDossier, WatchUpdate } from "../types/api";
 
 export function WatchlistPage() {
-  const [items, setItems] = useState<WatchlistItem[]>([]);
+  const [dossiers, setDossiers] = useState<WatchDossier[]>([]);
+  const [updates, setUpdates] = useState<WatchUpdate[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   async function loadWatchlist() {
-    const payload = await api.watchlist();
-    setItems(payload.items);
+    const [dossierPayload, updatePayload] = await Promise.all([api.watchlistDossiers(), api.watchlistUpdates()]);
+    setDossiers(dossierPayload.items);
+    setUpdates(updatePayload.items);
   }
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const payload = await api.watchlist();
+        const [dossierPayload, updatePayload] = await Promise.all([api.watchlistDossiers(), api.watchlistUpdates()]);
         if (active) {
-          setItems(payload.items);
+          setDossiers(dossierPayload.items);
+          setUpdates(updatePayload.items);
         }
       } catch {
         if (active) {
-          setError("Не удалось загрузить watchlist.");
+          setError("Не удалось загрузить dossier-ленту.");
         }
       }
     }
@@ -48,14 +52,29 @@ export function WatchlistPage() {
       <section className="panel">
         <SectionHeader
           title="Избранное"
-          subtitle="Здесь нет ручного ввода market_id. Основной сценарий — смотреть уже отмеченные рынки и чистить список, когда фокус сменился."
+          subtitle="Избранное теперь показывает не список id, а живые dossier по watched-рынкам: текущий тезис, последнее состояние и следующее действие."
         />
         <p className="muted">
-          Позже сюда добавятся быстрые действия из экранов “Сигналы” и “Разбор рынка”. Пока этот раздел работает как понятный список наблюдения.
+          Операторский сценарий здесь простой: посмотреть, что с тезисом сейчас, открыть нужный разбор только при изменениях и убрать рынок, когда он перестал быть важным.
         </p>
         {error ? <p>{error}</p> : null}
       </section>
-      <WatchlistPanel items={items} onRemove={onRemove} />
+      <section className="panel">
+        <SectionHeader
+          title="Dossier по рынкам"
+          subtitle="Каждая карточка показывает текущее состояние тезиса, последнее действие Pythia и следующий review."
+        />
+        {!dossiers.length ? (
+          <p className="muted">Пока пусто. Добавьте рынок из сигналов или разбора, чтобы включить автономное сопровождение.</p>
+        ) : (
+          <div className="watch-dossier-grid">
+            {dossiers.map((dossier) => (
+              <WatchDossierCard key={dossier.market_id} dossier={dossier} onRemove={onRemove} />
+            ))}
+          </div>
+        )}
+      </section>
+      <WatchUpdateFeed items={updates} />
     </main>
   );
 }

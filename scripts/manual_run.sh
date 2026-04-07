@@ -19,6 +19,8 @@ Usage: bash scripts/manual_run.sh <command>
 
 Commands:
   forecast  - run forecast manually
+  watchlist-refresh - run watchlist refresh manually
+  watch-alerts - send pending watchlist updates to Telegram
   resolve   - run resolution checker
   weekly    - generate weekly report
   edge      - calculate edge and Brier scores
@@ -49,6 +51,14 @@ DB_PATH="${DB_PATH:-/app/data/pythia.db}"
 case "$COMMAND" in
   forecast)
     docker compose run --rm --entrypoint "$ENTRYPOINT" "$SERVICE" forecast
+    ;;
+
+  watchlist-refresh)
+    docker compose run --rm --entrypoint "$ENTRYPOINT" "$SERVICE" watchlist-refresh
+    ;;
+
+  watch-alerts)
+    docker compose run --rm --entrypoint "$ENTRYPOINT" "$SERVICE" watch-alerts
     ;;
 
   resolve)

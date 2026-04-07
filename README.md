@@ -1,20 +1,21 @@
 # Pythia
 
-Pythia - это автономная система прогноза для Polymarket. Она отбирает подходящие рынки, запускает исследование и синтез вероятности, сохраняет результаты в SQLite, считает качество прогнозов и отправляет уведомления в Telegram.
+Pythia - это автономный аналитический decision desk для Polymarket. Она ежедневно ищет новые сильные рынки, ведёт decision journal и paper/shadow-позиции, а для рынков из `Избранного` запускает отдельный `watchlist refresh`, который сам отслеживает изменения тезиса, новостей и цены и поднимает оператору только важные апдейты.
 
 ## Архитектура
 
 ```text
 Polymarket Gamma API
-  -> отбор рынков
-  -> исследовательский news-light слой
-  -> базовый контрольный прогон Naked R1
-  -> синтез вероятности
-  -> SQLite + логи + Brier score
-  -> Dashboard API + Telegram-уведомления и отчеты
+  -> daily forecast
+  -> Research+R1 / Naked R1
+  -> predictions + signals
+  -> decision journal + paper/shadow positions
+  -> autonomous watchlist engine
+  -> SQLite + логи + Brier/PnL
+  -> Dashboard API + Telegram alerts/digests
 ```
 
-В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Основной интерфейс оператора теперь web-dashboard, а Telegram остаётся каналом алертов и быстрых команд.
+В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Основной интерфейс оператора теперь web-dashboard, а Telegram остаётся каналом алертов, `watch updates` и быстрых команд.
 
 Важно: в production сейчас используется собственный research-слой поверх Exa/Tavily и одного LLM-вызова. Нативный runtime `Dexter` в образ не включается и в проде не используется.
 
@@ -44,7 +45,13 @@ Polymarket Gamma API
 
 Работайте на хосте `amper` под пользователем `pythia`.
 
-Сначала создайте и заполните `.env` реальными значениями. Для запуска нужен либо прямой DeepSeek-доступ (`DEEPSEEK_API_KEY` и при необходимости `DEEPSEEK_BASE_URL`), либо OpenRouter-совместимые креды (`OPENROUTER_API_KEY` и `OPENROUTER_BASE_URL`). Для research-слоя задайте оба search-ключа: `EXA_API_KEY` как primary и `TAVILY_API_KEY` как fallback.
+Сначала создайте и заполните `.env` реальными значениями. Нужны:
+
+- ключи LLM backend;
+- `EXA_API_KEY` как primary search provider;
+- `TAVILY_API_KEY` как fallback search provider;
+- Telegram credentials;
+- dashboard credentials и session secret.
 
 ```bash
 cd /home/pythia/pythia
@@ -57,6 +64,8 @@ cp .env.example .env
 bash scripts/day0_check.sh
 docker compose build
 bash scripts/manual_run.sh forecast
+bash scripts/manual_run.sh watchlist-refresh
+bash scripts/manual_run.sh watch-alerts
 bash scripts/manual_run.sh status
 docker compose up -d
 ```
@@ -93,7 +102,11 @@ Pythia поддерживает операторский Telegram-бот как 
 
 ## Операции
 
-`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе. Это полезно для хостовой проверки, но не заменяет Telegram-оператора.
+`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе. Это полезно для хостовой проверки, но не заменяет dashboard и Telegram.
+
+`bash scripts/manual_run.sh watchlist-refresh` вручную прогоняет отдельный контур сопровождения рынков из `Избранного`.
+
+`bash scripts/manual_run.sh watch-alerts` отправляет накопленные `watch_updates` в Telegram без ожидания следующего cron-слота.
 
 `bash scripts/manual_run.sh logs` открывает журналы `pythia-scheduler`, `pythia-telegram` и `pythia-dashboard`.
 
@@ -104,6 +117,8 @@ Pythia поддерживает операторский Telegram-бот как 
 Планировщик работает по расписанию `supercronic`:
 
 - `forecast` - 06:00 UTC
+- `watchlist refresh` - каждые 6 часов
+- `watch alerts` - через 10 минут после каждого refresh
 - `resolution` - 18:00 UTC
 - `weekly report` - воскресенье, 20:00 UTC
 
@@ -119,8 +134,8 @@ Dashboard поднимается сервисом `pythia-dashboard` и слуш
 - `Качество` как отдельный trust-экран: сколько уже `resolved` рынков, как выглядят `Brier` и `edge vs market`, и достаточно ли данных, чтобы доверять этим метрикам;
 - `Главные сигналы дня` на `Сводке`: не просто список рынков, а короткий человеческий digest поверх последнего прогона;
 - `Сигналы` вместо сырой таблицы: рынки из последнего прогона, отсортированные по важности, с фильтрами `Только сильные` и `Только избранное`;
-- `Разбор рынка` в narrative-форме: что думает Pythia, почему есть расхождение, история оценки, что может сломать прогноз, прозрачность вывода и что отслеживать дальше;
-- `Избранное` без ручного `market_id`: рабочий список рынков, которые оператор отметил из `Сигналов` или `Разбора`;
+- `Разбор рынка` в dossier-first форме: сначала состояние тезиса, последнее изменение и что делать сейчас, а тяжёлый анализ и источники спрятаны во второй слой;
+- `Избранное` без ручного `market_id`: не список рынков, а живой board по `watch dossier` и последним `watch updates`;
 - `Действия` с human-summary-first результатами и техническим логом только как вторичным уровнем;
 - hover/tap-подсказки у сложных блоков и метрик в формате `Что это / Почему важно / Как читать`, чтобы оператору не приходилось держать внутреннюю модель системы в голове.
 
@@ -128,9 +143,9 @@ Trust-layer сейчас строится вокруг трёх вещей:
 
 - отдельной страницы `Качество`, где видно не только метрики, но и их интерпретацию;
 - human-summary/digest поверх последнего прогона;
-- прозрачного `Разбора рынка`, где оператор видит историю оценки, факты, источники и опровергающий сигнал.
+- прозрачного `Разбора рынка`, где оператор сначала видит состояние тезиса и действие, а подробности открывает только при необходимости.
 
-Telegram остаётся для алертов и как fallback-канал управления.
+Telegram остаётся для алертов и как fallback-канал управления. Для рынков из `Избранного` туда также приходят короткие `watch updates` вида `что изменилось / почему / что делать`.
 
 ## Критерий решения
 

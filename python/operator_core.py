@@ -21,10 +21,20 @@ from python.decision_store import (
     list_open_positions as load_open_positions,
 )
 from python.quality_metrics import load_quality_snapshot
+from python.watchlist_store import (
+    bootstrap_watch_dossier,
+    deactivate_watch_dossier,
+    get_watch_dossier as load_watch_dossier,
+    list_watch_updates_for_market as load_watch_updates_for_market,
+    ensure_watchlist_engine_schema,
+    list_watch_dossiers as load_watch_dossiers,
+    list_watch_updates as load_watch_updates,
+)
 
 SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
 LLM_PROVIDER_ENV_KEYS = ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY")
 DECISION_CORE_TABLES = ("signals", "books", "decisions", "positions", "position_events", "reviews", "postmortems")
+WATCHLIST_ENGINE_TABLES = ("watch_dossiers", "watch_refresh_runs", "watch_refresh_snapshots", "watch_updates")
 
 
 class OperatorCore:
@@ -54,6 +64,9 @@ class OperatorCore:
 
         with self._connect_rw() as conn:
             ensure_decision_core_schema(conn)
+
+    def _watchlist_engine_exists(self, conn: sqlite3.Connection) -> bool:
+        return all(self._table_exists(conn, table_name) for table_name in WATCHLIST_ENGINE_TABLES)
 
     def predictions_table_exists(self) -> bool:
         with self._connect() as conn:
@@ -481,6 +494,8 @@ class OperatorCore:
         self._ensure_decision_core_schema_rw()
         with self._connect() as conn:
             workspace = load_market_workspace(conn, market_id)
+            watch_dossier = load_watch_dossier(conn, market_id)
+            watch_updates = load_watch_updates_for_market(conn, market_id, limit=5)
         return {
             "market": market,
             "signal": workspace["signal"],
@@ -488,6 +503,8 @@ class OperatorCore:
             "due_reviews": workspace["due_reviews"],
             "recent_decisions": workspace["recent_decisions"],
             "latest_postmortem": workspace["latest_postmortem"],
+            "watch_dossier": watch_dossier,
+            "watch_updates": watch_updates,
         }
 
     def list_open_positions(self) -> list[dict[str, Any]]:
@@ -970,6 +987,7 @@ class OperatorCore:
         now = datetime.now(timezone.utc).isoformat()
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
+            ensure_watchlist_engine_schema(conn)
             conn.execute(
                 """
                 INSERT INTO watchlist (market_id, note, created_at, updated_at)
@@ -980,13 +998,29 @@ class OperatorCore:
                 """,
                 (market_id, str(note or "").strip(), now, now),
             )
+            bootstrap_watch_dossier(conn, market_id, str(note or "").strip(), now_iso=now)
             conn.commit()
 
     def remove_from_watchlist(self, market_id: str) -> None:
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
-            conn.execute("DELETE FROM watchlist WHERE market_id = ?", (str(market_id).strip(),))
+            ensure_watchlist_engine_schema(conn)
+            normalized_market_id = str(market_id).strip()
+            conn.execute("DELETE FROM watchlist WHERE market_id = ?", (normalized_market_id,))
+            deactivate_watch_dossier(conn, normalized_market_id)
             conn.commit()
+
+    def list_watch_dossiers(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if not self._watchlist_engine_exists(conn):
+                return []
+            return load_watch_dossiers(conn)
+
+    def list_watch_updates(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if not self._watchlist_engine_exists(conn):
+                return []
+            return load_watch_updates(conn, limit=limit)
 
     def run_safe_action(self, action: str) -> dict[str, Any]:
         if action not in SAFE_ACTION_NAMES:

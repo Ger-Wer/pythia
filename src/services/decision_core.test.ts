@@ -2,6 +2,12 @@ import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  createTestDatabase,
+  seedOpenOperatorPosition,
+  seedPrediction,
+  seedWatchDossier,
+} from './test_database';
 
 const tempDir = mkdtempSync(path.join(os.tmpdir(), 'pythia-decision-core-test-'));
 const dbPath = path.join(tempDir, 'pythia.db');
@@ -25,15 +31,77 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
+test('shared test database helpers seed dossier and open position scaffolding', () => {
+  const db = createTestDatabase();
+
+  try {
+    seedWatchDossier(db, {
+      market_id: 'watch-helper-market',
+      thesis_state: 'weakened',
+      current_market_price: 33,
+      current_research_probability: 41,
+      current_naked_probability: 39,
+      current_confidence: 'medium',
+      current_research_status: 'ON',
+      current_thesis_summary: 'The thesis weakened a bit.',
+    });
+    seedOpenOperatorPosition(db, { market_id: 'watch-helper-market' });
+
+    const dossier = db
+      .query(
+        `
+          SELECT market_id, thesis_state, current_market_price, current_research_probability
+          FROM watch_dossiers
+          WHERE market_id = ?1
+        `,
+      )
+      .get('watch-helper-market') as
+      | {
+          market_id: string;
+          thesis_state: string;
+          current_market_price: number;
+          current_research_probability: number;
+        }
+      | null;
+
+    const position = db
+      .query(
+        `
+          SELECT market_id, mode, status, side
+          FROM positions
+          WHERE market_id = ?1
+        `,
+      )
+      .get('watch-helper-market') as
+      | {
+          market_id: string;
+          mode: string;
+          status: string;
+          side: string;
+        }
+      | null;
+
+    expect(dossier).not.toBeNull();
+    expect(dossier?.market_id).toBe('watch-helper-market');
+    expect(dossier?.thesis_state).toBe('weakened');
+    expect(position).not.toBeNull();
+    expect(position?.mode).toBe('operator');
+    expect(position?.status).toBe('open');
+    expect(position?.side).toBe('yes');
+  } finally {
+    db.close();
+  }
+});
+
 test('syncDecisionCoreForForecastRun creates signals and auto-opens a shadow position for a strong research signal', async () => {
-  const { initDb, insertPrediction } = await dbModulePromise;
+  const { initDb } = await dbModulePromise;
   const { syncDecisionCoreForForecastRun } = await decisionCoreModulePromise;
 
   const db = initDb();
   const forecastTimestamp = '2026-04-07T06:00:00.000Z';
 
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-open',
       question: 'Will Arsenal finish in 2nd place?',
       category: 'sports',
@@ -164,7 +232,7 @@ test('syncDecisionCoreForForecastRun creates signals and auto-opens a shadow pos
 });
 
 test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_break when the refreshed signal invalidates it', async () => {
-  const { initDb, insertPrediction } = await dbModulePromise;
+  const { initDb } = await dbModulePromise;
   const { syncDecisionCoreForForecastRun } = await decisionCoreModulePromise;
 
   const db = initDb();
@@ -172,7 +240,7 @@ test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_bre
   const secondForecast = '2026-04-08T06:00:00.000Z';
 
   try {
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-break',
       question: 'Will Example Market stay strong?',
       category: 'tests',
@@ -201,7 +269,7 @@ test('syncDecisionCoreForForecastRun marks an open shadow position as thesis_bre
 
     syncDecisionCoreForForecastRun(db, firstForecast);
 
-    insertPrediction(db, {
+    seedPrediction(db, {
       market_id: 'market-shadow-break',
       question: 'Will Example Market stay strong?',
       category: 'tests',

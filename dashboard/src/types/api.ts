@@ -259,6 +259,8 @@ export interface MarketWorkspaceResponse {
   due_reviews: ReviewSummary[];
   recent_decisions: DecisionSummary[];
   latest_postmortem: PostmortemSummary | null;
+  watch_dossier: WatchDossier | null;
+  watch_updates: WatchUpdate[];
 }
 
 export interface OpenPositionsResponse {
@@ -317,6 +319,55 @@ export interface WatchlistItem {
 
 export interface WatchlistResponse {
   items: WatchlistItem[];
+}
+
+export interface WatchDossier {
+  id: number;
+  market_id: string;
+  question?: string | null;
+  status: string;
+  updated_at?: string | null;
+  next_review_due_at?: string | null;
+  freshness_policy?: string | null;
+  initial_snapshot_state?: string | null;
+  thesis_state?: string | null;
+  current_market_price?: number | null;
+  current_research_probability?: number | null;
+  current_naked_probability?: number | null;
+  current_confidence?: string | null;
+  current_research_status?: string | null;
+  current_thesis_summary?: string | null;
+  current_primary_driver?: string | null;
+  current_invalidation_signal?: string | null;
+  last_status_label?: string | null;
+  last_reason_summary?: string | null;
+  last_action_summary?: string | null;
+  operator_note?: string | null;
+}
+
+export interface WatchUpdate {
+  id: number;
+  market_id: string;
+  question?: string | null;
+  created_at: string;
+  severity: string;
+  status_label: string;
+  reason_summary: string;
+  action_summary: string;
+  market_price_before?: number | null;
+  market_price_after?: number | null;
+  research_probability_before?: number | null;
+  research_probability_after?: number | null;
+  delivered_to_dashboard_at?: string | null;
+  delivered_to_telegram_at?: string | null;
+}
+
+export interface WatchDossiersResponse {
+  items: WatchDossier[];
+}
+
+export interface WatchUpdatesResponse {
+  items: WatchUpdate[];
 }
 
 export interface MeResponse {

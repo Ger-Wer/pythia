@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Database as BunDatabase } from 'bun:sqlite';
 import { CONFIG } from '../config';
@@ -89,6 +89,17 @@ const REQUIRED_MIGRATIONS = [
   },
 ] as const;
 
+const WATCHLIST_ENGINE_SQL_PATH = path.resolve(import.meta.dir, '../../sql/watchlist_engine.sql');
+
+function runSqlScript(db: Database, sql: string): void {
+  for (const statement of sql
+    .split(/;\s*(?:\r?\n|$)/g)
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    db.run(statement);
+  }
+}
+
 function ensurePredictionMigrations(db: Database): void {
   const columns = db
     .query('PRAGMA table_info(predictions)')
@@ -129,6 +140,11 @@ function resolveDbPath(): string {
   return process.env.DB_PATH || CONFIG.paths.db;
 }
 
+export function ensureWatchlistEngineSchema(db: Database): void {
+  const sql = readFileSync(WATCHLIST_ENGINE_SQL_PATH, 'utf8');
+  runSqlScript(db, sql);
+}
+
 export function initDb(): Database {
   const dbPath = resolveDbPath();
   const dbDir = path.dirname(dbPath);
@@ -144,6 +160,7 @@ export function initDb(): Database {
   ensurePredictionMigrations(db);
   ensurePredictionIndexes(db);
   ensureDecisionCoreSchema(db);
+  ensureWatchlistEngineSchema(db);
 
   return db;
 }

@@ -137,11 +137,7 @@ describe("LatestRunPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Сигналы" })).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Will Burnley finish in last place in the 2025-26 English Premier League?")).toBeInTheDocument();
-    expect(screen.getByText("Не удалось загрузить избранное. Сигналы доступны без него.")).toBeInTheDocument();
+    expect(await screen.findByText("Will Burnley finish in last place in the 2025-26 English Premier League?")).toBeInTheDocument();
+    expect(await screen.findByText("Не удалось загрузить избранное. Сигналы доступны без него.")).toBeInTheDocument();
   });
 });

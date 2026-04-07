@@ -10,6 +10,8 @@ import type {
   MarketWorkspaceResponse,
   PositionSummary,
   ReviewSummary,
+  WatchDossier,
+  WatchUpdate,
 } from "../types/api";
 import { formatEdge, formatPercent, formatTimestamp } from "../utils/format";
 
@@ -50,6 +52,71 @@ function actionLabel(action: string | null | undefined): string {
 function cleanOptional(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function thesisStateLabel(value: string | null | undefined): string {
+  switch (value) {
+    case "intact":
+      return "тезис в силе";
+    case "strengthened":
+      return "тезис усилился";
+    case "weakened":
+      return "тезис ослаб";
+    case "review_required":
+      return "нужен review";
+    case "broken":
+      return "thesis break";
+    default:
+      return "статус тезиса не определён";
+  }
+}
+
+function severityLabel(value: string | null | undefined): string {
+  switch (value) {
+    case "critical":
+      return "критично";
+    case "warning":
+      return "важно";
+    case "review":
+      return "нужен review";
+    case "info":
+      return "к сведению";
+    default:
+      return "обновление";
+  }
+}
+
+function actionNowText(input: {
+  dossier: WatchDossier | null;
+  latestUpdate: WatchUpdate | null;
+  dueReviews: ReviewSummary[];
+  operatorPositions: PositionSummary[];
+  signalAction: string | null | undefined;
+}): string {
+  if (input.dueReviews.length > 0) {
+    return "Открыть review: есть просроченный пересмотр тезиса.";
+  }
+  if (input.latestUpdate?.action_summary) {
+    return input.latestUpdate.action_summary;
+  }
+  if (input.operatorPositions.length > 0) {
+    return "Сверить открытую operator-позицию с текущим тезисом.";
+  }
+  if (input.dossier?.last_action_summary) {
+    return input.dossier.last_action_summary;
+  }
+  switch (input.signalAction) {
+    case "enter_yes":
+      return "Если тезис вам подходит, можно открыть operator YES.";
+    case "enter_no":
+      return "Если тезис вам подходит, можно открыть operator NO.";
+    case "watch":
+      return "Добавить в избранное и ждать автоматического сопровождения.";
+    case "review":
+      return "Открыть ручной review перед любым действием.";
+    default:
+      return "Пока рынок можно просто наблюдать.";
+  }
 }
 
 export function MarketDetailPage() {
@@ -147,6 +214,15 @@ export function MarketDetailPage() {
   const shadowPositions = workspace?.open_positions.filter((position) => position.mode === "shadow") ?? [];
   const operatorPositions = workspace?.open_positions.filter((position) => position.mode === "operator") ?? [];
   const latestDecision = workspace?.recent_decisions[0] ?? null;
+  const watchDossier = workspace?.watch_dossier ?? null;
+  const latestWatchUpdate = workspace?.watch_updates?.[0] ?? null;
+  const actionNow = actionNowText({
+    dossier: watchDossier,
+    latestUpdate: latestWatchUpdate,
+    dueReviews: workspace?.due_reviews ?? [],
+    operatorPositions,
+    signalAction: workspace?.signal?.recommended_action,
+  });
 
   async function toggleWatch() {
     if (!details) return;
@@ -275,115 +351,58 @@ export function MarketDetailPage() {
         <section className="detail-metric-grid">
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Что думает Pythia"
-              subtitle="Короткий вывод по рынку: текущая оценка, уверенность и базовая частота."
+              title="Состояние тезиса"
+              subtitle="Главный статус сопровождения: что Pythia думает сейчас и жив ли тезис."
               tooltip={TOOLTIP_CONTENT.marketVerdict}
             />
             <p className="detail-lead">
-              {details.verdict_summary ||
-                `Pythia считает, что вероятность исхода ближе к ${formatPercent(details.research_probability)}, тогда как рынок сейчас стоит ${formatPercent(details.market_price)}.`}
+              {watchDossier?.current_thesis_summary ||
+                details.verdict_summary ||
+                `Pythia считает, что вероятность ближе к ${formatPercent(details.research_probability)} при рынке ${formatPercent(details.market_price)}.`}
             </p>
             <ul className="attention-list">
-              <li>Уверенность: {details.confidence ?? "нет данных"}</li>
-              <li>Базовая частота: {details.base_rate ?? "нет данных"}</li>
-              <li>
-                Объём рынка:{" "}
-                {details.volume !== null && details.volume !== undefined
-                  ? `$${details.volume.toLocaleString("ru-RU")}`
-                  : "нет данных"}
-              </li>
+              <li>Статус: {thesisStateLabel(watchDossier?.thesis_state)}</li>
+              <li>Уверенность: {watchDossier?.current_confidence ?? details.confidence ?? "нет данных"}</li>
+              <li>Research: {watchDossier?.current_research_status ?? workspace?.signal?.research_status ?? "нет данных"}</li>
+              <li>Следующий review: {formatTimestamp(watchDossier?.next_review_due_at)}</li>
             </ul>
           </article>
 
           <article className="panel detail-metric-card">
             <SectionHeader
-              title="Почему расходится с рынком"
-              subtitle="Не просто цифра edge, а краткое объяснение, на чём держится расхождение."
+              title="Последнее изменение"
+              subtitle="Только короткий update: что изменилось и насколько это важно."
               tooltip={TOOLTIP_CONTENT.marketDivergence}
             />
             <div className="detail-stack">
               <p className="detail-lead">
-                Текущее расхождение с рынком составляет <strong>{formatEdge(edge)}</strong>.
+                {latestWatchUpdate
+                  ? `${latestWatchUpdate.status_label} (${severityLabel(latestWatchUpdate.severity)})`
+                  : watchDossier?.last_status_label ?? "С момента последнего прогона изменений ещё не было."}
               </p>
-              <p>{details.reasoning ?? "Обоснование пока не записано."}</p>
-              <p className="muted">Основной драйвер: {details.research.primary_driver ?? "нет данных"}</p>
+              <p>{latestWatchUpdate?.reason_summary ?? watchDossier?.last_reason_summary ?? details.reasoning ?? "Короткое объяснение пока не записано."}</p>
+              <p className="muted">
+                Обновлено: {formatTimestamp(latestWatchUpdate?.created_at ?? watchDossier?.updated_at ?? details.last_updated)}
+              </p>
             </div>
           </article>
-        </section>
-      ) : null}
 
-      {details ? (
-        <section className="panel">
-          <SectionHeader
-            title="История оценки"
-            subtitle="Как менялись рынок, основной контур и baseline между прогонами."
-            tooltip={TOOLTIP_CONTENT.historyChart}
-          />
-          <ProbabilityHistoryChart history={details.history} />
-        </section>
-      ) : null}
-
-      {details ? (
-        <section className="detail-metric-grid">
-          <section className="panel">
+          <article className="panel detail-metric-card">
             <SectionHeader
-              title="Что может сломать прогноз"
-              subtitle="Главные поводы перепроверить рынок или ждать новых данных."
-              tooltip={TOOLTIP_CONTENT.keyRisk}
+              title="Что делать сейчас"
+              subtitle="Один следующий шаг для оператора вместо длинного перечня фактов."
+              tooltip={TOOLTIP_CONTENT.followUp}
             />
             <div className="detail-stack">
-              <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
-              <p className="muted">Что может опровергнуть прогноз</p>
-              <p>{transparency?.falsifier ?? "нет данных"}</p>
+              <p className="detail-lead">{actionNow}</p>
+              <ul className="attention-list">
+                <li>Сигнал: {workspace?.signal ? actionLabel(workspace.signal.recommended_action) : "сигнал не сформирован"}</li>
+                <li>Открытых operator-позиций: {operatorPositions.length}</li>
+                <li>Просроченных review: {workspace?.due_reviews.length ?? 0}</li>
+                <li>Ключевой риск: {watchDossier?.current_invalidation_signal ?? details.key_risk ?? "нет данных"}</li>
+              </ul>
             </div>
-          </section>
-
-          <section className="panel">
-            <SectionHeader
-              title="Прозрачность вывода"
-              subtitle="Какие факты и источники лежат под текущим прогнозом."
-              tooltip={TOOLTIP_CONTENT.transparency}
-            />
-            <div className="transparency-grid">
-              <article className="transparency-card">
-                <p className="muted transparency-label">Какие факты использованы</p>
-                <ul className="attention-list">
-                  {transparency?.facts?.length ? (
-                    transparency.facts.map((fact) => <li key={fact}>{fact}</li>)
-                  ) : (
-                    <li>Нет данных</li>
-                  )}
-                </ul>
-              </article>
-
-              <article className="transparency-card transparency-card-wide">
-                <p className="muted transparency-label">Какие источники использованы</p>
-                <ul className="source-list">
-                  {transparency?.sources?.length ? (
-                    transparency.sources.map((source) => (
-                      <li key={source}>
-                        <a className="source-link" href={source} target="_blank" rel="noreferrer" title={source}>
-                          {formatSourceLabel(source)}
-                        </a>
-                      </li>
-                    ))
-                  ) : (
-                    <li>Нет данных</li>
-                  )}
-                </ul>
-              </article>
-
-              <article className="transparency-card">
-                <p className="muted transparency-label">Что может опровергнуть прогноз</p>
-                <p>{transparency?.falsifier ?? "нет данных"}</p>
-              </article>
-
-              <article className="transparency-card">
-                <p className="muted transparency-label">Последнее обновление</p>
-                <p>{formatTimestamp(transparency?.updated_at)}</p>
-              </article>
-            </div>
-          </section>
+          </article>
         </section>
       ) : null}
 
@@ -474,174 +493,295 @@ export function MarketDetailPage() {
       ) : null}
 
       {details ? (
-        <section className="detail-metric-grid">
-          <section className="panel">
-            <SectionHeader title="Shadow позиция" subtitle="Автоматическая paper-position, если сигнал прошёл правила shadow engine." />
-            {shadowPositions.length ? (
-              <div className="workspace-card-list">
-                {shadowPositions.map((position) => (
-                  <article key={position.id} className="workspace-card">
-                    <strong>
-                      {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
-                    </strong>
-                    <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
-                    <p>Review до: {formatTimestamp(position.review_due_at)}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Открытой shadow-позиции по рынку сейчас нет.</p>
-            )}
-          </section>
-
-          <section className="panel">
-            <SectionHeader title="Operator позиция" subtitle="Ручные paper-позиции оператора по этому рынку." />
-            {operatorPositions.length ? (
-              <div className="workspace-card-list">
-                {operatorPositions.map((position) => (
-                  <article key={position.id} className="workspace-card">
-                    <strong>
-                      {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
-                    </strong>
-                    <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
-                    <p>Открыта: {formatTimestamp(position.opened_at)}</p>
-                    <p>Review до: {formatTimestamp(position.review_due_at)}</p>
-                    <div className="action-bar">
-                      <button
-                        type="button"
-                        className="danger-btn"
-                        disabled={busyAction !== null}
-                        onClick={() => void closeOpenPosition(position)}
-                      >
-                        Закрыть позицию
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Открытой operator-позиции по рынку сейчас нет.</p>
-            )}
-          </section>
-        </section>
-      ) : null}
-
-      {details ? (
-        <section className="detail-metric-grid">
-          <section className="panel">
-            <SectionHeader title="Review" subtitle="Что из этого рынка уже требует пересмотра и подтверждения тезиса." />
-            {workspace?.due_reviews.length ? (
-              <div className="workspace-card-list">
-                {workspace.due_reviews.map((review) => (
-                  <article key={review.id} className="workspace-card">
-                    <strong>{review.review_type}</strong>
-                    <p>Срок: {formatTimestamp(review.due_at)}</p>
-                    <p>{review.review_note ?? "Review без пояснения."}</p>
-                    <div className="action-bar">
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        disabled={busyAction !== null}
-                        onClick={() => void markReviewDone(review)}
-                      >
-                        Пометить review выполненным
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Просроченных review по рынку сейчас нет.</p>
-            )}
-          </section>
-
-          <section className="panel">
-            <SectionHeader
-              title="Что отслеживать дальше"
-              subtitle="Короткий checklist после основного вывода."
-              tooltip={TOOLTIP_CONTENT.followUp}
-            />
-            <div className="detail-stack">
-              <p className="detail-lead">
-                {details.research.primary_driver ?? "Следующие сигналы помогут понять, сохраняется ли текущий тезис."}
-              </p>
-              <p className="muted">Основной драйвер</p>
-              <p>{details.research.primary_driver ?? "нет данных"}</p>
-              {!!details.research.second_order_effects?.length ? (
-                <>
-                  <p className="muted">Вторичные эффекты</p>
-                  <ul className="attention-list">
-                    {details.research.second_order_effects.map((effect) => (
-                      <li key={effect}>{effect}</li>
-                    ))}
-                  </ul>
-                </>
+        <details className="panel detail-disclosure">
+          <summary className="detail-disclosure__summary">Paper позиции, review и post-mortem</summary>
+          <div className="detail-disclosure__content detail-metric-grid">
+            <section className="panel panel-embedded">
+              <SectionHeader title="Shadow позиция" subtitle="Автоматическая paper-position, если сигнал прошёл правила shadow engine." />
+              {shadowPositions.length ? (
+                <div className="workspace-card-list">
+                  {shadowPositions.map((position) => (
+                    <article key={position.id} className="workspace-card">
+                      <strong>
+                        {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
+                      </strong>
+                      <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
+                      <p>Review до: {formatTimestamp(position.review_due_at)}</p>
+                    </article>
+                  ))}
+                </div>
               ) : (
-                <>
-                  <p className="muted">Вторичные эффекты</p>
-                  <p className="muted">Вторичные эффекты пока не выделены.</p>
-                </>
+                <p className="muted">Открытой shadow-позиции по рынку сейчас нет.</p>
               )}
-            </div>
-          </section>
-        </section>
+            </section>
+
+            <section className="panel panel-embedded">
+              <SectionHeader title="Operator позиция" subtitle="Ручные paper-позиции оператора по этому рынку." />
+              {operatorPositions.length ? (
+                <div className="workspace-card-list">
+                  {operatorPositions.map((position) => (
+                    <article key={position.id} className="workspace-card">
+                      <strong>
+                        {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
+                      </strong>
+                      <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
+                      <p>Открыта: {formatTimestamp(position.opened_at)}</p>
+                      <p>Review до: {formatTimestamp(position.review_due_at)}</p>
+                      <div className="action-bar">
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          disabled={busyAction !== null}
+                          onClick={() => void closeOpenPosition(position)}
+                        >
+                          Закрыть позицию
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">Открытой operator-позиции по рынку сейчас нет.</p>
+              )}
+            </section>
+
+            <section className="panel panel-embedded">
+              <SectionHeader title="Review" subtitle="Что из этого рынка уже требует пересмотра и подтверждения тезиса." />
+              {workspace?.due_reviews.length ? (
+                <div className="workspace-card-list">
+                  {workspace.due_reviews.map((review) => (
+                    <article key={review.id} className="workspace-card">
+                      <strong>{review.review_type}</strong>
+                      <p>Срок: {formatTimestamp(review.due_at)}</p>
+                      <p>{review.review_note ?? "Review без пояснения."}</p>
+                      <div className="action-bar">
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          disabled={busyAction !== null}
+                          onClick={() => void markReviewDone(review)}
+                        >
+                          Пометить review выполненным
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">Просроченных review по рынку сейчас нет.</p>
+              )}
+            </section>
+
+            {workspace?.latest_postmortem ? (
+              <section className="panel panel-embedded">
+                <SectionHeader title="Последний пост-мортем" subtitle="Короткий итог уже завершённого thesis-cycle по этому рынку." />
+                <div className="detail-stack">
+                  <p className="detail-lead">{workspace.latest_postmortem.system_note ?? "Пост-мортем без системной заметки."}</p>
+                  <ul className="attention-list">
+                    <li>Итог: {workspace.latest_postmortem.outcome_label ?? "нет данных"}</li>
+                    <li>PnL: {formatEdge(workspace.latest_postmortem.pnl_percent)}</li>
+                  </ul>
+                </div>
+              </section>
+            ) : (
+              <section className="panel panel-embedded">
+                <SectionHeader title="Post-mortem" subtitle="После закрытия позиции сюда попадёт разбор ошибки решения и итог paper-cycle." />
+                <p className="muted">По этому рынку ещё нет завершённого post-mortem.</p>
+              </section>
+            )}
+          </div>
+        </details>
       ) : null}
 
       {details ? (
-        <section className="detail-metric-grid">
-          <section className="panel">
-            <SectionHeader
-              title="Источники и исследовательская справка"
-              subtitle="Сжатый контекст и ссылки, к которым можно вернуться после основного вывода."
-              tooltip={TOOLTIP_CONTENT.researchBrief}
-            />
-            <div className="detail-stack">
-              <p className="detail-lead">{details.research.summary || "Краткая сводка пока отсутствует."}</p>
-              {!!details.research.key_facts?.length ? (
-                <>
-                  <p className="muted">Ключевые факты:</p>
-                  <ul className="attention-list">
-                    {details.research.key_facts.map((fact) => (
-                      <li key={fact}>{fact}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-              {!!details.research.sources?.length ? (
-                <>
-                  <p className="muted">Источники:</p>
-                  <ul className="source-list">
-                    {details.research.sources.map((source) => (
-                      <li key={source}>
-                        <a className="source-link" href={source} target="_blank" rel="noreferrer" title={source}>
-                          {formatSourceLabel(source)}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-            </div>
-          </section>
-
-          {workspace?.latest_postmortem ? (
-            <section className="panel">
-              <SectionHeader title="Последний пост-мортем" subtitle="Короткий итог уже завершённого thesis-cycle по этому рынку." />
-              <div className="detail-stack">
-                <p className="detail-lead">{workspace.latest_postmortem.system_note ?? "Пост-мортем без системной заметки."}</p>
+        <details className="panel detail-disclosure">
+          <summary className="detail-disclosure__summary">Подробный анализ и история</summary>
+          <div className="detail-disclosure__content">
+            <section className="detail-metric-grid">
+              <article className="panel panel-embedded detail-metric-card">
+                <SectionHeader
+                  title="Что думает Pythia"
+                  subtitle="Короткий вывод по рынку: текущая оценка, уверенность и базовая частота."
+                  tooltip={TOOLTIP_CONTENT.marketVerdict}
+                />
+                <p className="detail-lead">
+                  {details.verdict_summary ||
+                    `Pythia считает, что вероятность исхода ближе к ${formatPercent(details.research_probability)}, тогда как рынок сейчас стоит ${formatPercent(details.market_price)}.`}
+                </p>
                 <ul className="attention-list">
-                  <li>Итог: {workspace.latest_postmortem.outcome_label ?? "нет данных"}</li>
-                  <li>PnL: {formatEdge(workspace.latest_postmortem.pnl_percent)}</li>
+                  <li>Уверенность: {details.confidence ?? "нет данных"}</li>
+                  <li>Базовая частота: {details.base_rate ?? "нет данных"}</li>
+                  <li>
+                    Объём рынка:{" "}
+                    {details.volume !== null && details.volume !== undefined
+                      ? `$${details.volume.toLocaleString("ru-RU")}`
+                      : "нет данных"}
+                  </li>
                 </ul>
-              </div>
+              </article>
+
+              <article className="panel panel-embedded detail-metric-card">
+                <SectionHeader
+                  title="Почему расходится с рынком"
+                  subtitle="Не просто цифра edge, а краткое объяснение, на чём держится расхождение."
+                  tooltip={TOOLTIP_CONTENT.marketDivergence}
+                />
+                <div className="detail-stack">
+                  <p className="detail-lead">
+                    Текущее расхождение с рынком составляет <strong>{formatEdge(edge)}</strong>.
+                  </p>
+                  <p>{details.reasoning ?? "Обоснование пока не записано."}</p>
+                  <p className="muted">Основной драйвер: {details.research.primary_driver ?? "нет данных"}</p>
+                </div>
+              </article>
             </section>
-          ) : (
-            <section className="panel">
-              <SectionHeader title="Post-mortem" subtitle="После закрытия позиции сюда попадёт разбор ошибки решения и итог paper-cycle." />
-              <p className="muted">По этому рынку ещё нет завершённого post-mortem.</p>
+
+            <section className="panel panel-embedded">
+              <SectionHeader
+                title="История оценки"
+                subtitle="Как менялись рынок, основной контур и baseline между прогонами."
+                tooltip={TOOLTIP_CONTENT.historyChart}
+              />
+              <ProbabilityHistoryChart history={details.history} />
             </section>
-          )}
-        </section>
+
+            <section className="detail-metric-grid">
+              <section className="panel panel-embedded">
+                <SectionHeader
+                  title="Что может сломать прогноз"
+                  subtitle="Главные поводы перепроверить рынок или ждать новых данных."
+                  tooltip={TOOLTIP_CONTENT.keyRisk}
+                />
+                <div className="detail-stack">
+                  <p className="detail-lead">{details.key_risk ?? "Ключевой риск пока не выделен."}</p>
+                  <p className="muted">Что может опровергнуть прогноз</p>
+                  <p>{transparency?.falsifier ?? "нет данных"}</p>
+                </div>
+              </section>
+
+              <section className="panel panel-embedded">
+                <SectionHeader
+                  title="Что отслеживать дальше"
+                  subtitle="Короткий checklist после основного вывода."
+                  tooltip={TOOLTIP_CONTENT.followUp}
+                />
+                <div className="detail-stack">
+                  <p className="detail-lead">
+                    {details.research.primary_driver ?? "Следующие сигналы помогут понять, сохраняется ли текущий тезис."}
+                  </p>
+                  <p className="muted">Основной драйвер</p>
+                  <p>{details.research.primary_driver ?? "нет данных"}</p>
+                  {!!details.research.second_order_effects?.length ? (
+                    <>
+                      <p className="muted">Вторичные эффекты</p>
+                      <ul className="attention-list">
+                        {details.research.second_order_effects.map((effect) => (
+                          <li key={effect}>{effect}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <>
+                      <p className="muted">Вторичные эффекты</p>
+                      <p className="muted">Вторичные эффекты пока не выделены.</p>
+                    </>
+                  )}
+                </div>
+              </section>
+            </section>
+          </div>
+        </details>
+      ) : null}
+
+      {details ? (
+        <details className="panel detail-disclosure">
+          <summary className="detail-disclosure__summary">Источники и исследовательская справка</summary>
+          <div className="detail-disclosure__content">
+            <section className="detail-metric-grid">
+              <section className="panel panel-embedded">
+                <SectionHeader
+                  title="Источники и исследовательская справка"
+                  subtitle="Сжатый контекст и ссылки, к которым можно вернуться после основного вывода."
+                  tooltip={TOOLTIP_CONTENT.researchBrief}
+                />
+                <div className="detail-stack">
+                  <p className="detail-lead">{details.research.summary || "Краткая сводка пока отсутствует."}</p>
+                  {!!details.research.key_facts?.length ? (
+                    <>
+                      <p className="muted">Ключевые факты:</p>
+                      <ul className="attention-list">
+                        {details.research.key_facts.map((fact) => (
+                          <li key={fact}>{fact}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                  {!!details.research.sources?.length ? (
+                    <>
+                      <p className="muted">Источники:</p>
+                      <ul className="source-list">
+                        {details.research.sources.map((source) => (
+                          <li key={source}>
+                            <a className="source-link" href={source} target="_blank" rel="noreferrer" title={source}>
+                              {formatSourceLabel(source)}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="panel panel-embedded">
+                <SectionHeader
+                  title="Прозрачность вывода"
+                  subtitle="Какие факты и источники лежат под текущим прогнозом."
+                  tooltip={TOOLTIP_CONTENT.transparency}
+                />
+                <div className="transparency-grid">
+                  <article className="transparency-card">
+                    <p className="muted transparency-label">Какие факты использованы</p>
+                    <ul className="attention-list">
+                      {transparency?.facts?.length ? (
+                        transparency.facts.map((fact) => <li key={fact}>{fact}</li>)
+                      ) : (
+                        <li>Нет данных</li>
+                      )}
+                    </ul>
+                  </article>
+
+                  <article className="transparency-card transparency-card-wide">
+                    <p className="muted transparency-label">Какие источники использованы</p>
+                    <ul className="source-list">
+                      {transparency?.sources?.length ? (
+                        transparency.sources.map((source) => (
+                          <li key={source}>
+                            <a className="source-link" href={source} target="_blank" rel="noreferrer" title={source}>
+                              {formatSourceLabel(source)}
+                            </a>
+                          </li>
+                        ))
+                      ) : (
+                        <li>Нет данных</li>
+                      )}
+                    </ul>
+                  </article>
+
+                  <article className="transparency-card">
+                    <p className="muted transparency-label">Что может опровергнуть прогноз</p>
+                    <p>{transparency?.falsifier ?? "нет данных"}</p>
+                  </article>
+
+                  <article className="transparency-card">
+                    <p className="muted transparency-label">Последнее обновление</p>
+                    <p>{formatTimestamp(transparency?.updated_at)}</p>
+                  </article>
+                </div>
+              </section>
+            </section>
+          </div>
+        </details>
       ) : null}
 
       <TimelinePanel history={details?.history} forecastTimestamp={details?.forecast_timestamp} endDate={details?.end_date} />

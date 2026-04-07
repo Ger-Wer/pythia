@@ -11,12 +11,21 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+from python.watchlist_store import (
+    ensure_watchlist_engine_schema,
+    list_pending_watch_updates,
+    mark_watch_updates_delivered,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
 LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
+
+
+def dashboard_base_url() -> str:
+    return os.getenv("DASHBOARD_PUBLIC_BASE_URL", "").rstrip("/")
 
 
 def prediction_columns(conn: sqlite3.Connection) -> set[str]:
@@ -33,38 +42,56 @@ def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
     return f" AND {prefix}is_valid = 1"
 
 
-def send_message(text: str):
+def send_message(text: str) -> bool:
     if not BOT_TOKEN or not CHAT_ID:
         print(f"Telegram не настроен. Сообщение: {text}")
-        return
+        return False
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(
-        url,
-        json={
-            "chat_id": CHAT_ID,
-            "text": text,
-            "parse_mode": "Markdown",
-        },
-        timeout=20,
-    )
-
-
-def send_photo(path: str, caption: str = ""):
-    if not BOT_TOKEN or not CHAT_ID:
-        print(f"Telegram не настроен. Изображение: {path}")
-        return
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    with open(path, "rb") as handle:
-        requests.post(
+    try:
+        response = requests.post(
             url,
-            data={
+            json={
                 "chat_id": CHAT_ID,
-                "caption": caption,
+                "text": text,
                 "parse_mode": "Markdown",
             },
-            files={"photo": handle},
-            timeout=60,
+            timeout=20,
         )
+    except requests.RequestException as error:
+        print(f"Telegram sendMessage failed: {error}")
+        return False
+
+    if not response.ok:
+        print(f"Telegram sendMessage failed: HTTP {response.status_code} {response.text}")
+        return False
+    return True
+
+
+def send_photo(path: str, caption: str = "") -> bool:
+    if not BOT_TOKEN or not CHAT_ID:
+        print(f"Telegram не настроен. Изображение: {path}")
+        return False
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    with open(path, "rb") as handle:
+        try:
+            response = requests.post(
+                url,
+                data={
+                    "chat_id": CHAT_ID,
+                    "caption": caption,
+                    "parse_mode": "Markdown",
+                },
+                files={"photo": handle},
+                timeout=60,
+            )
+        except requests.RequestException as error:
+            print(f"Telegram sendPhoto failed: {error}")
+            return False
+
+    if not response.ok:
+        print(f"Telegram sendPhoto failed: HTTP {response.status_code} {response.text}")
+        return False
+    return True
 
 
 def weekly_report():
@@ -143,11 +170,46 @@ _{datetime.now().strftime('%Y-%m-%d')}_
         send_photo(cal_path, "Калибровочная кривая")
 
 
+def watch_updates(limit: int = 10):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    ensure_watchlist_engine_schema(conn)
+    pending = list_pending_watch_updates(conn, limit=limit)
+    if not pending:
+        conn.close()
+        print("Нет новых watchlist updates для Telegram.")
+        return
+
+    delivered_ids: list[int] = []
+    for item in pending:
+        market_id = item.get("market_id")
+        market_link = f"{dashboard_base_url()}/markets/{market_id}" if dashboard_base_url() and market_id else ""
+        sent = send_message(
+            "\n".join(
+                [
+                    "👀 *Watchlist update*",
+                    f"Рынок: {item.get('question') or item.get('market_id')}",
+                    f"Статус: {item.get('status_label')}",
+                    f"Почему: {item.get('reason_summary')}",
+                    f"Действие: {item.get('action_summary')}",
+                    *( [f"Открыть разбор: {market_link}"] if market_link else [] ),
+                ]
+            )
+        )
+        if sent:
+            delivered_ids.append(int(item["id"]))
+
+    if delivered_ids:
+        mark_watch_updates_delivered(conn, delivered_ids)
+    conn.close()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--alert", type=str, help="Send alert message")
     parser.add_argument("--weekly-report", action="store_true")
     parser.add_argument("--send-image", type=str)
+    parser.add_argument("--watch-updates", action="store_true")
     args = parser.parse_args()
 
     if args.alert:
@@ -156,3 +218,5 @@ if __name__ == "__main__":
         weekly_report()
     elif args.send_image:
         send_photo(args.send_image)
+    elif args.watch_updates:
+        watch_updates()
