@@ -11,6 +11,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+from python.watchlist_store import (
+    ensure_watchlist_engine_schema,
+    list_pending_watch_updates,
+    mark_watch_updates_delivered,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -143,11 +148,42 @@ _{datetime.now().strftime('%Y-%m-%d')}_
         send_photo(cal_path, "Калибровочная кривая")
 
 
+def watch_updates(limit: int = 10):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    ensure_watchlist_engine_schema(conn)
+    pending = list_pending_watch_updates(conn, limit=limit)
+    if not pending:
+        conn.close()
+        print("Нет новых watchlist updates для Telegram.")
+        return
+
+    delivered_ids: list[int] = []
+    for item in pending:
+        send_message(
+            "\n".join(
+                [
+                    "👀 *Watchlist update*",
+                    f"Рынок: {item.get('question') or item.get('market_id')}",
+                    f"Статус: {item.get('status_label')}",
+                    f"Почему: {item.get('reason_summary')}",
+                    f"Действие: {item.get('action_summary')}",
+                ]
+            )
+        )
+        delivered_ids.append(int(item["id"]))
+
+    if delivered_ids:
+        mark_watch_updates_delivered(conn, delivered_ids)
+    conn.close()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--alert", type=str, help="Send alert message")
     parser.add_argument("--weekly-report", action="store_true")
     parser.add_argument("--send-image", type=str)
+    parser.add_argument("--watch-updates", action="store_true")
     args = parser.parse_args()
 
     if args.alert:
@@ -156,3 +192,5 @@ if __name__ == "__main__":
         weekly_report()
     elif args.send_image:
         send_photo(args.send_image)
+    elif args.watch_updates:
+        watch_updates()

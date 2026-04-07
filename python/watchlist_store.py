@@ -470,3 +470,58 @@ def list_watch_updates(conn: sqlite3.Connection, *, limit: int = 20) -> list[dic
         """,
         (limit,),
     )
+
+
+def list_pending_watch_updates(conn: sqlite3.Connection, *, limit: int = 10) -> list[dict[str, Any]]:
+    if not _table_exists(conn, "watch_updates") or not _table_exists(conn, "watch_dossiers"):
+        return []
+    return _fetchall_dicts(
+        conn,
+        """
+        SELECT
+            u.id,
+            d.market_id,
+            u.created_at,
+            u.severity,
+            u.status_label,
+            u.reason_summary,
+            u.action_summary,
+            (
+                SELECT p.question
+                FROM predictions p
+                WHERE p.market_id = d.market_id
+                  AND COALESCE(p.is_valid, 1) = 1
+                ORDER BY p.forecast_timestamp DESC, p.id DESC
+                LIMIT 1
+            ) AS question
+        FROM watch_updates u
+        JOIN watch_dossiers d ON d.id = u.watch_dossier_id
+        WHERE u.delivered_to_telegram_at IS NULL
+        ORDER BY u.created_at ASC, u.id ASC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+
+
+def mark_watch_updates_delivered(
+    conn: sqlite3.Connection,
+    update_ids: list[int],
+    *,
+    delivered_at: str | None = None,
+) -> int:
+    if not update_ids:
+        return 0
+
+    timestamp = delivered_at or utc_now_iso()
+    placeholders = ",".join("?" for _ in update_ids)
+    cursor = conn.execute(
+        f"""
+        UPDATE watch_updates
+        SET delivered_to_telegram_at = ?
+        WHERE id IN ({placeholders})
+        """,
+        (timestamp, *update_ids),
+    )
+    conn.commit()
+    return int(cursor.rowcount or 0)

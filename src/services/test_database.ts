@@ -182,16 +182,102 @@ export function seedOpenOperatorPosition(
     `,
   );
 
+  const prediction = db
+    .query(
+      `
+        SELECT id
+        FROM predictions
+        WHERE market_id = ?1
+        ORDER BY forecast_timestamp DESC, id DESC
+        LIMIT 1
+      `,
+    )
+    .get(input.market_id) as { id: number } | null;
+
+  if (!prediction) {
+    seedPrediction(db, {
+      market_id: input.market_id,
+      question: `Question for ${input.market_id}`,
+      market_price: 42,
+      dexter_p: 55,
+      naked_p: 49,
+      dexter_confidence: 'medium',
+      forecast_timestamp: '2026-04-07T06:00:00.000Z',
+      end_date: '2026-05-01T12:00:00.000Z',
+    });
+  }
+
+  const predictionId = (db
+    .query(
+      `
+        SELECT id
+        FROM predictions
+        WHERE market_id = ?1
+        ORDER BY forecast_timestamp DESC, id DESC
+        LIMIT 1
+      `,
+    )
+    .get(input.market_id) as { id: number }).id;
+
+  const book = db
+    .query(
+      `
+        SELECT id
+        FROM books
+        WHERE name = 'operator_default'
+        LIMIT 1
+      `,
+    )
+    .get() as { id: number } | null;
+
+  const bookId = book?.id ?? 1;
+
+  db.query(
+    `
+      INSERT INTO signals (
+        prediction_id, market_id, question, forecast_timestamp, market_price,
+        research_probability, naked_probability, best_probability, signal_edge,
+        signal_strength, recommended_action, entry_zone_min, entry_zone_max,
+        thesis_summary, primary_driver, disconfirming_signal, confidence,
+        research_status, status, created_at, updated_at
+      ) VALUES (
+        ?1, ?2, ?3, '2026-04-07T06:00:00.000Z', 42,
+        55, 49, 55, 13, 13, 'enter_yes', 40, 53,
+        'Fixture thesis', 'Fixture driver', 'Fixture invalidation', 'medium',
+        'ON', 'new', '2026-04-07T06:00:00.000Z', '2026-04-07T06:00:00.000Z'
+      )
+    `,
+  ).run(predictionId, input.market_id, `Question for ${input.market_id}`);
+
+  const signalId = Number(db.query('SELECT last_insert_rowid() as id').get()?.id ?? 0);
+
+  db.query(
+    `
+      INSERT INTO decisions (
+        signal_id, book_id, market_id, actor_type, decision_type, decision_reason,
+        operator_confidence, confirmation_criteria, invalidation_criteria, review_due_at, status, created_at
+      ) VALUES (
+        ?1, ?2, ?3, 'operator', 'enter_yes', 'Fixture operator decision',
+        'medium', 'Fixture confirmation', 'Fixture invalidation', '2026-04-08T06:00:00.000Z', 'active', '2026-04-07T06:00:00.000Z'
+      )
+    `,
+  ).run(signalId, bookId, input.market_id);
+
+  const decisionId = Number(db.query('SELECT last_insert_rowid() as id').get()?.id ?? 0);
+
   db.query(
     `
       INSERT INTO positions (
         book_id, market_id, signal_id, opened_by_decision_id, mode, side, status,
         entry_yes_price, entry_cost_per_contract, size_contracts, notional_usd,
         review_due_at, opened_at, thesis_cycle_number
-      ) VALUES (1, ?1, 1, 1, 'operator', 'yes', 'open', 42, 0.42, 100, 42, ?2, ?3, 1)
+      ) VALUES (?1, ?2, ?3, ?4, 'operator', 'yes', 'open', 42, 0.42, 100, 42, ?5, ?6, 1)
     `,
   ).run(
+    bookId,
     input.market_id,
+    signalId,
+    decisionId,
     '2026-04-08T06:00:00.000Z',
     '2026-04-07T06:00:00.000Z',
   );

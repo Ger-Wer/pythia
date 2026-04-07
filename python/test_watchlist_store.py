@@ -6,7 +6,9 @@ from python.watchlist_store import (
     bootstrap_watch_dossier,
     ensure_watchlist_engine_schema,
     list_watch_dossiers,
+    list_pending_watch_updates,
     list_watch_updates,
+    mark_watch_updates_delivered,
 )
 
 
@@ -190,3 +192,50 @@ class WatchlistStoreTests(unittest.TestCase):
             self.assertEqual(updates[0]["market_id"], "watch-2")
             self.assertEqual(updates[0]["status_label"], "тезис ослаб")
             self.assertEqual(updates[0]["action_summary"], "Открыть review")
+
+    def test_pending_watch_updates_can_be_marked_delivered(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-3",
+                question="Will monitored thesis update be sent?",
+                market_price=31.0,
+                dexter_p=44.0,
+                naked_p=40.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+
+            with sqlite3.connect(db_path) as conn:
+                ensure_watchlist_engine_schema(conn)
+                bootstrap_watch_dossier(conn, "watch-3")
+                conn.execute(
+                    """
+                    INSERT INTO watch_refresh_runs (
+                        started_at, finished_at, status, markets_total, markets_checked, markets_changed,
+                        deep_reviews_triggered, alerts_created, error_summary
+                    ) VALUES ('2026-04-07T12:00:00Z', '2026-04-07T12:05:00Z', 'success', 1, 1, 1, 0, 1, '')
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO watch_updates (
+                        watch_dossier_id, refresh_run_id, created_at, severity, status_label,
+                        reason_summary, action_summary, change_summary_json
+                    ) VALUES (
+                        1, 1, '2026-04-07T12:10:00Z', 'warning', 'тезис ослаб',
+                        'Рынок двинулся против тезиса.', 'Открыть разбор рынка', '{}'
+                    )
+                    """
+                )
+                conn.commit()
+
+                pending = list_pending_watch_updates(conn)
+                self.assertEqual(len(pending), 1)
+                self.assertEqual(pending[0]["market_id"], "watch-3")
+
+                updated = mark_watch_updates_delivered(conn, [int(pending[0]["id"])], delivered_at="2026-04-07T12:20:00Z")
+                self.assertEqual(updated, 1)
+
+                remaining = list_pending_watch_updates(conn)
+                self.assertEqual(remaining, [])

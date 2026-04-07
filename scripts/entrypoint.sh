@@ -20,6 +20,16 @@ case "${1:-}" in
     /app/python/venv/bin/python python/resolution_checker.py 2>&1 | tee -a "$LOG_DIR/resolution_${TODAY}.log"
     ;;
 
+  watchlist-refresh)
+    cd /app
+    bun run src/watchlist_refresh.ts 2>&1 | tee -a "$LOG_DIR/watchlist_refresh_${TODAY}.log"
+    ;;
+
+  watch-alerts)
+    cd /app
+    /app/python/venv/bin/python python/telegram_bot.py --watch-updates 2>&1 | tee -a "$LOG_DIR/watch_alerts_${TODAY}.log"
+    ;;
+
   weekly)
     cd /app
     {
