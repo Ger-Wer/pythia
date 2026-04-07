@@ -23,6 +23,8 @@ from python.decision_store import (
 from python.quality_metrics import load_quality_snapshot
 from python.watchlist_store import (
     bootstrap_watch_dossier,
+    get_watch_dossier as load_watch_dossier,
+    list_watch_updates_for_market as load_watch_updates_for_market,
     ensure_watchlist_engine_schema,
     list_watch_dossiers as load_watch_dossiers,
     list_watch_updates as load_watch_updates,
@@ -491,6 +493,8 @@ class OperatorCore:
         self._ensure_decision_core_schema_rw()
         with self._connect() as conn:
             workspace = load_market_workspace(conn, market_id)
+            watch_dossier = load_watch_dossier(conn, market_id)
+            watch_updates = load_watch_updates_for_market(conn, market_id, limit=5)
         return {
             "market": market,
             "signal": workspace["signal"],
@@ -498,6 +502,8 @@ class OperatorCore:
             "due_reviews": workspace["due_reviews"],
             "recent_decisions": workspace["recent_decisions"],
             "latest_postmortem": workspace["latest_postmortem"],
+            "watch_dossier": watch_dossier,
+            "watch_updates": watch_updates,
         }
 
     def list_open_positions(self) -> list[dict[str, Any]]:

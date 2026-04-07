@@ -515,6 +515,8 @@ class DashboardApiTests(unittest.TestCase):
             self.assertEqual(workspace_before.status_code, 200)
             self.assertEqual(workspace_before.json()["signal"]["recommended_action"], "enter_yes")
             self.assertEqual(workspace_before.json()["open_positions"], [])
+            self.assertIsNone(workspace_before.json()["watch_dossier"])
+            self.assertEqual(workspace_before.json()["watch_updates"], [])
 
             create_decision = client.post(
                 "/api/decisions",

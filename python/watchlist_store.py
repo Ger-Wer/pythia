@@ -435,6 +435,51 @@ def list_watch_dossiers(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     ]
 
 
+def get_watch_dossier(conn: sqlite3.Connection, market_id: str) -> dict[str, Any] | None:
+    if not _table_exists(conn, "watch_dossiers"):
+        return None
+
+    row = _fetchone_dict(
+        conn,
+        """
+        SELECT
+            d.id,
+            d.market_id,
+            d.status,
+            d.updated_at,
+            d.next_review_due_at,
+            d.freshness_policy,
+            d.initial_snapshot_state,
+            d.thesis_state,
+            d.current_market_price,
+            d.current_research_probability,
+            d.current_naked_probability,
+            d.current_confidence,
+            d.current_research_status,
+            d.current_thesis_summary,
+            d.current_primary_driver,
+            d.current_invalidation_signal,
+            d.last_status_label,
+            d.last_reason_summary,
+            d.last_action_summary,
+            d.operator_note,
+            (
+                SELECT p.question
+                FROM predictions p
+                WHERE p.market_id = d.market_id
+                  AND COALESCE(p.is_valid, 1) = 1
+                ORDER BY p.forecast_timestamp DESC, p.id DESC
+                LIMIT 1
+            ) AS question
+        FROM watch_dossiers d
+        WHERE d.market_id = ?
+        LIMIT 1
+        """,
+        (market_id,),
+    )
+    return row
+
+
 def list_watch_updates(conn: sqlite3.Connection, *, limit: int = 20) -> list[dict[str, Any]]:
     if not _table_exists(conn, "watch_updates") or not _table_exists(conn, "watch_dossiers"):
         return []
@@ -469,6 +514,49 @@ def list_watch_updates(conn: sqlite3.Connection, *, limit: int = 20) -> list[dic
         LIMIT ?
         """,
         (limit,),
+    )
+
+
+def list_watch_updates_for_market(
+    conn: sqlite3.Connection,
+    market_id: str,
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    if not _table_exists(conn, "watch_updates") or not _table_exists(conn, "watch_dossiers"):
+        return []
+    return _fetchall_dicts(
+        conn,
+        """
+        SELECT
+            u.id,
+            d.market_id,
+            u.created_at,
+            u.severity,
+            u.status_label,
+            u.reason_summary,
+            u.action_summary,
+            u.market_price_before,
+            u.market_price_after,
+            u.research_probability_before,
+            u.research_probability_after,
+            u.delivered_to_dashboard_at,
+            u.delivered_to_telegram_at,
+            (
+                SELECT p.question
+                FROM predictions p
+                WHERE p.market_id = d.market_id
+                  AND COALESCE(p.is_valid, 1) = 1
+                ORDER BY p.forecast_timestamp DESC, p.id DESC
+                LIMIT 1
+            ) AS question
+        FROM watch_updates u
+        JOIN watch_dossiers d ON d.id = u.watch_dossier_id
+        WHERE d.market_id = ?
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT ?
+        """,
+        (market_id, limit),
     )
 
 

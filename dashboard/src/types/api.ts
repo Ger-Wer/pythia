@@ -259,6 +259,8 @@ export interface MarketWorkspaceResponse {
   due_reviews: ReviewSummary[];
   recent_decisions: DecisionSummary[];
   latest_postmortem: PostmortemSummary | null;
+  watch_dossier: WatchDossier | null;
+  watch_updates: WatchUpdate[];
 }
 
 export interface OpenPositionsResponse {

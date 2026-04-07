@@ -867,6 +867,30 @@ a {
   background: rgba(37, 95, 74, 0.05);
 }
 
+.detail-disclosure {
+  display: grid;
+  gap: 16px;
+}
+
+.detail-disclosure__summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.detail-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-disclosure__content {
+  display: grid;
+  gap: 18px;
+}
+
+.panel-embedded {
+  background: rgba(255, 255, 255, 0.72);
+}
+
 .source-list {
   margin: 0;
   padding-left: 18px;

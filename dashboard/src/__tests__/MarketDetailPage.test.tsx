@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
@@ -92,6 +92,47 @@ function workspacePayload(overrides: Record<string, unknown> = {}) {
     due_reviews: [],
     recent_decisions: [],
     latest_postmortem: null,
+    watch_dossier: {
+      id: 12,
+      market_id: "572833",
+      question: "Will Wolves finish in last place in the 2025-26 English Premier League?",
+      status: "active",
+      updated_at: "2026-04-05T09:00:00.000Z",
+      next_review_due_at: "2026-04-06T09:00:00.000Z",
+      freshness_policy: "normal_24h",
+      initial_snapshot_state: "reused",
+      thesis_state: "weakened",
+      current_market_price: 53,
+      current_research_probability: 68,
+      current_naked_probability: 58,
+      current_confidence: "medium",
+      current_research_status: "ON",
+      current_thesis_summary: "Автосопровождение считает, что тезис по Wolves остаётся живым, но требует внимания.",
+      current_primary_driver: "Результаты Wolves в ближайших турах",
+      current_invalidation_signal: "Две победы подряд над соседями по таблице",
+      last_status_label: "тезис ослаб",
+      last_reason_summary: "Рынок чуть сдвинулся против тезиса, но идея пока жива.",
+      last_action_summary: "Сверить рынок с тезисом и решить, оставаться ли в позиции.",
+      operator_note: "",
+    },
+    watch_updates: [
+      {
+        id: 91,
+        market_id: "572833",
+        question: "Will Wolves finish in last place in the 2025-26 English Premier League?",
+        created_at: "2026-04-05T09:00:00.000Z",
+        severity: "warning",
+        status_label: "тезис ослаб",
+        reason_summary: "Рынок чуть сдвинулся против тезиса, но идея пока жива.",
+        action_summary: "Открыть разбор и проверить позицию.",
+        market_price_before: 49,
+        market_price_after: 53,
+        research_probability_before: 61,
+        research_probability_after: 68,
+        delivered_to_dashboard_at: "2026-04-05T09:00:00.000Z",
+        delivered_to_telegram_at: null,
+      },
+    ],
     ...overrides,
   };
 }
@@ -132,7 +173,7 @@ describe("MarketDetailPage", () => {
     });
   });
 
-  it("renders a narrative market analysis with a watch action", async () => {
+  it("renders a dossier-first market workspace with a watch action", async () => {
     const user = userEvent.setup();
 
     render(
@@ -143,34 +184,19 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
+    expect(await screen.findByText("Состояние тезиса")).toBeInTheDocument();
 
-    expect(screen.getByText("Что думает Pythia")).toBeInTheDocument();
-    expect(screen.getByText("Почему расходится с рынком")).toBeInTheDocument();
-    expect(screen.getByText("История оценки")).toBeInTheDocument();
-    expect(screen.getByText("Что может сломать прогноз")).toBeInTheDocument();
-    expect(screen.getByText("Прозрачность вывода")).toBeInTheDocument();
-    expect(screen.getByText("Что отслеживать дальше")).toBeInTheDocument();
-    expect(screen.getByText("Источники и исследовательская справка")).toBeInTheDocument();
+    expect(screen.getByText("Состояние тезиса")).toBeInTheDocument();
+    expect(screen.getByText("Последнее изменение")).toBeInTheDocument();
+    expect(screen.getByText("Что делать сейчас")).toBeInTheDocument();
     expect(screen.getByText("Сигнал")).toBeInTheDocument();
     expect(screen.getByText("Моё решение")).toBeInTheDocument();
-    expect(screen.getByText("Shadow позиция")).toBeInTheDocument();
-    expect(screen.getByText("Operator позиция")).toBeInTheDocument();
-    expect(screen.getByText("Review")).toBeInTheDocument();
-    expect(
-      screen.getByText("Pythia видит рынок заметно выше цены и считает, что рынок недооценивает проблемы Wolves."),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Начало:/)).toBeInTheDocument();
-    expect(screen.getByText(/Последняя точка:/)).toBeInTheDocument();
-    expect(screen.getByText("Wolves выглядят хуже двух прямых конкурентов по форме и составу.")).toBeInTheDocument();
-    const transparencySection = screen.getByRole("heading", { name: "Прозрачность вывода" }).closest("section");
-    expect(transparencySection).not.toBeNull();
-    const transparency = within(transparencySection as HTMLElement);
-    expect(transparency.getByText("Две победы подряд над соседями по таблице")).toBeInTheDocument();
-    expect(transparency.getByText("Какие факты использованы")).toBeInTheDocument();
-    expect(transparency.getByText("Какие источники использованы")).toBeInTheDocument();
-    expect(transparency.getByText("Что может опровергнуть прогноз")).toBeInTheDocument();
-    expect(transparency.getByText("Последнее обновление")).toBeInTheDocument();
+    expect(screen.getByText("тезис ослаб (важно)")).toBeInTheDocument();
+    expect(screen.getByText("Открыть разбор и проверить позицию.")).toBeInTheDocument();
+    expect(screen.getByText("Автосопровождение считает, что тезис по Wolves остаётся живым, но требует внимания.")).toBeInTheDocument();
+    expect(screen.getByText("Подробный анализ и история")).toBeInTheDocument();
+    expect(screen.getAllByText("Источники и исследовательская справка").length).toBeGreaterThan(0);
+    expect(screen.getByText("Paper позиции, review и post-mortem")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Добавить в избранное" }));
 
@@ -196,9 +222,12 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
+    const user = userEvent.setup();
+
+    expect(await screen.findByText("Состояние тезиса")).toBeInTheDocument();
 
     expect(screen.getByText("Не удалось загрузить статус избранного. Разбор доступен без него.")).toBeInTheDocument();
+    await user.click(screen.getByText("Подробный анализ и история"));
     expect(screen.getByText("Объём рынка: $0")).toBeInTheDocument();
   });
 
@@ -227,7 +256,10 @@ describe("MarketDetailPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Что думает Pythia")).toBeInTheDocument();
+    const user = userEvent.setup();
+
+    expect(await screen.findByText("Состояние тезиса")).toBeInTheDocument();
+    await user.click(screen.getAllByText("Источники и исследовательская справка")[0]);
 
     const link = screen.getByRole("link", { name: "exa.ai / library / sports / premier-league — 2025-05-25" });
     expect(link).toHaveAttribute(
@@ -283,6 +315,8 @@ describe("MarketDetailPage", () => {
               review_note: "Нужно перепроверить тезис.",
             },
           ],
+          watch_dossier: workspacePayload().watch_dossier,
+          watch_updates: workspacePayload().watch_updates,
         }),
       )
       .mockResolvedValueOnce(
@@ -309,6 +343,8 @@ describe("MarketDetailPage", () => {
             pnl_percent: 5.5,
             system_note: "Position closed via manual_exit.",
           },
+          watch_dossier: workspacePayload().watch_dossier,
+          watch_updates: workspacePayload().watch_updates,
         }),
       );
 
@@ -338,6 +374,7 @@ describe("MarketDetailPage", () => {
     });
 
     expect(await screen.findByText("Открыта operator paper position: YES по рынку 53.0%.")).toBeInTheDocument();
+    await user.click(screen.getByText("Paper позиции, review и post-mortem"));
 
     await user.click(screen.getByRole("button", { name: "Пометить review выполненным" }));
     await waitFor(() => {

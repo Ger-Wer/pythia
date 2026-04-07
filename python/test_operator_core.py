@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from python.decision_store import create_manual_decision, ensure_decision_core_schema
 from python.operator_core import OperatorCore
-from python.test_support import seed_prediction, temp_db
+from python.test_support import seed_prediction, seed_watch_update, temp_db
 
 
 class OperatorCoreTests(unittest.TestCase):
@@ -1031,6 +1031,36 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(len(workspace["recent_decisions"]), 1)
             self.assertEqual(workspace["recent_decisions"][0]["decision_type"], "enter_yes")
             self.assertEqual(workspace["latest_postmortem"]["outcome_label"], "early_exit")
+            self.assertIsNone(workspace["watch_dossier"])
+            self.assertEqual(workspace["watch_updates"], [])
+
+    def test_market_workspace_includes_watch_dossier_and_updates(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-workspace",
+                question="Will watch workspace include dossier?",
+                market_price=22.0,
+                dexter_p=37.0,
+                naked_p=31.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="watch-workspace",
+                status_label="тезис ослаб",
+                reason_summary="Рынок ушёл против тезиса.",
+                action_summary="Открыть разбор рынка",
+            )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+            workspace = core.get_market_workspace("watch-workspace")
+
+            self.assertIsNotNone(workspace["watch_dossier"])
+            self.assertEqual(workspace["watch_dossier"]["market_id"], "watch-workspace")
+            self.assertEqual(workspace["watch_updates"][0]["status_label"], "тезис ослаб")
+            self.assertEqual(workspace["watch_updates"][0]["action_summary"], "Открыть разбор рынка")
 
     def test_get_market_workspace_bootstraps_decision_core_on_legacy_db(self):
         with TemporaryDirectory() as temp_dir:
