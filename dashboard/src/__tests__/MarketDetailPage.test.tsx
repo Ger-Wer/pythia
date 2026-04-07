@@ -160,7 +160,8 @@ describe("MarketDetailPage", () => {
     expect(
       screen.getByText("Pythia видит рынок заметно выше цены и считает, что рынок недооценивает проблемы Wolves."),
     ).toBeInTheDocument();
-    expect(screen.getByText("03.04.2026, 11:16")).toBeInTheDocument();
+    expect(screen.getByText(/Начало:/)).toBeInTheDocument();
+    expect(screen.getByText(/Последняя точка:/)).toBeInTheDocument();
     expect(screen.getByText("Wolves выглядят хуже двух прямых конкурентов по форме и составу.")).toBeInTheDocument();
     const transparencySection = screen.getByRole("heading", { name: "Прозрачность вывода" }).closest("section");
     expect(transparencySection).not.toBeNull();
