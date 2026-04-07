@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test';
 import type { MonitoringInput } from './services/watchlist_engine';
-import { buildHeuristicMonitoringResult } from './watchlist_refresh';
+
+process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
+process.env.DEEPSEEK_MODEL = 'test-model';
+process.env.EXA_API_KEY = 'test-exa-key';
+
+const watchlistRefreshModulePromise = import('./watchlist_refresh');
 
 function monitoringInput(overrides?: Partial<MonitoringInput>): MonitoringInput {
   return {
@@ -33,7 +38,8 @@ function monitoringInput(overrides?: Partial<MonitoringInput>): MonitoringInput 
   };
 }
 
-test('heuristic monitoring fallback uses refreshed probabilities instead of the stale previous value', () => {
+test('heuristic monitoring fallback uses refreshed probabilities instead of the stale previous value', async () => {
+  const { buildHeuristicMonitoringResult } = await watchlistRefreshModulePromise;
   const result = buildHeuristicMonitoringResult(monitoringInput(), {
     dueReview: false,
     largePriceMove: true,
