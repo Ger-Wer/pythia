@@ -8,6 +8,21 @@ import { TOOLTIP_CONTENT } from "../content/tooltips";
 import type { MarketDetailsResponse } from "../types/api";
 import { formatEdge, formatPercent, formatTimestamp } from "../utils/format";
 
+function formatSourceLabel(source: string): string {
+  try {
+    const url = new URL(source);
+    const hostname = url.hostname.replace(/^www\./, "");
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+    const normalizedPath = pathSegments.length ? ` / ${pathSegments.join(" / ")}` : "";
+    const date = url.searchParams.get("date");
+    const label = `${hostname}${normalizedPath}${date ? ` — ${date}` : ""}`;
+
+    return label.length > 88 ? `${label.slice(0, 85)}...` : label;
+  } catch {
+    return source.length > 88 ? `${source.slice(0, 85)}...` : source;
+  }
+}
+
 export function MarketDetailPage() {
   const { marketId } = useParams<{ marketId: string }>();
   const [details, setDetails] = useState<MarketDetailsResponse | null>(null);
@@ -219,14 +234,14 @@ export function MarketDetailPage() {
                 </ul>
               </article>
 
-              <article className="transparency-card">
+              <article className="transparency-card transparency-card-wide">
                 <p className="muted transparency-label">Какие источники использованы</p>
                 <ul className="source-list">
                   {transparency?.sources?.length ? (
                     transparency.sources.map((source) => (
                       <li key={source}>
-                        <a href={source} target="_blank" rel="noreferrer">
-                          {source}
+                        <a className="source-link" href={source} target="_blank" rel="noreferrer" title={source}>
+                          {formatSourceLabel(source)}
                         </a>
                       </li>
                     ))

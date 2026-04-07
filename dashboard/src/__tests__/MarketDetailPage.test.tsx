@@ -142,4 +142,38 @@ describe("MarketDetailPage", () => {
     expect(screen.getByText("Не удалось загрузить статус избранного. Разбор доступен без него.")).toBeInTheDocument();
     expect(screen.getByText("Объём рынка: $0")).toBeInTheDocument();
   });
+
+  it("renders human-readable source labels instead of raw search URLs", async () => {
+    marketDetails.mockResolvedValueOnce(
+      marketDetailsPayload({
+        transparency: {
+          facts: ["Арсенал выиграл у Саутгемптона 2-1 25 мая 2025 года"],
+          sources: [
+            "https://exa.ai/library/sports/premier-league?date=2025-05-25&t=69d4ab7f515b1fa9f27b54aa",
+          ],
+          falsifier: "Серия неудачных матчей у прямых конкурентов",
+          updated_at: "2026-04-07T06:00:00.000Z",
+        },
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/markets/572833"]}>
+        <Routes>
+          <Route path="/markets/:marketId" element={<MarketDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Разбор рынка" })).toBeInTheDocument();
+    });
+
+    const link = screen.getByRole("link", { name: "exa.ai / library / sports / premier-league — 2025-05-25" });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://exa.ai/library/sports/premier-league?date=2025-05-25&t=69d4ab7f515b1fa9f27b54aa",
+    );
+    expect(screen.queryByText(/69d4ab7f515b1fa9f27b54aa/)).not.toBeInTheDocument();
+  });
 });

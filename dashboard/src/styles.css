@@ -740,6 +740,10 @@ a {
   gap: 10px;
 }
 
+.transparency-card-wide {
+  grid-column: 1 / -1;
+}
+
 .transparency-card p {
   margin: 0;
 }
@@ -768,6 +772,14 @@ a {
   padding-left: 18px;
   display: grid;
   gap: 8px;
+}
+
+.source-link {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .status-box {
