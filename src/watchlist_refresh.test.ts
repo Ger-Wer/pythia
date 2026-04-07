@@ -26,7 +26,7 @@ function monitoringInput(overrides?: Partial<MonitoringInput>): MonitoringInput 
       has_open_position: 0,
     },
     current: {
-      marketPrice: 31,
+      marketPrice: 16,
       researchProbability: 26,
       nakedProbability: 24,
     },
