@@ -1,0 +1,124 @@
+<h2>Pythia как decision desk, а не как информационная помойка</h2>
+<p class="subtitle">
+  Ниже показан предлагаемый операторский поток: Pythia сама наблюдает рынки из избранного и подаёт оператору только то,
+  что нужно для решения прямо сейчас.
+</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Как выглядит сейчас: плохо</div>
+      <div class="mockup-body">
+        <div class="label">ПРОБЛЕМА</div>
+        <div class="card-body">
+          <h3>Разбор рынка = склад фактов</h3>
+          <p>
+            История, факты, источники, риски, транспарентность, позиции, reviews и post-mortem свалены в один длинный
+            экран.
+          </p>
+        </div>
+        <div class="placeholder" style="height: 150px; margin-top: 14px;">Очень длинная простыня из блоков</div>
+        <div class="pros-cons" style="margin-top: 16px;">
+          <div class="cons">
+            <h4>Почему это плохо</h4>
+            <ul>
+              <li>Оператор сам вылавливает смысл из мусора</li>
+              <li>Pythia не берёт на себя сопровождение идеи</li>
+              <li>Избранное не работает как активный контур наблюдения</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">Как должно быть: хорошо</div>
+      <div class="mockup-body">
+        <div class="label">ПРАВИЛЬНАЯ МОДЕЛЬ</div>
+        <div class="cards" style="grid-template-columns: 1fr;">
+          <div class="card">
+            <div class="card-body">
+              <h3>1. Сводка даёт только главные сигналы</h3>
+              <p>Не 12 блоков и не все факты, а 3-5 рынков, на которые реально стоит смотреть.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <h3>2. Добавил в избранное = включил автосопровождение</h3>
+              <p>
+                Pythia сама перепроверяет цену, research, источники, thesis break, review due и сдвиги оценки на каждом
+                следующем прогоне.
+              </p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <h3>3. Разбор рынка = decision workspace</h3>
+              <p>
+                На первом экране только: что делать, почему, что сломает идею, когда review и есть ли действие прямо
+                сейчас.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Предлагаемый рабочий поток</h3>
+  <div class="cards" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="card">
+      <div class="card-body">
+        <div class="label">ЭКРАН 1</div>
+        <h3>Главные сигналы дня</h3>
+        <p>Рынок, edge, тезис в 1-2 строках, кнопки: <strong>Разобрать</strong> и <strong>В избранное</strong>.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="label">ЭКРАН 2</div>
+        <h3>Избранное = активное наблюдение</h3>
+        <p>
+          Pythia сама следит за изменением цены, обновлением тезиса, review due, thesis break и даёт только важные
+          изменения.
+        </p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="label">ЭКРАН 3</div>
+        <h3>Decision workspace</h3>
+        <p>Решение, зона интереса, статус позиции, что делать сейчас, без простыни вторичных фактов.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Что должно остаться скрытым по умолчанию</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="sources-hidden" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Источники и сырые факты</h3>
+        <p>Показывать только по кнопке «Почему Pythia так думает?».</p>
+      </div>
+    </div>
+    <div class="option" data-choice="timeline-hidden" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>История оценок</h3>
+        <p>Показывать только если есть хотя бы 2-3 осмысленные точки.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="postmortem-hidden" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Post-mortem и служебные блоки</h3>
+        <p>Показывать только после завершения цикла или по отдельной вкладке.</p>
+      </div>
+    </div>
+  </div>
+</div>
