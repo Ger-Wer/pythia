@@ -28,6 +28,8 @@ from python.dashboard_models import (
     ReviewCompleteRequest,
     ReviewCompleteResponse,
     WatchlistItemRequest,
+    WatchDossiersResponse,
+    WatchUpdatesResponse,
     WatchlistResponse,
 )
 from python.operator_core import OperatorCore, SAFE_ACTION_NAMES
@@ -184,6 +186,16 @@ def create_app(
     def watchlist(request: Request) -> WatchlistResponse:
         require_session(request)
         return WatchlistResponse(items=core.list_watchlist())
+
+    @app.get("/api/watchlist/dossiers", response_model=WatchDossiersResponse)
+    def watchlist_dossiers(request: Request) -> WatchDossiersResponse:
+        require_session(request)
+        return WatchDossiersResponse(items=core.list_watch_dossiers())
+
+    @app.get("/api/watchlist/updates", response_model=WatchUpdatesResponse)
+    def watchlist_updates(request: Request) -> WatchUpdatesResponse:
+        require_session(request)
+        return WatchUpdatesResponse(items=core.list_watch_updates())
 
     @app.post("/api/watchlist")
     def watchlist_add(body: WatchlistItemRequest, request: Request) -> dict[str, bool]:

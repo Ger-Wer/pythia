@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from typing import Iterator
 
 from python.dashboard_api import create_app
+from python.watchlist_store import bootstrap_watch_dossier, ensure_watchlist_engine_schema
 
 
 @contextmanager
@@ -104,66 +105,22 @@ def seed_watch_update(
     action_summary: str,
 ) -> None:
     with sqlite3.connect(db_path) as conn:
+        ensure_watchlist_engine_schema(conn)
+        bootstrap_watch_dossier(conn, market_id, now_iso="2026-04-07T06:00:00Z")
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS watch_dossiers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                market_id TEXT NOT NULL UNIQUE,
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                first_watched_at TEXT NOT NULL,
-                freshness_policy TEXT NOT NULL,
-                initial_snapshot_state TEXT NOT NULL,
-                thesis_state TEXT NOT NULL,
-                operator_note TEXT NOT NULL DEFAULT ''
-            )
+            INSERT INTO watch_refresh_runs (
+                started_at, finished_at, status, markets_total, markets_checked, markets_changed,
+                deep_reviews_triggered, alerts_created, error_summary
+            ) VALUES ('2026-04-07T12:00:00Z', '2026-04-07T12:05:00Z', 'success', 1, 1, 1, 0, 1, '')
             """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS watch_refresh_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                started_at TEXT NOT NULL,
-                status TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS watch_updates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                watch_dossier_id INTEGER NOT NULL,
-                refresh_run_id INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                status_label TEXT NOT NULL,
-                reason_summary TEXT NOT NULL,
-                action_summary TEXT NOT NULL,
-                change_summary_json TEXT NOT NULL DEFAULT '{}',
-                delivered_to_dashboard_at TEXT,
-                delivered_to_telegram_at TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO watch_dossiers (
-                market_id, status, created_at, updated_at, first_watched_at,
-                freshness_policy, initial_snapshot_state, thesis_state, operator_note
-            ) VALUES (?, 'active', '2026-04-07T06:00:00Z', '2026-04-07T06:00:00Z', '2026-04-07T06:00:00Z', 'normal_24h', 'reused', 'review_required', '')
-            """,
-            (market_id,),
-        )
-        conn.execute(
-            "INSERT INTO watch_refresh_runs (started_at, status) VALUES ('2026-04-07T12:00:00Z', 'success')"
         )
         conn.execute(
             """
             INSERT INTO watch_updates (
                 watch_dossier_id, refresh_run_id, created_at, severity, status_label,
-                reason_summary, action_summary
-            ) VALUES (1, 1, '2026-04-07T12:10:00Z', 'review', ?, ?, ?)
+                reason_summary, action_summary, change_summary_json
+            ) VALUES (1, 1, '2026-04-07T12:10:00Z', 'review', ?, ?, ?, '{}')
             """,
             (status_label, reason_summary, action_summary),
         )

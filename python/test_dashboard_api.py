@@ -8,7 +8,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from python.dashboard_api import create_app
-from python.test_support import create_test_app, seed_prediction, temp_db
+from python.test_support import create_test_app, seed_prediction, seed_watch_update, temp_db
 
 
 class DashboardApiTests(unittest.TestCase):
@@ -222,6 +222,41 @@ class DashboardApiTests(unittest.TestCase):
             remove_watch = client.delete("/api/watchlist/572833")
             self.assertEqual(remove_watch.status_code, 200)
             self.assertEqual(client.get("/api/watchlist").json()["items"], [])
+
+    def test_watchlist_dossier_and_update_endpoints(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-99",
+                question="Will Burnley finish in last place?",
+                market_price=43.6,
+                dexter_p=65.0,
+                naked_p=68.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="watch-99",
+                status_label="тезис ослаб",
+                reason_summary="Рынок ушёл против тезиса.",
+                action_summary="Открыть review",
+            )
+            app = create_test_app(db_path)
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            dossiers = client.get("/api/watchlist/dossiers")
+            self.assertEqual(dossiers.status_code, 200)
+            self.assertEqual(len(dossiers.json()["items"]), 1)
+            self.assertEqual(dossiers.json()["items"][0]["market_id"], "watch-99")
+            self.assertEqual(dossiers.json()["items"][0]["question"], "Will Burnley finish in last place?")
+
+            updates = client.get("/api/watchlist/updates")
+            self.assertEqual(updates.status_code, 200)
+            self.assertEqual(len(updates.json()["items"]), 1)
+            self.assertEqual(updates.json()["items"][0]["market_id"], "watch-99")
+            self.assertEqual(updates.json()["items"][0]["status_label"], "тезис ослаб")
 
     def test_quality_endpoint_returns_complete_quality_payload(self):
         with TemporaryDirectory() as temp_dir:

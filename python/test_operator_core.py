@@ -58,6 +58,64 @@ class OperatorCoreTests(unittest.TestCase):
             with core._connect() as conn:
                 self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
 
+    def test_add_to_watchlist_creates_dossier_from_fresh_prediction(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-1",
+                question="Will Arsenal finish in 2nd place?",
+                market_price=12.0,
+                dexter_p=30.0,
+                naked_p=35.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+
+            core.add_to_watchlist("watch-1", "Следить внимательно")
+
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute(
+                    """
+                    SELECT market_id, freshness_policy, thesis_state, current_market_price,
+                           current_research_probability, current_thesis_summary
+                    FROM watch_dossiers
+                    WHERE market_id = 'watch-1'
+                    """
+                ).fetchone()
+
+            self.assertEqual(row[0], "watch-1")
+            self.assertEqual(row[1], "normal_24h")
+            self.assertEqual(row[2], "intact")
+            self.assertEqual(row[3], 12.0)
+            self.assertEqual(row[4], 30.0)
+            self.assertTrue(row[5])
+
+    def test_add_to_watchlist_marks_pending_deep_review_for_stale_snapshot(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="watch-2",
+                question="Will stale snapshot be reused?",
+                forecast_timestamp="2026-04-05T00:00:00Z",
+                end_date="2026-04-20T12:00:00Z",
+            )
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+
+            core.add_to_watchlist("watch-2", "Нужен автопересмотр")
+
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute(
+                    """
+                    SELECT initial_snapshot_state, thesis_state
+                    FROM watch_dossiers
+                    WHERE market_id = 'watch-2'
+                    """
+                ).fetchone()
+
+            self.assertEqual(row[0], "pending_deep_review")
+            self.assertEqual(row[1], "review_required")
+
     def test_get_overview_does_not_require_rw_access_for_watchlist_count(self):
         with temp_db() as db_path:
             seed_prediction(

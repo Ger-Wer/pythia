@@ -298,6 +298,51 @@ test('initDb creates decision-core tables and seeds default books', async () => 
   }
 });
 
+test('initDb creates watchlist-engine tables and indexes', async () => {
+  const { initDb } = await dbModulePromise;
+
+  const db = initDb();
+  try {
+    const tables = (
+      db.query(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table'
+          ORDER BY name ASC
+        `,
+      )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name);
+
+    expect(tables).toContain('watch_dossiers');
+    expect(tables).toContain('watch_refresh_runs');
+    expect(tables).toContain('watch_refresh_snapshots');
+    expect(tables).toContain('watch_updates');
+
+    const indexes = (
+      db.query(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'index'
+          ORDER BY name ASC
+        `,
+      )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name);
+
+    expect(indexes).toContain('idx_watch_dossiers_market_id');
+    expect(indexes).toContain('idx_watch_dossiers_status_updated_at');
+    expect(indexes).toContain('idx_watch_refresh_runs_status_started_at');
+    expect(indexes).toContain('idx_watch_refresh_snapshots_dossier_captured_at');
+    expect(indexes).toContain('idx_watch_updates_dossier_created_at');
+    expect(indexes).toContain('idx_watch_updates_delivery');
+  } finally {
+    db.close();
+  }
+});
+
 test('shared test database helpers seed predictions consistently', () => {
   const db = createTestDatabase();
   try {

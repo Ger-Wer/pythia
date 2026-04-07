@@ -14,6 +14,8 @@ import type {
   QualityResponse,
   ReviewCompleteResponse,
   WatchlistResponse,
+  WatchDossiersResponse,
+  WatchUpdatesResponse,
 } from "../types/api";
 
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
@@ -44,6 +46,8 @@ export const api = {
   openPositions: () => request<OpenPositionsResponse>("/api/positions/open"),
   dueReviews: () => request<DueReviewsResponse>("/api/reviews/due"),
   watchlist: () => request<WatchlistResponse>("/api/watchlist"),
+  watchlistDossiers: () => request<WatchDossiersResponse>("/api/watchlist/dossiers"),
+  watchlistUpdates: () => request<WatchUpdatesResponse>("/api/watchlist/updates"),
   login: (username: string, password: string) =>
     request<{ ok: boolean }>("/api/auth/login", {
       method: "POST",

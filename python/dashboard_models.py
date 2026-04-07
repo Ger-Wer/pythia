@@ -163,6 +163,14 @@ class WatchlistResponse(BaseModel):
     items: list[dict[str, Any]]
 
 
+class WatchDossiersResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
+class WatchUpdatesResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
 class MarketWorkspaceResponse(BaseModel):
     market: dict[str, Any]
     signal: dict[str, Any] | None = None
