@@ -75,6 +75,7 @@ export function ProbabilityHistoryChart({ history = [] }: ProbabilityHistoryChar
   const innerWidth = chartWidth - paddingX * 2;
   const innerHeight = chartHeight - paddingY * 2;
   const hasPoints = history.length > 0;
+  const hasSinglePoint = history.length === 1;
 
   const positions = history.map((point, index) => ({
     x: history.length > 1 ? paddingX + (innerWidth * index) / (history.length - 1) : chartWidth / 2,
@@ -91,7 +92,7 @@ export function ProbabilityHistoryChart({ history = [] }: ProbabilityHistoryChar
   return (
     <figure className="probability-history-chart">
       <div className="probability-history-chart-frame">
-        {hasPoints ? (
+        {hasPoints && !hasSinglePoint ? (
           <svg
             className="probability-history-svg"
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
@@ -147,6 +148,12 @@ export function ProbabilityHistoryChart({ history = [] }: ProbabilityHistoryChar
               );
             })}
           </svg>
+        ) : hasSinglePoint ? (
+          <div className="probability-history-single">
+            <p className="probability-history-single-message">
+              Пока есть только один прогноз. Линия появится после следующего прогона.
+            </p>
+          </div>
         ) : (
           <div className="probability-history-empty">История пока недоступна.</div>
         )}
