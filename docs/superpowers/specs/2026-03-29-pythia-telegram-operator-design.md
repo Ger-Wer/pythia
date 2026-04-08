@@ -212,7 +212,7 @@ Slash-команды:
 - вопрос
 - market price
 - naked prediction
-- dexter prediction, если есть
+- research prediction, если есть
 - время прогноза
 
 Для MVP достаточно последних `5` записей.

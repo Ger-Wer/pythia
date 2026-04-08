@@ -81,8 +81,6 @@ python/venv/
 python/__pycache__/
 *.pyc
 
-dexter/
-
 data/*
 !data/.gitkeep
 logs/*
@@ -137,10 +135,6 @@ RUN bun install
 COPY python/requirements.txt /app/python/requirements.txt
 RUN python3 -m venv /app/python/venv \
     && /app/python/venv/bin/pip install --no-cache-dir -r /app/python/requirements.txt
-
-RUN git clone --depth 1 https://github.com/virattt/dexter.git /app/dexter \
-    && cd /app/dexter \
-    && bun install
 
 COPY src /app/src
 COPY python /app/python

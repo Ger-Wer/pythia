@@ -28,7 +28,6 @@ python/.venv/
 python/venv/
 __pycache__/
 *.py[cod]
-dexter/
 data/*
 !data/.gitkeep
 logs/*
