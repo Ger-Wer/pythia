@@ -90,6 +90,7 @@ const REQUIRED_MIGRATIONS = [
 ] as const;
 
 const WATCHLIST_ENGINE_SQL_PATH = path.resolve(import.meta.dir, '../../sql/watchlist_engine.sql');
+const ATTENTION_ENGINE_SQL_PATH = path.resolve(import.meta.dir, '../../sql/attention_engine.sql');
 
 function runSqlScript(db: Database, sql: string): void {
   for (const statement of sql
@@ -145,6 +146,11 @@ export function ensureWatchlistEngineSchema(db: Database): void {
   runSqlScript(db, sql);
 }
 
+export function ensureAttentionEngineSchema(db: Database): void {
+  const sql = readFileSync(ATTENTION_ENGINE_SQL_PATH, 'utf8');
+  runSqlScript(db, sql);
+}
+
 export function initDb(): Database {
   const dbPath = resolveDbPath();
   const dbDir = path.dirname(dbPath);
@@ -161,6 +167,7 @@ export function initDb(): Database {
   ensurePredictionIndexes(db);
   ensureDecisionCoreSchema(db);
   ensureWatchlistEngineSchema(db);
+  ensureAttentionEngineSchema(db);
 
   return db;
 }

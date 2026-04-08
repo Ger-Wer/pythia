@@ -67,7 +67,7 @@ class OperatorCoreTests(unittest.TestCase):
                 market_price=12.0,
                 dexter_p=30.0,
                 naked_p=35.0,
-                forecast_timestamp="2026-04-07T06:00:00Z",
+                forecast_timestamp="2026-04-08T06:00:00Z",
                 end_date="2026-05-01T12:00:00Z",
             )
             core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
@@ -1062,6 +1062,42 @@ class OperatorCoreTests(unittest.TestCase):
             self.assertEqual(workspace["watch_dossier"]["market_id"], "watch-workspace")
             self.assertEqual(workspace["watch_updates"][0]["status_label"], "тезис ослаб")
             self.assertEqual(workspace["watch_updates"][0]["action_summary"], "Открыть разбор рынка")
+
+    def test_overview_and_workspace_include_attention_engine_views(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="attention-workspace",
+                question="Will attention be visible in overview?",
+                market_price=22.0,
+                dexter_p=37.0,
+                naked_p=31.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-01T12:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="attention-workspace",
+                status_label="тезис ослаб",
+                reason_summary="Рынок ушёл против тезиса.",
+                action_summary="Открыть разбор рынка",
+            )
+
+            core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
+            overview = core.get_overview()
+            workspace = core.get_market_workspace("attention-workspace")
+            dossiers = core.list_watch_dossiers()
+
+            self.assertIn("attention_summary", overview)
+            self.assertIn("urgent_items", overview)
+            self.assertIn("today_items", overview)
+            self.assertIn("later_items", overview)
+            self.assertIn("watchlist_changed_count", overview)
+            grouped_items = overview["urgent_items"] + overview["today_items"] + overview["later_items"]
+            self.assertTrue(any(item["market_id"] == "attention-workspace" for item in grouped_items))
+            self.assertEqual(workspace["active_attention_items"][0]["market_id"], "attention-workspace")
+            self.assertTrue(dossiers[0]["has_open_attention"])
+            self.assertEqual(dossiers[0]["attention_priority"], "urgent")
 
     def test_get_market_workspace_bootstraps_decision_core_on_legacy_db(self):
         with TemporaryDirectory() as temp_dir:

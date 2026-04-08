@@ -10,6 +10,9 @@ from fastapi.staticfiles import StaticFiles
 from python.dashboard_auth import DashboardAuthConfig, build_serializer, verify_password
 from python.dashboard_models import (
     ActionResponse,
+    AttentionItemsResponse,
+    AttentionTransitionRequest,
+    AttentionTransitionResponse,
     HealthResponse,
     LatestRunResponse,
     LoginRequest,
@@ -196,6 +199,20 @@ def create_app(
     def watchlist_updates(request: Request) -> WatchUpdatesResponse:
         require_session(request)
         return WatchUpdatesResponse(items=core.list_watch_updates())
+
+    @app.get("/api/attention-items", response_model=AttentionItemsResponse)
+    def attention_items(request: Request, priority: str | None = None, status: str = "open") -> AttentionItemsResponse:
+        require_session(request)
+        return AttentionItemsResponse(items=core.list_attention_items(priority=priority, status=status))
+
+    @app.post("/api/attention-items/{item_id}/transition", response_model=AttentionTransitionResponse)
+    def attention_transition(item_id: int, body: AttentionTransitionRequest, request: Request) -> AttentionTransitionResponse:
+        require_session(request)
+        try:
+            payload = core.transition_attention_item(item_id, body.action)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="ATTENTION_ITEM_NOT_FOUND") from exc
+        return AttentionTransitionResponse(**payload)
 
     @app.post("/api/watchlist")
     def watchlist_add(body: WatchlistItemRequest, request: Request) -> dict[str, bool]:

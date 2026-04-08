@@ -5,15 +5,18 @@ import { SectionHeader } from "./SectionHeader";
 
 interface WatchUpdateFeedProps {
   items: WatchUpdate[];
+  title?: string;
+  subtitle?: string;
 }
 
-export function WatchUpdateFeed({ items }: WatchUpdateFeedProps) {
+export function WatchUpdateFeed({
+  items,
+  title = "Последние изменения",
+  subtitle = "Короткие обновления по watched-рынкам: что изменилось, почему и что делать дальше.",
+}: WatchUpdateFeedProps) {
   return (
     <section className="panel">
-      <SectionHeader
-        title="Последние изменения"
-        subtitle="Короткие обновления по watched-рынкам: что изменилось, почему и что делать дальше."
-      />
+      <SectionHeader title={title} subtitle={subtitle} />
       {!items.length ? (
         <p className="muted">Пока критичных изменений нет.</p>
       ) : (

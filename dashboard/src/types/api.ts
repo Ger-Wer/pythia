@@ -92,6 +92,18 @@ export interface OverviewResponse {
   open_shadow_positions: number;
   open_operator_positions: number;
   due_reviews_count: number;
+  attention_summary: {
+    urgent: number;
+    today: number;
+    later: number;
+    open_total: number;
+  };
+  urgent_items: AttentionItem[];
+  today_items: AttentionItem[];
+  later_items: AttentionItem[];
+  watchlist_changed_count: number;
+  active_positions: PositionSummary[];
+  recent_watch_updates: WatchUpdate[];
   latest_run: LatestRunSummary;
   top_signals: LatestRunItem[];
   attention_items: Array<{
@@ -261,6 +273,7 @@ export interface MarketWorkspaceResponse {
   latest_postmortem: PostmortemSummary | null;
   watch_dossier: WatchDossier | null;
   watch_updates: WatchUpdate[];
+  active_attention_items: AttentionItem[];
 }
 
 export interface OpenPositionsResponse {
@@ -343,6 +356,19 @@ export interface WatchDossier {
   last_reason_summary?: string | null;
   last_action_summary?: string | null;
   operator_note?: string | null;
+  active_attention_item_id?: number | null;
+  attention_title?: string | null;
+  attention_detail?: string | null;
+  attention_action_label?: string | null;
+  attention_status?: string | null;
+  attention_priority?: "urgent" | "today" | "later" | null;
+  has_open_attention?: boolean;
+  latest_change_at?: string | null;
+  next_action_text?: string | null;
+  active_attention_count?: number;
+  open_operator_positions?: number;
+  open_shadow_positions?: number;
+  has_due_review?: boolean;
 }
 
 export interface WatchUpdate {
@@ -368,6 +394,35 @@ export interface WatchDossiersResponse {
 
 export interface WatchUpdatesResponse {
   items: WatchUpdate[];
+}
+
+export interface AttentionItem {
+  id: number;
+  market_id: string;
+  source_type: string;
+  source_id?: number | null;
+  category: string;
+  priority: "urgent" | "today" | "later";
+  status: "new" | "in_progress" | "closed" | "cancelled";
+  title: string;
+  detail: string;
+  action_label: string;
+  created_at: string;
+  updated_at: string;
+  last_seen_at?: string | null;
+  last_telegram_sent_at?: string | null;
+  question?: string | null;
+}
+
+export interface AttentionItemsResponse {
+  items: AttentionItem[];
+}
+
+export interface AttentionTransitionResponse {
+  id: number;
+  status: string;
+  priority: string;
+  market_id: string;
 }
 
 export interface MeResponse {

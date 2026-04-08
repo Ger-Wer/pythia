@@ -10,6 +10,88 @@ vi.mock("../api/client", () => ({
       valid_predictions: 67,
       resolved_predictions: 12,
       watchlist_count: 4,
+      attention_summary: {
+        urgent: 1,
+        today: 1,
+        later: 1,
+        open_total: 3,
+      },
+      urgent_items: [
+        {
+          id: 901,
+          market_id: "m1",
+          category: "thesis_break",
+          priority: "urgent",
+          status: "new",
+          title: "Burnley thesis break",
+          detail: "Появился сильный сигнал против тезиса по Burnley.",
+          action_label: "Открыть разбор",
+          created_at: "2026-04-04T09:00:00Z",
+          updated_at: "2026-04-04T09:00:00Z",
+          source_type: "watch_update",
+        },
+      ],
+      today_items: [
+        {
+          id: 902,
+          market_id: "m3",
+          category: "review_due",
+          priority: "today",
+          status: "new",
+          title: "BTC review due",
+          detail: "Наступил срок review по watched-рынку BTC.",
+          action_label: "Открыть review",
+          created_at: "2026-04-04T09:30:00Z",
+          updated_at: "2026-04-04T09:30:00Z",
+          source_type: "review",
+        },
+      ],
+      later_items: [
+        {
+          id: 903,
+          market_id: "m2",
+          category: "watch_change",
+          priority: "later",
+          status: "new",
+          title: "Fed observation",
+          detail: "Есть слабое изменение по watched-рынку Fed.",
+          action_label: "Посмотреть позже",
+          created_at: "2026-04-04T10:00:00Z",
+          updated_at: "2026-04-04T10:00:00Z",
+          source_type: "watch_update",
+        },
+      ],
+      watchlist_changed_count: 3,
+      active_positions: [
+        {
+          id: 700,
+          market_id: "m1",
+          mode: "operator",
+          side: "yes",
+          status: "open",
+          entry_yes_price: 43.6,
+          notional_usd: 200,
+          review_due_at: "2026-04-05T08:16:48Z",
+          opened_at: "2026-04-04T09:15:00Z",
+          question: "Will Burnley finish in last place?",
+        },
+      ],
+      recent_watch_updates: [
+        {
+          id: 5001,
+          market_id: "m1",
+          question: "Will Burnley finish in last place?",
+          severity: "warning",
+          status_label: "тезис ослаб",
+          reason_summary: "Рынок сдвинулся против прежнего тезиса.",
+          action_summary: "Проверить watched-рынок",
+          created_at: "2026-04-04T09:45:00Z",
+          market_price_before: 40,
+          market_price_after: 43.6,
+          research_probability_before: 61,
+          research_probability_after: 65,
+        },
+      ],
       latest_run: {
         forecast_timestamp: "2026-04-04T08:16:48Z",
         markets_processed: 11,
@@ -133,7 +215,7 @@ vi.mock("../api/client", () => ({
 }));
 
 describe("OverviewPage", () => {
-  it("renders a summary-first operator console", async () => {
+  it("renders a command-center overview grouped by urgency", async () => {
     render(
       <MemoryRouter>
         <OverviewPage />
@@ -141,39 +223,26 @@ describe("OverviewPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Что требует внимания")).toBeInTheDocument();
+      expect(screen.getByText("Срочно")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Что делать сейчас")).toBeInTheDocument();
-    expect(screen.getByText("Откройте главный сигнал и решите, добавлять ли его в избранное.")).toBeInTheDocument();
-    const digestHeading = screen.getByRole("heading", { name: "Главные сигналы дня" });
-    const digestSection = digestHeading.closest("section");
-    expect(digestSection).not.toBeNull();
-    expect(screen.getByText("Сегодня Pythia выделяет 2 самых сильных сигнала в последнем прогоне.")).toBeInTheDocument();
-    expect(screen.getByText("Сначала смотрю на самые заметные расхождения, затем сверяю их с рынками из списка наблюдения.")).toBeInTheDocument();
-    expect(screen.getAllByText(/Почему это важно:/i)).toHaveLength(3);
-    expect(digestSection).not.toBeNull();
-    const digestLinks = within(digestSection as HTMLElement).getAllByRole("link", { name: "Открыть разбор" });
-    expect(digestLinks).toHaveLength(3);
-    expect(digestLinks[0]).toHaveAttribute("href", "/markets/m1");
-    expect(digestLinks[1]).toHaveAttribute("href", "/markets/m3");
-    expect(digestLinks[2]).toHaveAttribute("href", "/markets/m2");
+    expect(screen.getByText("Сегодня")).toBeInTheDocument();
+    expect(screen.getByText("Можно позже")).toBeInTheDocument();
+    expect(screen.getByText("Burnley thesis break")).toBeInTheDocument();
+    expect(screen.getByText("BTC review due")).toBeInTheDocument();
+    expect(screen.getByText("Fed observation")).toBeInTheDocument();
+    expect(screen.getByText("Активные позиции")).toBeInTheDocument();
+    expect(screen.getByText("Последние изменения в watchlist")).toBeInTheDocument();
     expect(screen.getByText("Состояние системы")).toBeInTheDocument();
     expect(screen.getByText("sqlite")).toBeInTheDocument();
     expect(screen.getByText("llm")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Запустить прогноз" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Проверить resolved" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Обновить статус" })).toBeInTheDocument();
-    const signalLinks = [
-      screen.getByRole("link", { name: /Will Burnley finish in last place/i }),
-      screen.getByRole("link", { name: /Will BTC hit 150k/i }),
-      screen.getByRole("link", { name: /Will Fed cut rates/i }),
-    ];
-    expect(signalLinks[0]).toHaveAttribute("href", "/markets/m1");
-    expect(signalLinks[1]).toHaveAttribute("href", "/markets/m3");
-    expect(signalLinks[2]).toHaveAttribute("href", "/markets/m2");
-    expect(screen.queryByRole("link", { name: /Will this fourth signal/i })).not.toBeInTheDocument();
-    expect(screen.getByText("Главный сигнал сейчас")).toBeInTheDocument();
+    const urgentSection = screen.getByRole("heading", { name: "Срочно" }).closest("section");
+    expect(urgentSection).not.toBeNull();
+    const urgentLinks = within(urgentSection as HTMLElement).getAllByRole("link", { name: "Открыть разбор" });
+    expect(urgentLinks[0]).toHaveAttribute("href", "/markets/m1");
     expect(screen.getByText("Tavily работает как fallback, Exa недоступен.")).toBeInTheDocument();
   });
 });

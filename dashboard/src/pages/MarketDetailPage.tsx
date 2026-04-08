@@ -86,6 +86,19 @@ function severityLabel(value: string | null | undefined): string {
   }
 }
 
+function attentionPriorityLabel(value: string | null | undefined): string {
+  switch (value) {
+    case "urgent":
+      return "срочно";
+    case "today":
+      return "сегодня";
+    case "later":
+      return "позже";
+    default:
+      return "к разбору";
+  }
+}
+
 function actionNowText(input: {
   dossier: WatchDossier | null;
   latestUpdate: WatchUpdate | null;
@@ -409,23 +422,21 @@ export function MarketDetailPage() {
       {details ? (
         <section className="detail-metric-grid">
           <section className="panel">
-            <SectionHeader title="Сигнал" subtitle="Какой actionable-сигнал построен поверх последнего прогноза." />
-            {workspace?.signal ? (
+            <SectionHeader title="Внимание сейчас" subtitle="Только активные triage-объекты по этому рынку." />
+            {workspace?.active_attention_items.length ? (
               <div className="detail-stack">
-                <p className="detail-lead">{workspace.signal.thesis_summary ?? "Тезис сигнала пока не записан."}</p>
-                <ul className="attention-list">
-                  <li>Рекомендуемое действие: {actionLabel(workspace.signal.recommended_action)}</li>
-                  <li>Сила сигнала: {formatEdge(workspace.signal.signal_strength)}</li>
-                  <li>Edge: {formatEdge(workspace.signal.signal_edge ?? workspace.signal.signal_strength)}</li>
-                  <li>
-                    Зона входа: {formatPercent(workspace.signal.entry_zone_min)} -{" "}
-                    {formatPercent(workspace.signal.entry_zone_max)}
-                  </li>
-                  <li>Research: {workspace.signal.research_status ?? "нет данных"}</li>
-                </ul>
+                {workspace.active_attention_items.map((item) => (
+                  <article key={item.id} className="workspace-card">
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <p className="muted">
+                      Приоритет: {attentionPriorityLabel(item.priority)} · Действие: {item.action_label}
+                    </p>
+                  </article>
+                ))}
               </div>
             ) : (
-              <p className="muted">Сигнал по этому рынку пока не сформирован.</p>
+              <p className="muted">Сейчас по этому рынку нет открытых triage-задач.</p>
             )}
           </section>
 
@@ -493,40 +504,19 @@ export function MarketDetailPage() {
       ) : null}
 
       {details ? (
-        <details className="panel detail-disclosure">
-          <summary className="detail-disclosure__summary">Paper позиции, review и post-mortem</summary>
-          <div className="detail-disclosure__content detail-metric-grid">
-            <section className="panel panel-embedded">
-              <SectionHeader title="Shadow позиция" subtitle="Автоматическая paper-position, если сигнал прошёл правила shadow engine." />
-              {shadowPositions.length ? (
-                <div className="workspace-card-list">
-                  {shadowPositions.map((position) => (
-                    <article key={position.id} className="workspace-card">
-                      <strong>
-                        {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
-                      </strong>
-                      <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
-                      <p>Review до: {formatTimestamp(position.review_due_at)}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">Открытой shadow-позиции по рынку сейчас нет.</p>
-              )}
-            </section>
-
-            <section className="panel panel-embedded">
-              <SectionHeader title="Operator позиция" subtitle="Ручные paper-позиции оператора по этому рынку." />
-              {operatorPositions.length ? (
-                <div className="workspace-card-list">
-                  {operatorPositions.map((position) => (
-                    <article key={position.id} className="workspace-card">
-                      <strong>
-                        {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
-                      </strong>
-                      <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
-                      <p>Открыта: {formatTimestamp(position.opened_at)}</p>
-                      <p>Review до: {formatTimestamp(position.review_due_at)}</p>
+        <section className="detail-metric-grid">
+          <section className="panel">
+            <SectionHeader title="Открытые позиции" subtitle="Только то, что сейчас реально сопровождается как paper-позиция." />
+            {shadowPositions.length || operatorPositions.length ? (
+              <div className="workspace-card-list">
+                {[...operatorPositions, ...shadowPositions].map((position) => (
+                  <article key={position.id} className="workspace-card">
+                    <strong>
+                      {(position.mode === "operator" ? "Operator" : "Shadow")} {positionLabel(position.side)} по рынку {formatPercent(position.entry_yes_price)}
+                    </strong>
+                    <p>Notional: ${Math.round(position.notional_usd ?? 0).toLocaleString("ru-RU")}</p>
+                    <p>Review до: {formatTimestamp(position.review_due_at)}</p>
+                    {position.mode === "operator" ? (
                       <div className="action-bar">
                         <button
                           type="button"
@@ -537,68 +527,49 @@ export function MarketDetailPage() {
                           Закрыть позицию
                         </button>
                       </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">Открытой operator-позиции по рынку сейчас нет.</p>
-              )}
-            </section>
-
-            <section className="panel panel-embedded">
-              <SectionHeader title="Review" subtitle="Что из этого рынка уже требует пересмотра и подтверждения тезиса." />
-              {workspace?.due_reviews.length ? (
-                <div className="workspace-card-list">
-                  {workspace.due_reviews.map((review) => (
-                    <article key={review.id} className="workspace-card">
-                      <strong>{review.review_type}</strong>
-                      <p>Срок: {formatTimestamp(review.due_at)}</p>
-                      <p>{review.review_note ?? "Review без пояснения."}</p>
-                      <div className="action-bar">
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          disabled={busyAction !== null}
-                          onClick={() => void markReviewDone(review)}
-                        >
-                          Пометить review выполненным
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">Просроченных review по рынку сейчас нет.</p>
-              )}
-            </section>
-
-            {workspace?.latest_postmortem ? (
-              <section className="panel panel-embedded">
-                <SectionHeader title="Последний пост-мортем" subtitle="Короткий итог уже завершённого thesis-cycle по этому рынку." />
-                <div className="detail-stack">
-                  <p className="detail-lead">{workspace.latest_postmortem.system_note ?? "Пост-мортем без системной заметки."}</p>
-                  <ul className="attention-list">
-                    <li>Итог: {workspace.latest_postmortem.outcome_label ?? "нет данных"}</li>
-                    <li>PnL: {formatEdge(workspace.latest_postmortem.pnl_percent)}</li>
-                  </ul>
-                </div>
-              </section>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
             ) : (
-              <section className="panel panel-embedded">
-                <SectionHeader title="Post-mortem" subtitle="После закрытия позиции сюда попадёт разбор ошибки решения и итог paper-cycle." />
-                <p className="muted">По этому рынку ещё нет завершённого post-mortem.</p>
-              </section>
+              <p className="muted">Открытых paper-позиций по этому рынку сейчас нет.</p>
             )}
-          </div>
-        </details>
+          </section>
+
+          <section className="panel">
+            <SectionHeader title="Review к действию" subtitle="Что по этому рынку требует ручного подтверждения прямо сейчас." />
+            {workspace?.due_reviews.length ? (
+              <div className="workspace-card-list">
+                {workspace.due_reviews.map((review) => (
+                  <article key={review.id} className="workspace-card">
+                    <strong>{review.review_type}</strong>
+                    <p>Срок: {formatTimestamp(review.due_at)}</p>
+                    <p>{review.review_note ?? "Review без пояснения."}</p>
+                    <div className="action-bar">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        disabled={busyAction !== null}
+                        onClick={() => void markReviewDone(review)}
+                      >
+                        Пометить review выполненным
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Сейчас по рынку нет review, которые требуют ручного действия.</p>
+            )}
+          </section>
+        </section>
       ) : null}
 
       {details ? (
         <details className="panel detail-disclosure">
-          <summary className="detail-disclosure__summary">Подробный анализ и история</summary>
-          <div className="detail-disclosure__content">
-            <section className="detail-metric-grid">
-              <article className="panel panel-embedded detail-metric-card">
+          <summary className="detail-disclosure__summary">Почему Pythia так думает</summary>
+          <div className="detail-disclosure__content detail-metric-grid">
+            <article className="panel panel-embedded detail-metric-card">
                 <SectionHeader
                   title="Что думает Pythia"
                   subtitle="Короткий вывод по рынку: текущая оценка, уверенность и базовая частота."
@@ -618,9 +589,9 @@ export function MarketDetailPage() {
                       : "нет данных"}
                   </li>
                 </ul>
-              </article>
+            </article>
 
-              <article className="panel panel-embedded detail-metric-card">
+            <article className="panel panel-embedded detail-metric-card">
                 <SectionHeader
                   title="Почему расходится с рынком"
                   subtitle="Не просто цифра edge, а краткое объяснение, на чём держится расхождение."
@@ -633,8 +604,7 @@ export function MarketDetailPage() {
                   <p>{details.reasoning ?? "Обоснование пока не записано."}</p>
                   <p className="muted">Основной драйвер: {details.research.primary_driver ?? "нет данных"}</p>
                 </div>
-              </article>
-            </section>
+            </article>
 
             <section className="panel panel-embedded">
               <SectionHeader
@@ -642,7 +612,7 @@ export function MarketDetailPage() {
                 subtitle="Как менялись рынок, основной контур и baseline между прогонами."
                 tooltip={TOOLTIP_CONTENT.historyChart}
               />
-              <ProbabilityHistoryChart history={details.history} />
+                <ProbabilityHistoryChart history={details.history} />
             </section>
 
             <section className="detail-metric-grid">
@@ -661,32 +631,21 @@ export function MarketDetailPage() {
 
               <section className="panel panel-embedded">
                 <SectionHeader
-                  title="Что отслеживать дальше"
-                  subtitle="Короткий checklist после основного вывода."
+                  title="Последние watch updates"
+                  subtitle="Что уже изменялось по рынку в контуре автосопровождения."
                   tooltip={TOOLTIP_CONTENT.followUp}
                 />
-                <div className="detail-stack">
-                  <p className="detail-lead">
-                    {details.research.primary_driver ?? "Следующие сигналы помогут понять, сохраняется ли текущий тезис."}
-                  </p>
-                  <p className="muted">Основной драйвер</p>
-                  <p>{details.research.primary_driver ?? "нет данных"}</p>
-                  {!!details.research.second_order_effects?.length ? (
-                    <>
-                      <p className="muted">Вторичные эффекты</p>
-                      <ul className="attention-list">
-                        {details.research.second_order_effects.map((effect) => (
-                          <li key={effect}>{effect}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <>
-                      <p className="muted">Вторичные эффекты</p>
-                      <p className="muted">Вторичные эффекты пока не выделены.</p>
-                    </>
-                  )}
-                </div>
+                {workspace?.watch_updates.length ? (
+                  <ul className="attention-list">
+                    {workspace.watch_updates.map((item) => (
+                      <li key={item.id}>
+                        <strong>{item.status_label}</strong>: {item.reason_summary} Действие: {item.action_summary}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">По watched-рынку ещё не было значимых обновлений.</p>
+                )}
               </section>
             </section>
           </div>
@@ -695,7 +654,7 @@ export function MarketDetailPage() {
 
       {details ? (
         <details className="panel detail-disclosure">
-          <summary className="detail-disclosure__summary">Источники и исследовательская справка</summary>
+          <summary className="detail-disclosure__summary">Глубокий контекст</summary>
           <div className="detail-disclosure__content">
             <section className="detail-metric-grid">
               <section className="panel panel-embedded">
