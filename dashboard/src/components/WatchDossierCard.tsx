@@ -55,6 +55,7 @@ export function WatchDossierCard({ dossier, onRemove, onTransition, busyActionId
         </span>
       </div>
       <p className="watch-dossier-card__summary">{dossier.current_thesis_summary || "Тезис пока не сформирован."}</p>
+      {dossier.attention_title ? <strong className="watch-dossier-card__attention">{dossier.attention_title}</strong> : null}
       <p className="muted">
         Статус тезиса: {thesisStateLabel(dossier.thesis_state)} · {dossier.attention_title || dossier.last_status_label || "без изменений"}
       </p>

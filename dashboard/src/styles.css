@@ -247,6 +247,10 @@ a {
   line-height: 1.5;
 }
 
+.watch-dossier-card__attention {
+  font-size: 0.98rem;
+}
+
 .watch-dossier-card__actions {
   display: flex;
   gap: 10px;
@@ -873,9 +877,17 @@ a {
 }
 
 .detail-disclosure__summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   cursor: pointer;
   font-weight: 700;
   list-style: none;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
 }
 
 .detail-disclosure__summary::-webkit-details-marker {

@@ -189,6 +189,7 @@ export function OverviewPage() {
               subtitle="Короткая диагностика ключевых компонентов без похода в логи."
               tooltip={TOOLTIP_CONTENT.systemStatus}
             />
+            {overview.research_warning ? <p className="warning-note">{overview.research_warning}</p> : null}
             <div className="health-check-grid">
               {(health?.checks ?? []).slice(0, 4).map((check) => (
                 <article key={check.component} className="health-check-card">

@@ -146,6 +146,8 @@ export function MarketDetailPage() {
   const [confirmationCriteria, setConfirmationCriteria] = useState("");
   const [invalidationCriteria, setInvalidationCriteria] = useState("");
   const [lastPrefilledSignalId, setLastPrefilledSignalId] = useState<number | null>(null);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [deepContextOpen, setDeepContextOpen] = useState(false);
 
   const loadWorkspace = useCallback(async () => {
     if (!marketId) {
@@ -566,9 +568,16 @@ export function MarketDetailPage() {
       ) : null}
 
       {details ? (
-        <details className="panel detail-disclosure">
-          <summary className="detail-disclosure__summary">Почему Pythia так думает</summary>
-          <div className="detail-disclosure__content detail-metric-grid">
+        <section className="panel detail-disclosure">
+          <button
+            type="button"
+            className="detail-disclosure__summary"
+            onClick={() => setAnalysisOpen((current) => !current)}
+          >
+            <span>Почему Pythia так думает</span>
+            <span>{analysisOpen ? "Скрыть" : "Показать"}</span>
+          </button>
+          {analysisOpen ? <div className="detail-disclosure__content detail-metric-grid">
             <article className="panel panel-embedded detail-metric-card">
                 <SectionHeader
                   title="Что думает Pythia"
@@ -648,14 +657,21 @@ export function MarketDetailPage() {
                 )}
               </section>
             </section>
-          </div>
-        </details>
+          </div> : null}
+        </section>
       ) : null}
 
       {details ? (
-        <details className="panel detail-disclosure">
-          <summary className="detail-disclosure__summary">Глубокий контекст</summary>
-          <div className="detail-disclosure__content">
+        <section className="panel detail-disclosure">
+          <button
+            type="button"
+            className="detail-disclosure__summary"
+            onClick={() => setDeepContextOpen((current) => !current)}
+          >
+            <span>Глубокий контекст</span>
+            <span>{deepContextOpen ? "Скрыть" : "Показать"}</span>
+          </button>
+          {deepContextOpen ? <div className="detail-disclosure__content">
             <section className="detail-metric-grid">
               <section className="panel panel-embedded">
                 <SectionHeader
@@ -739,8 +755,23 @@ export function MarketDetailPage() {
                 </div>
               </section>
             </section>
+          </div> : null}
+        </section>
+      ) : null}
+
+      {details && workspace?.latest_postmortem ? (
+        <section className="panel">
+          <SectionHeader
+            title="Последний пост-мортем"
+            subtitle="Короткий итог завершённого thesis-cycle: чем закончился рынок и что стоит запомнить."
+          />
+          <div className="detail-stack">
+            <p className="detail-lead">
+              Исход: {workspace.latest_postmortem.outcome_label ?? "нет данных"} · PnL {formatEdge(workspace.latest_postmortem.pnl_percent)}
+            </p>
+            <p>{workspace.latest_postmortem.system_note ?? "Системная заметка пока не записана."}</p>
           </div>
-        </details>
+        </section>
       ) : null}
 
       <TimelinePanel history={details?.history} forecastTimestamp={details?.forecast_timestamp} endDate={details?.end_date} />
