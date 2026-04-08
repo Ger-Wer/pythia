@@ -104,6 +104,13 @@ class OverviewResponse(BaseModel):
     open_shadow_positions: int = 0
     open_operator_positions: int = 0
     due_reviews_count: int = 0
+    attention_summary: dict[str, int] = Field(default_factory=dict)
+    urgent_items: list[dict[str, Any]] = Field(default_factory=list)
+    today_items: list[dict[str, Any]] = Field(default_factory=list)
+    later_items: list[dict[str, Any]] = Field(default_factory=list)
+    watchlist_changed_count: int = 0
+    active_positions: list[dict[str, Any]] = Field(default_factory=list)
+    recent_watch_updates: list[dict[str, Any]] = Field(default_factory=list)
     latest_run: LatestRunSummary
     top_signals: list[dict[str, Any]]
     attention_items: list[dict[str, Any]] = []
@@ -171,6 +178,21 @@ class WatchUpdatesResponse(BaseModel):
     items: list[dict[str, Any]]
 
 
+class AttentionItemsResponse(BaseModel):
+    items: list[dict[str, Any]]
+
+
+class AttentionTransitionRequest(BaseModel):
+    action: Literal["start", "close", "cancel", "bump_today", "bump_later"]
+
+
+class AttentionTransitionResponse(BaseModel):
+    id: int
+    status: str
+    priority: str
+    market_id: str
+
+
 class MarketWorkspaceResponse(BaseModel):
     market: dict[str, Any]
     signal: dict[str, Any] | None = None
@@ -180,6 +202,7 @@ class MarketWorkspaceResponse(BaseModel):
     latest_postmortem: dict[str, Any] | None = None
     watch_dossier: dict[str, Any] | None = None
     watch_updates: list[dict[str, Any]] = Field(default_factory=list)
+    active_attention_items: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class OpenPositionsResponse(BaseModel):

@@ -26,16 +26,17 @@ Pythia - это приватный аналитический `decision desk` д
 - paper/shadow lifecycle без реальных ордеров;
 - отдельный `watchlist refresh` каждые 6 часов;
 - `watch dossiers` и `watch updates`;
+- `attention_items` и triage-очередь `urgent / today / later`;
+- `Сводка` как command-center baseline;
+- `Избранное` как triage-board по watched-рынкам;
 - dashboard как основной интерфейс оператора;
-- Telegram как канал alerts, `watch updates` и fallback-команд.
+- Telegram как outbound inbox для `urgent/today` attention updates и fallback-команд.
 
 ## Что еще не закончено
 
 Следующие большие куски еще впереди:
 
-- полноценный `attention engine`;
-- Telegram triage inbox;
-- command-center версия `Сводки`;
+- inbound Telegram triage;
 - decision-quality метрики поверх operator/shadow performance;
 - любой live execution через Polymarket API.
 
@@ -109,14 +110,15 @@ Polymarket Gamma API
 - `src/services/watchlist_engine.ts`
 - `python/watchlist_store.py`
 
-### 4. Operator layer
+### 4. Attention + operator layer
 
 Dashboard - главный интерфейс оператора.
 
-Telegram - канал прерываний и резервных команд.
+`attention engine` поднимает operator-facing triage-объекты из `watch updates`, `reviews` и system degradation. Dashboard показывает полную очередь внимания. Telegram рассылает только `urgent/today`.
 
 Главные файлы:
 
+- `python/attention_store.py`
 - `python/dashboard_api.py`
 - `python/dashboard_models.py`
 - `python/operator_core.py`
@@ -177,10 +179,11 @@ docker compose up -d
 
 Главная логика сейчас такая:
 
-- `Сводка` и `Главные сигналы дня` дают новые идеи;
-- `Разбор рынка` показывает состояние тезиса и следующее действие;
-- `Избранное` стало контуром сопровождения, а не списком `market_id`;
-- Telegram нужен для кратких важных alerts, а не для чтения полных разборов.
+- `Сводка` показывает очередь внимания и ближайшие действия;
+- `Сигналы` дают новые идеи;
+- `Разбор рынка` показывает состояние тезиса, triage и следующее действие;
+- `Избранное` стало triage-board контуром сопровождения, а не списком `market_id`;
+- Telegram нужен для кратких `urgent/today` alerts, а не для чтения полных разборов.
 
 Ручные команды:
 

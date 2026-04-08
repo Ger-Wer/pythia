@@ -259,6 +259,43 @@ class DashboardApiTests(unittest.TestCase):
             self.assertEqual(updates.json()["items"][0]["market_id"], "watch-99")
             self.assertEqual(updates.json()["items"][0]["status_label"], "тезис ослаб")
 
+    def test_attention_item_endpoints_allow_list_and_transition(self):
+        with temp_db() as db_path:
+            seed_prediction(
+                db_path,
+                market_id="attention-api",
+                question="Will attention API work?",
+                market_price=33.0,
+                dexter_p=48.0,
+                naked_p=41.0,
+                forecast_timestamp="2026-04-07T06:00:00Z",
+                end_date="2026-05-07T06:00:00Z",
+            )
+            seed_watch_update(
+                db_path,
+                market_id="attention-api",
+                status_label="тезис ослаб",
+                reason_summary="Рынок двинулся против тезиса.",
+                action_summary="Открыть review",
+            )
+
+            app = create_test_app(db_path)
+            client = TestClient(app)
+            client.post("/api/auth/login", json={"username": "operator", "password": "secret-pass"})
+
+            attention = client.get("/api/attention-items")
+            self.assertEqual(attention.status_code, 200)
+            self.assertGreaterEqual(len(attention.json()["items"]), 1)
+            self.assertTrue(any(item["market_id"] == "attention-api" for item in attention.json()["items"]))
+
+            item_id = next(item["id"] for item in attention.json()["items"] if item["category"] in {"watch_change", "thesis_break"})
+            transitioned = client.post(
+                f"/api/attention-items/{item_id}/transition",
+                json={"action": "start"},
+            )
+            self.assertEqual(transitioned.status_code, 200)
+            self.assertEqual(transitioned.json()["status"], "in_progress")
+
     def test_quality_endpoint_returns_complete_quality_payload(self):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pythia.db"

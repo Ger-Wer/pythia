@@ -1,5 +1,7 @@
 import type {
   ActionResponse,
+  AttentionItemsResponse,
+  AttentionTransitionResponse,
   DueReviewsResponse,
   HealthResponse,
   LatestRunResponse,
@@ -48,6 +50,17 @@ export const api = {
   watchlist: () => request<WatchlistResponse>("/api/watchlist"),
   watchlistDossiers: () => request<WatchDossiersResponse>("/api/watchlist/dossiers"),
   watchlistUpdates: () => request<WatchUpdatesResponse>("/api/watchlist/updates"),
+  attentionItems: (priority?: "urgent" | "today" | "later", status: "open" | "all" = "open") =>
+    request<AttentionItemsResponse>(
+      `/api/attention-items?${new URLSearchParams(
+        Object.fromEntries(
+          Object.entries({
+            ...(priority ? { priority } : {}),
+            status,
+          }).filter(([, value]) => value !== undefined),
+        ) as Record<string, string>,
+      ).toString()}`,
+    ),
   login: (username: string, password: string) =>
     request<{ ok: boolean }>("/api/auth/login", {
       method: "POST",
@@ -78,4 +91,9 @@ export const api = {
     }),
   removeWatchlist: (marketId: string) =>
     request<{ ok: boolean }>(`/api/watchlist/${marketId}`, { method: "DELETE" }),
+  transitionAttentionItem: (itemId: number, action: "start" | "close" | "cancel" | "bump_today" | "bump_later") =>
+    request<AttentionTransitionResponse>(`/api/attention-items/${itemId}/transition`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }),
 };

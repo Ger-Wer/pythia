@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { WatchlistPage } from "../pages/WatchlistPage";
+
+const { transitionAttentionItem, removeWatchlist } = vi.hoisted(() => ({
+  transitionAttentionItem: vi.fn().mockResolvedValue({ id: 11, status: "in_progress", priority: "today", market_id: "m1" }),
+  removeWatchlist: vi.fn().mockResolvedValue({ ok: true }),
+}));
 
 vi.mock("../api/client", () => ({
   api: {
@@ -14,6 +20,17 @@ vi.mock("../api/client", () => ({
           thesis_state: "intact",
           last_status_label: "без изменений",
           last_action_summary: "Ничего не делать.",
+          active_attention_item_id: 11,
+          attention_title: "BTC review due",
+          attention_detail: "Наступил review window по watched-рынку.",
+          attention_action_label: "Открыть review",
+          attention_priority: "today",
+          has_open_attention: true,
+          latest_change_at: "2026-04-04T12:00:00Z",
+          next_action_text: "Открыть review",
+          open_operator_positions: 1,
+          open_shadow_positions: 0,
+          has_due_review: true,
           current_market_price: 31,
           current_research_probability: 48,
           current_naked_probability: 44,
@@ -35,12 +52,14 @@ vi.mock("../api/client", () => ({
       ],
     }),
     addWatchlist: vi.fn(),
-    removeWatchlist: vi.fn(),
+    removeWatchlist,
+    transitionAttentionItem,
   },
 }));
 
 describe("WatchlistPage", () => {
-  it("renders dossier board and update feed without manual market_id entry", async () => {
+  it("renders a triage board and lets the operator start work from a dossier card", async () => {
+    const user = userEvent.setup();
     render(
       <MemoryRouter>
         <WatchlistPage />
@@ -51,9 +70,13 @@ describe("WatchlistPage", () => {
     expect(links.length).toBeGreaterThan(0);
 
     expect(screen.queryByLabelText("market_id")).not.toBeInTheDocument();
-    expect(screen.getByText("Следить до следующего weekly.")).toBeInTheDocument();
-    expect(screen.getByText("без изменений")).toBeInTheDocument();
-    expect(screen.getByText("тезис ослаб")).toBeInTheDocument();
+    expect(screen.getByText("Требует действия сейчас")).toBeInTheDocument();
+    expect(screen.getByText("Под наблюдением, без изменений")).toBeInTheDocument();
+    expect(screen.getByText("Недавние изменения")).toBeInTheDocument();
+    expect(screen.getByText("BTC review due")).toBeInTheDocument();
     expect(screen.getByText("Открыть review")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "В работу" }));
+    expect(transitionAttentionItem).toHaveBeenCalledWith(11, "start");
   });
 });

@@ -20,6 +20,15 @@ from python.decision_store import (
     list_due_reviews as load_due_reviews,
     list_open_positions as load_open_positions,
 )
+from python.attention_store import (
+    ensure_attention_engine_schema,
+    enrich_dossiers_with_attention,
+    get_attention_summary,
+    list_active_attention_for_market,
+    list_attention_items as load_attention_items,
+    sync_attention_items,
+    transition_attention_item as apply_attention_transition,
+)
 from python.quality_metrics import load_quality_snapshot
 from python.watchlist_store import (
     bootstrap_watch_dossier,
@@ -35,6 +44,7 @@ SAFE_ACTION_NAMES = {"forecast", "resolve", "weekly"}
 LLM_PROVIDER_ENV_KEYS = ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY")
 DECISION_CORE_TABLES = ("signals", "books", "decisions", "positions", "position_events", "reviews", "postmortems")
 WATCHLIST_ENGINE_TABLES = ("watch_dossiers", "watch_refresh_runs", "watch_refresh_snapshots", "watch_updates")
+ATTENTION_ENGINE_TABLES = ("attention_items", "attention_item_events")
 
 
 class OperatorCore:
@@ -67,6 +77,25 @@ class OperatorCore:
 
     def _watchlist_engine_exists(self, conn: sqlite3.Connection) -> bool:
         return all(self._table_exists(conn, table_name) for table_name in WATCHLIST_ENGINE_TABLES)
+
+    def _attention_engine_exists(self, conn: sqlite3.Connection) -> bool:
+        return all(self._table_exists(conn, table_name) for table_name in ATTENTION_ENGINE_TABLES)
+
+    def _sync_attention_engine(self, *, health: dict[str, Any] | None = None) -> dict[str, int]:
+        current_health = health or self.get_health()
+        try:
+            with self._connect_rw() as conn:
+                ensure_attention_engine_schema(conn)
+                summary = sync_attention_items(
+                    conn,
+                    system_status=str(current_health["system_status"]),
+                    research_status=str(current_health["research_status"]),
+                    research_warning=str(current_health["research_warning"]),
+                )
+                conn.commit()
+                return summary
+        except sqlite3.Error:
+            return {"urgent": 0, "today": 0, "later": 0, "open_total": 0}
 
     def predictions_table_exists(self) -> bool:
         with self._connect() as conn:
@@ -368,6 +397,13 @@ class OperatorCore:
                     },
                     "top_signals": [],
                     "attention_items": [],
+                    "attention_summary": {"urgent": 0, "today": 0, "later": 0, "open_total": 0},
+                    "urgent_items": [],
+                    "today_items": [],
+                    "later_items": [],
+                    "watchlist_changed_count": 0,
+                    "active_positions": [],
+                    "recent_watch_updates": [],
                     "daily_digest": {
                         "headline": "Сегодня Pythia пока не видит сильных сигналов в последнем прогоне.",
                         "summary": "Сначала стоит запустить новый прогон, чтобы появились рынки для ручной проверки.",
@@ -407,25 +443,17 @@ class OperatorCore:
         overview_research_status = health["research_status"]
         if any(item.get("research_probability") is not None for item in latest_run["items"]):
             overview_research_status = "ON"
+        self._sync_attention_engine(health=health)
+        with self._connect() as conn:
+            attention_summary = get_attention_summary(conn) if self._attention_engine_exists(conn) else {"urgent": 0, "today": 0, "later": 0, "open_total": 0}
+            urgent_items = load_attention_items(conn, priority="urgent", status="open", limit=5) if self._attention_engine_exists(conn) else []
+            today_items = load_attention_items(conn, priority="today", status="open", limit=5) if self._attention_engine_exists(conn) else []
+            later_items = load_attention_items(conn, priority="later", status="open", limit=5) if self._attention_engine_exists(conn) else []
+            recent_watch_updates = load_watch_updates(conn, limit=5) if self._watchlist_engine_exists(conn) else []
+            active_positions = load_open_positions(conn)[:5] if all(self._table_exists(conn, name) for name in ("positions", "books")) else []
 
-        attention_items: list[dict[str, Any]] = []
-        if health["research_warning"]:
-            attention_items.append(
-                self._attention_item(
-                    "Research-слой требует внимания",
-                    health["research_warning"],
-                    action_label="Проверить статус",
-                )
-            )
-        if latest_ts is None or markets_processed == 0:
-            attention_items.append(
-                self._attention_item(
-                    "Нет свежего прогноза",
-                    "Последний forecast ещё не сформировал рабочую картину. Запустите прогнозный прогон.",
-                    action_label="Запустить прогноз",
-                )
-            )
-        elif top_signals:
+        attention_items = (urgent_items + today_items + later_items)[:3]
+        if not attention_items and top_signals:
             top_signal = top_signals[0]
             top_signal_edge = top_signal.get("edge")
             if top_signal_edge is None:
@@ -434,24 +462,19 @@ class OperatorCore:
                 edge_detail = f"расхождение {float(top_signal_edge):+.1f} п.п."
             attention_items.append(
                 self._attention_item(
-                    "Главный сигнал сейчас",
+                    "Следующий рынок для разбора",
                     f"{top_signal['question']} · {edge_detail}",
                     market_id=top_signal["market_id"],
                     action_label="Открыть разбор",
                 )
             )
-        if watchlist_count == 0 and top_signals:
-            attention_items.append(
-                self._attention_item(
-                    "Избранное пока пусто",
-                    "Добавьте хотя бы один рынок в избранное, чтобы быстро вернуться к нему после следующего прогона.",
-                    market_id=top_signals[0]["market_id"],
-                    action_label="Добавить в избранное",
-                )
-            )
 
         next_step = "Проверьте здоровье системы и запустите первый прогноз."
-        if top_signals:
+        if urgent_items:
+            next_step = "Сначала разберите срочные изменения по watched-рынкам и открытым позициям."
+        elif today_items:
+            next_step = "Закройте задачи на сегодня: review и заметные изменения по избранному."
+        elif top_signals:
             next_step = "Откройте главный сигнал и решите, добавлять ли его в избранное."
         elif latest_ts:
             next_step = "Откройте раздел «Сигналы» и проверьте, появились ли рынки для разбора."
@@ -469,6 +492,13 @@ class OperatorCore:
             "open_shadow_positions": decision_counts["open_shadow_positions"],
             "open_operator_positions": decision_counts["open_operator_positions"],
             "due_reviews_count": decision_counts["due_reviews_count"],
+            "attention_summary": attention_summary,
+            "urgent_items": urgent_items,
+            "today_items": today_items,
+            "later_items": later_items,
+            "watchlist_changed_count": attention_summary["urgent"] + attention_summary["today"] + attention_summary["later"],
+            "active_positions": active_positions,
+            "recent_watch_updates": recent_watch_updates,
             "latest_run": {
                 "forecast_timestamp": latest_ts,
                 "markets_processed": markets_processed,
@@ -492,10 +522,13 @@ class OperatorCore:
     def get_market_workspace(self, market_id: str) -> dict[str, Any]:
         market = self.get_market_details(market_id)
         self._ensure_decision_core_schema_rw()
+        health = self.get_health()
+        self._sync_attention_engine(health=health)
         with self._connect() as conn:
             workspace = load_market_workspace(conn, market_id)
             watch_dossier = load_watch_dossier(conn, market_id)
             watch_updates = load_watch_updates_for_market(conn, market_id, limit=5)
+            active_attention_items = list_active_attention_for_market(conn, market_id) if self._attention_engine_exists(conn) else []
         return {
             "market": market,
             "signal": workspace["signal"],
@@ -505,6 +538,7 @@ class OperatorCore:
             "latest_postmortem": workspace["latest_postmortem"],
             "watch_dossier": watch_dossier,
             "watch_updates": watch_updates,
+            "active_attention_items": active_attention_items,
         }
 
     def list_open_positions(self) -> list[dict[str, Any]]:
@@ -548,7 +582,15 @@ class OperatorCore:
 
     def complete_review(self, review_id: int, note: str = "") -> dict[str, Any]:
         with self._connect_rw() as conn:
-            return complete_review(conn, review_id, note)
+            result = complete_review(conn, review_id, note)
+            sync_attention_items(
+                conn,
+                system_status=str(self.get_health()["system_status"]),
+                research_status=str(self.get_health()["research_status"]),
+                research_warning=str(self.get_health()["research_warning"]),
+            )
+            conn.commit()
+            return result
 
     def get_market_details(self, market_id: str) -> dict[str, Any]:
         with self._connect() as conn:
@@ -1011,16 +1053,36 @@ class OperatorCore:
             conn.commit()
 
     def list_watch_dossiers(self) -> list[dict[str, Any]]:
+        self._sync_attention_engine()
         with self._connect() as conn:
             if not self._watchlist_engine_exists(conn):
                 return []
-            return load_watch_dossiers(conn)
+            return enrich_dossiers_with_attention(conn, load_watch_dossiers(conn))
 
     def list_watch_updates(self, limit: int = 20) -> list[dict[str, Any]]:
         with self._connect() as conn:
             if not self._watchlist_engine_exists(conn):
                 return []
             return load_watch_updates(conn, limit=limit)
+
+    def list_attention_items(self, *, priority: str | None = None, status: str = "open") -> list[dict[str, Any]]:
+        self._sync_attention_engine()
+        with self._connect() as conn:
+            if not self._attention_engine_exists(conn):
+                return []
+            return load_attention_items(conn, priority=priority, status=status, limit=50)
+
+    def transition_attention_item(self, item_id: int, action: str) -> dict[str, Any]:
+        with self._connect_rw() as conn:
+            ensure_attention_engine_schema(conn)
+            result = apply_attention_transition(conn, item_id, action)
+            conn.commit()
+            return {
+                "id": int(result["id"]),
+                "status": str(result["status"]),
+                "priority": str(result["priority"]),
+                "market_id": str(result["market_id"]),
+            }
 
     def run_safe_action(self, action: str) -> dict[str, Any]:
         if action not in SAFE_ACTION_NAMES:

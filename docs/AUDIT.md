@@ -12,14 +12,16 @@ Pythia сейчас - это рабочая Docker-first система прог
 - `Research+R1` и `Naked R1`;
 - `decision core` для paper/shadow lifecycle;
 - `autonomous watchlist engine`;
+- `attention engine` foundation;
 - dashboard как основной интерфейс;
-- Telegram как канал alerts и fallback-команд.
+- Telegram как outbound inbox и fallback-команд.
 
 В production пока нет:
 
 - live trading;
 - хранения реальных trading-ключей;
-- полноценного `attention engine`.
+- inbound Telegram triage;
+- decision-quality dashboard поверх `operator vs shadow`.
 
 ## 2. Назначение системы
 
@@ -84,7 +86,17 @@ Pythia помогает оператору:
 - monitoring mode
 - deep review по триггерам
 - `watch updates`
-- Telegram delivery для `watch updates`
+- Telegram delivery для operator-facing updates
+
+### Attention engine
+
+Отвечает за:
+
+- `attention_items`
+- приоритеты `urgent / today / later`
+- дедупликацию operator attention по watched-рынкам
+- command-center read-model для dashboard
+- Telegram outbound inbox для `urgent/today`
 
 ### Operator layer
 
@@ -134,22 +146,20 @@ Pythia помогает оператору:
 
 Есть:
 
-- `Сводка`
+- `Сводка` как command-center baseline
 - `Качество`
 - `Сигналы`
 - dossier-first `Разбор рынка`
-- `Избранное` как board по `watch dossiers`
+- `Избранное` как triage-board по `watch dossiers`
 - `Действия`
 
 ## 6. Что еще не завершено
 
 Следующие части еще находятся в roadmap:
 
-- `attention_item` как единая сущность внимания;
-- Telegram triage inbox;
-- `Сводка` как полноценный command center;
 - decision-quality метрики поверх `operator vs shadow`;
-- более сильный command workflow вокруг `Избранного`.
+- inbound Telegram triage;
+- более сильный weekly/discipline workflow вокруг `Избранного`.
 
 ## 7. Роль LLM и news API
 
@@ -166,8 +176,8 @@ News API используются для поиска новых значимы�
 
 Текущее разделение ролей такое:
 
-- dashboard - главное рабочее место оператора;
-- Telegram - alerts, `watch updates`, fallback-команды.
+- dashboard - source of truth для triage;
+- Telegram - outbound inbox для `urgent/today`, плюс fallback-команды.
 
 Это уже реализовано в production и соответствует текущей продуктовой модели.
 
@@ -175,8 +185,7 @@ News API используются для поиска новых значимы�
 
 - live execution нет;
 - реальных trading-ключей в системе нет;
-- `attention engine` еще не построен;
-- operator UX еще не доведен до финальной command-center формы;
+- operator UX уже переведен в command-center baseline, но еще не доведен до финальной формы;
 - quality layer по решениям слабее quality layer по прогнозам.
 
 ## 10. Текущий статус по качеству продукта
@@ -187,7 +196,7 @@ News API используются для поиска новых значимы�
 
 - back-end контуры уже сильнее, чем UX;
 - операторский workflow еще можно заметно упростить;
-- следующий главный шаг - превратить `Сводку` и `Избранное` в настоящий command workflow.
+- следующий главный шаг - decision-quality слой и weekly operator discipline loop.
 
 ## 11. Source of truth
 

@@ -92,6 +92,21 @@ function workspacePayload(overrides: Record<string, unknown> = {}) {
     due_reviews: [],
     recent_decisions: [],
     latest_postmortem: null,
+    active_attention_items: [
+      {
+        id: 91,
+        market_id: "572833",
+        category: "watch_change",
+        priority: "today",
+        status: "new",
+        title: "Wolves review due",
+        detail: "Рынок чуть сдвинулся против тезиса, но идея пока жива.",
+        action_label: "Открыть review",
+        created_at: "2026-04-05T09:00:00.000Z",
+        updated_at: "2026-04-05T09:00:00.000Z",
+        source_type: "watch_update",
+      },
+    ],
     watch_dossier: {
       id: 12,
       market_id: "572833",
@@ -173,7 +188,7 @@ describe("MarketDetailPage", () => {
     });
   });
 
-  it("renders a dossier-first market workspace with a watch action", async () => {
+  it("renders a decision workspace with urgent attention first and deep context hidden by default", async () => {
     const user = userEvent.setup();
 
     render(
@@ -189,14 +204,16 @@ describe("MarketDetailPage", () => {
     expect(screen.getByText("Состояние тезиса")).toBeInTheDocument();
     expect(screen.getByText("Последнее изменение")).toBeInTheDocument();
     expect(screen.getByText("Что делать сейчас")).toBeInTheDocument();
-    expect(screen.getByText("Сигнал")).toBeInTheDocument();
+    expect(screen.getByText("Внимание сейчас")).toBeInTheDocument();
+    expect(screen.getByText("Открытые позиции")).toBeInTheDocument();
+    expect(screen.getByText("Review к действию")).toBeInTheDocument();
     expect(screen.getByText("Моё решение")).toBeInTheDocument();
-    expect(screen.getByText("тезис ослаб (важно)")).toBeInTheDocument();
+    expect(screen.getByText("Wolves review due")).toBeInTheDocument();
     expect(screen.getByText("Открыть разбор и проверить позицию.")).toBeInTheDocument();
     expect(screen.getByText("Автосопровождение считает, что тезис по Wolves остаётся живым, но требует внимания.")).toBeInTheDocument();
-    expect(screen.getByText("Подробный анализ и история")).toBeInTheDocument();
-    expect(screen.getAllByText("Источники и исследовательская справка").length).toBeGreaterThan(0);
-    expect(screen.getByText("Paper позиции, review и post-mortem")).toBeInTheDocument();
+    expect(screen.getByText("Почему Pythia так думает")).toBeInTheDocument();
+    expect(screen.getByText("Глубокий контекст")).toBeInTheDocument();
+    expect(screen.queryByText("Источники и исследовательская справка")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Добавить в избранное" }));
 
@@ -227,7 +244,7 @@ describe("MarketDetailPage", () => {
     expect(await screen.findByText("Состояние тезиса")).toBeInTheDocument();
 
     expect(screen.getByText("Не удалось загрузить статус избранного. Разбор доступен без него.")).toBeInTheDocument();
-    await user.click(screen.getByText("Подробный анализ и история"));
+    await user.click(screen.getByText("Почему Pythia так думает"));
     expect(screen.getByText("Объём рынка: $0")).toBeInTheDocument();
   });
 
@@ -259,7 +276,7 @@ describe("MarketDetailPage", () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText("Состояние тезиса")).toBeInTheDocument();
-    await user.click(screen.getAllByText("Источники и исследовательская справка")[0]);
+    await user.click(screen.getByText("Глубокий контекст"));
 
     const link = screen.getByRole("link", { name: "exa.ai / library / sports / premier-league — 2025-05-25" });
     expect(link).toHaveAttribute(
@@ -374,7 +391,7 @@ describe("MarketDetailPage", () => {
     });
 
     expect(await screen.findByText("Открыта operator paper position: YES по рынку 53.0%.")).toBeInTheDocument();
-    await user.click(screen.getByText("Paper позиции, review и post-mortem"));
+    await user.click(screen.getByText("Почему Pythia так думает"));
 
     await user.click(screen.getByRole("button", { name: "Пометить review выполненным" }));
     await waitFor(() => {

@@ -10,7 +10,7 @@
 
 ## Система в одном абзаце
 
-Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, а затем отдельно сопровождает выбранные рынки через `watchlist engine`. Dashboard - главный интерфейс оператора. Telegram - канал alerts и fallback-команд.
+Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, отдельно сопровождает выбранные рынки через `watchlist engine`, а затем поднимает operator-facing triage-очередь через `attention engine`. Dashboard - главный интерфейс оператора. Telegram - outbound inbox и fallback-команды.
 
 ## Главные runtime-контуры
 
@@ -82,12 +82,19 @@ Pythia - это Docker-first `decision desk` для Polymarket. Она кажд�
 
 Задача:
 
+- строить `attention_items` поверх watched-рынков, due reviews и system degradation;
 - отдавать данные для dashboard;
 - обеспечивать whitelisted operator actions;
-- отправлять Telegram alerts и updates.
+- отправлять в Telegram только `urgent/today` inbox-элементы.
+
+Сущности:
+
+- `attention_items`
+- `attention_item_events`
 
 Основные файлы:
 
+- `python/attention_store.py`
 - `python/dashboard_api.py`
 - `python/dashboard_models.py`
 - `python/operator_core.py`
@@ -109,7 +116,7 @@ Polymarket -> market selection -> research -> synthesis -> predictions
 ```text
 watch dossier -> current market snapshot -> monitoring mode
               -> optional deep review -> watch update
-              -> dashboard + Telegram watch alert
+              -> attention item -> dashboard + Telegram inbox alert
 ```
 
 ### Resolution flow
@@ -139,18 +146,17 @@ resolved market -> update prediction outcome -> close paper positions
 
 Что уже есть:
 
-- `Сводка`
+- `Сводка` как command-center baseline
 - `Качество`
 - `Сигналы`
 - dossier-first `Разбор рынка`
-- `Избранное` как board по `watch dossiers`
+- `Избранное` как triage-board по `watch dossiers`
 - `Действия`
+- `attention_items` с triage-переходами в dashboard
 
 Что еще впереди:
 
-- `Сводка` как настоящий command center;
-- `attention items`;
-- Telegram triage inbox;
+- inbound Telegram triage;
 - еще более короткий operator workflow.
 
 ## Deployment topology
@@ -187,4 +193,4 @@ Production живет на `amper`.
 - не является автотрейдером;
 - не открывает публичный backend без авторизации.
 
-Это важно для чтения кода: если вы видите в roadmap разговоры про `attention engine` или более глубокую автоматизацию, это еще не production reality.
+Это важно для чтения кода: foundation `attention engine` уже в production, но inbound Telegram triage, decision-quality слой и любая live execution-автоматизация еще не production reality.

@@ -44,16 +44,18 @@
 - `Phase 0` завершена
 - `Phase 1` завершена
 - `Phase 2` реализована в baseline-варианте и уже в production
-- `Phase 3` начата частично через dossier-first UX, но не завершена
-- `Phase 4+` еще впереди
+- `Phase 3A` реализована как command-center foundation и уже в production
+- `Phase 4A` реализована как attention-engine foundation и уже в production
+- `Phase 5+` еще впереди
 
 Коротко:
 
 - forecast работает;
 - decision core работает;
 - autonomous watchlist engine уже в production;
-- operator UX еще нужно упростить и довести до command-center модели;
-- attention engine и decision-quality layer еще не построены.
+- operator UX уже переведен в command-center baseline, но еще не доведен до финальной daily-desk формы;
+- attention engine foundation уже построен;
+- decision-quality layer еще не построен.
 
 ## Уже доставлено в production
 
@@ -97,24 +99,36 @@
 - [x] `Качество`
 - [x] `Главные сигналы дня`
 - [x] dossier-first `Разбор рынка`
-- [x] `Избранное` как board по `watch dossier`
+- [x] `Избранное` как triage-board по `watch dossier`
+- [x] `Сводка` как command-center baseline
 - [x] tooltip/glossary слой
+
+### Attention engine
+
+- [x] `attention_items`
+- [x] `attention_item_events`
+- [x] статусы `urgent / today / later / in_progress / closed`
+- [x] dashboard triage transitions
+- [x] Telegram outbound inbox для `urgent/today`
 
 ## Что еще не закончено
 
 ### Product / UX
 
-- [ ] `Сводка` как полноценный command center
-- [ ] `Избранное` как главный рабочий экран сопровождения
+- [x] `Сводка` как command-center baseline
+- [x] `Избранное` как главный рабочий экран сопровождения
+- [x] отделить "сейчас важно" от "полезно для глубокой проверки"
 - [ ] еще сильнее сократить шум в `Разборе рынка`
-- [ ] отделить "сейчас важно" от "полезно для глубокой проверки"
+- [ ] weekly workflow поверх command center
 
 ### Alerting / attention
 
-- [ ] сущность `attention_item`
-- [ ] статусы `urgent / today / later / in_progress / closed`
-- [ ] Telegram triage inbox
-- [ ] связка `attention item -> dashboard workspace`
+- [x] сущность `attention_item`
+- [x] статусы `urgent / today / later / in_progress / closed`
+- [x] связка `attention item -> dashboard workspace`
+- [x] outbound Telegram inbox
+- [ ] inbound Telegram triage
+- [ ] единый дневной digest по attention queue
 
 ### Quality / validation
 
@@ -172,24 +186,25 @@
 - [x] deep review triggers
 - [x] watch updates
 - [x] Telegram delivery
-- [ ] attention items
+- [x] attention items foundation
 
 ### Phase 3 — Operator Workflow Redesign
 
-- [ ] `Сводка` как command center
-- [ ] `Избранное` как основной рабочий экран
+- [x] `Сводка` как command-center baseline
+- [x] `Избранное` как основной рабочий экран
 - [ ] оператор видит только:
-  - [ ] что изменилось
-  - [ ] почему это важно
-  - [ ] что делать
-  - [ ] когда review
-- [ ] тяжелые факты и источники по умолчанию спрятаны во второй слой
+  - [x] что изменилось
+  - [x] почему это важно
+  - [x] что делать
+  - [x] когда review
+- [x] тяжелые факты и источники по умолчанию спрятаны во второй слой
 
 ### Phase 4 — Attention Engine + Telegram Inbox
 
-- [ ] единый `attention_item`
-- [ ] приоритизация alerts
-- [ ] Telegram triage flow
+- [x] единый `attention_item`
+- [x] приоритизация alerts
+- [x] outbound Telegram inbox
+- [ ] inbound Telegram triage flow
 - [ ] единый дневной digest
 
 ### Phase 5 — Decision Quality Layer
@@ -224,14 +239,14 @@
 
 Самая важная следующая задача сейчас:
 
-- [ ] довести operator UX от "умной панели" до "command center"
+- [ ] построить decision-quality слой поверх текущего command-center и attention engine
 
 Практически это означает:
 
-- `Сводка` должна стать экраном принятия решений;
-- `Избранное` должно стать рабочей доской сопровождения;
-- operator должен тратить меньше времени на чтение и больше - на осмысленные решения;
-- attention layer должен поднять только действительно важные изменения.
+- считать `operator vs shadow`;
+- считать review discipline;
+- делать weekly decision review;
+- использовать накопленный dataset для ranking/prompts/heuristics.
 
 ## Критерии того, что мы движемся правильно
 

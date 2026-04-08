@@ -11,10 +11,15 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+from python.attention_store import (
+    ensure_attention_engine_schema,
+    list_pending_attention_items,
+    mark_attention_items_delivered,
+    sync_attention_items,
+)
+from python.operator_core import OperatorCore
 from python.watchlist_store import (
     ensure_watchlist_engine_schema,
-    list_pending_watch_updates,
-    mark_watch_updates_delivered,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -174,10 +179,19 @@ def watch_updates(limit: int = 10):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     ensure_watchlist_engine_schema(conn)
-    pending = list_pending_watch_updates(conn, limit=limit)
+    ensure_attention_engine_schema(conn)
+    health = OperatorCore(DB_PATH, LOG_DIR).get_health()
+    sync_attention_items(
+        conn,
+        system_status=str(health["system_status"]),
+        research_status=str(health["research_status"]),
+        research_warning=str(health["research_warning"]),
+    )
+    conn.commit()
+    pending = list_pending_attention_items(conn, limit=limit)
     if not pending:
         conn.close()
-        print("Нет новых watchlist updates для Telegram.")
+        print("Нет новых attention updates для Telegram.")
         return
 
     delivered_ids: list[int] = []
@@ -187,11 +201,11 @@ def watch_updates(limit: int = 10):
         sent = send_message(
             "\n".join(
                 [
-                    "👀 *Watchlist update*",
+                    "📬 *Pythia inbox*",
                     f"Рынок: {item.get('question') or item.get('market_id')}",
-                    f"Статус: {item.get('status_label')}",
-                    f"Почему: {item.get('reason_summary')}",
-                    f"Действие: {item.get('action_summary')}",
+                    f"Статус: {item.get('title')}",
+                    f"Почему: {item.get('detail')}",
+                    f"Действие: {item.get('action_label')}",
                     *( [f"Открыть разбор: {market_link}"] if market_link else [] ),
                 ]
             )
@@ -200,7 +214,8 @@ def watch_updates(limit: int = 10):
             delivered_ids.append(int(item["id"]))
 
     if delivered_ids:
-        mark_watch_updates_delivered(conn, delivered_ids)
+        mark_attention_items_delivered(conn, delivered_ids)
+        conn.commit()
     conn.close()
 
 

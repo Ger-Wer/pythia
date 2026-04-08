@@ -3,12 +3,10 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ActionSummaryCard } from "../components/ActionSummaryCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { DailyDigestCard } from "../components/DailyDigestCard";
 import { KpiCard } from "../components/KpiCard";
 import { SectionHeader } from "../components/SectionHeader";
-import { SignalList } from "../components/SignalList";
 import { StatusPills } from "../components/StatusPills";
-import type { ActionResponse, HealthResponse, OverviewResponse } from "../types/api";
+import type { ActionResponse, AttentionItem, HealthResponse, OverviewResponse } from "../types/api";
 import { TOOLTIP_CONTENT } from "../content/tooltips";
 import { formatTimestamp } from "../utils/format";
 
@@ -70,9 +68,31 @@ export function OverviewPage() {
     }
   }
 
-  const topSignals = overview?.top_signals.slice(0, 3) ?? [];
-  const attentionItems = overview?.attention_items ?? [];
   const displayedAction = lastAction ?? overview?.last_action ?? null;
+
+  function renderAttentionSection(title: string, items: AttentionItem[], emptyText: string) {
+    return (
+      <section className="panel">
+        <SectionHeader title={title} subtitle="Короткие triage-объекты: что изменилось, почему это важно и куда идти дальше." />
+        {items.length ? (
+          <div className="attention-card-grid">
+            {items.map((item) => (
+              <article key={item.id} className="attention-card">
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
+                <p className="muted">Действие: {item.action_label}</p>
+                <Link to={`/markets/${item.market_id}`} className="ghost-btn">
+                  Открыть разбор
+                </Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">{emptyText}</p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <main className="page-grid">
@@ -92,6 +112,7 @@ export function OverviewPage() {
           <div className="overview-hero-meta">
             <span>Последний прогон: {formatTimestamp(overview.latest_run.forecast_timestamp)}</span>
             <span>Обработано рынков: {overview.latest_run.markets_processed}</span>
+            <span>Открыто triage-задач: {overview.attention_summary.open_total}</span>
           </div>
         ) : null}
       </section>
@@ -105,33 +126,60 @@ export function OverviewPage() {
             />
             <p className="detail-lead">{overview.next_step}</p>
           </section>
+          {overview.attention_summary.open_total === 0 ? (
+            <section className="panel">
+              <SectionHeader title="Очередь внимания" subtitle="Сейчас у watched-рынков и открытых позиций нет активных вмешательств." />
+              <p className="muted">Сейчас нет активных вмешательств. Можно смотреть новые сигналы или просто ждать следующего refresh.</p>
+            </section>
+          ) : null}
 
-          {overview.daily_digest ? <DailyDigestCard digest={overview.daily_digest} /> : null}
+          {renderAttentionSection("Срочно", overview.urgent_items, "Срочных вмешательств сейчас нет.")}
+          {renderAttentionSection("Сегодня", overview.today_items, "Сегодня нет обязательных ручных шагов.")}
+          {renderAttentionSection("Можно позже", overview.later_items, "Поздних triage-задач сейчас нет.")}
 
           <section className="panel">
-            <SectionHeader
-              title="Что требует внимания"
-              subtitle="Короткие выводы без похода по разделам."
-              tooltip={TOOLTIP_CONTENT.attention}
-            />
-            {attentionItems.length ? (
+            <SectionHeader title="Активные позиции" subtitle="Открытые paper-позиции, к которым стоит вернуться до следующего прогона." />
+            {overview.active_positions.length ? (
               <div className="attention-card-grid">
-                {attentionItems.map((item) => (
-                  <article key={`${item.title}-${item.market_id ?? item.detail}`} className="attention-card">
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
-                    {item.market_id ? (
-                      <Link to={`/markets/${item.market_id}`} className="ghost-btn">
-                        {item.action_label ?? "Открыть разбор"}
-                      </Link>
-                    ) : item.action_label ? (
-                      <span className="muted">{item.action_label}</span>
-                    ) : null}
+                {overview.active_positions.map((position) => (
+                  <article key={position.id} className="attention-card">
+                    <strong>{position.question || position.market_id}</strong>
+                    <p>
+                      {position.mode === "operator" ? "Operator" : "Shadow"} {position.side?.toUpperCase()} · вход{" "}
+                      {position.entry_yes_price ?? "N/A"}%
+                    </p>
+                    <p className="muted">Review до: {formatTimestamp(position.review_due_at)}</p>
+                    <Link to={`/markets/${position.market_id}`} className="ghost-btn">
+                      Открыть разбор
+                    </Link>
                   </article>
                 ))}
               </div>
             ) : (
-              <p className="muted">Сильных поводов для вмешательства сейчас нет.</p>
+              <p className="muted">Открытых paper-позиций сейчас нет.</p>
+            )}
+          </section>
+
+          <section className="panel">
+            <SectionHeader
+              title="Последние изменения в watchlist"
+              subtitle="Сжатая лента последних существенных изменений по сопровождаемым рынкам."
+            />
+            {overview.recent_watch_updates.length ? (
+              <ul className="watch-update-feed">
+                {overview.recent_watch_updates.map((item) => (
+                  <li key={item.id}>
+                    <div className="watch-update-feed__row">
+                      <Link to={`/markets/${item.market_id}`}>{item.question || item.market_id}</Link>
+                      <span className="pill warn">{item.status_label}</span>
+                    </div>
+                    <p className="muted">{item.reason_summary}</p>
+                    <p className="watch-update-feed__action">{item.action_summary}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">По watched-рынкам пока не было новых значимых изменений.</p>
             )}
           </section>
 
@@ -141,6 +189,7 @@ export function OverviewPage() {
               subtitle="Короткая диагностика ключевых компонентов без похода в логи."
               tooltip={TOOLTIP_CONTENT.systemStatus}
             />
+            {overview.research_warning ? <p className="warning-note">{overview.research_warning}</p> : null}
             <div className="health-check-grid">
               {(health?.checks ?? []).slice(0, 4).map((check) => (
                 <article key={check.component} className="health-check-card">
@@ -216,16 +265,6 @@ export function OverviewPage() {
           </section>
 
           {displayedAction ? <ActionSummaryCard action={displayedAction} tooltip={TOOLTIP_CONTENT.lastAction} /> : null}
-
-          <section className="panel">
-            <SectionHeader
-              title="Сильные сигналы"
-              subtitle="Начните отсюда, если хотите быстро понять, где Pythia расходится с рынком."
-              tooltip={TOOLTIP_CONTENT.strongSignals}
-            />
-            {overview.research_warning ? <p className="warning-note">{overview.research_warning}</p> : null}
-            <SignalList items={topSignals} />
-          </section>
         </>
       ) : null}
       <ConfirmDialog
