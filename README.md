@@ -1,120 +1,198 @@
 # Pythia
 
-Pythia - это автономный аналитический decision desk для Polymarket. Она ежедневно ищет новые сильные рынки, ведёт decision journal и paper/shadow-позиции, а для рынков из `Избранного` запускает отдельный `watchlist refresh`, который сам отслеживает изменения тезиса, новостей и цены и поднимает оператору только важные апдейты.
+Дата актуализации: 2026-04-08
 
-## Архитектура
+Pythia - это приватный аналитический `decision desk` для Polymarket. Система ежедневно ищет новые сильные рынки, строит прогнозы, ведет `decision journal` и paper/shadow-позиции, а для рынков из `Избранного` запускает отдельный `watchlist refresh`, который сам отслеживает изменения тезиса, цены и новостей и поднимает оператору только важные обновления.
+
+## Что важно понять сразу
+
+Если вы новый разработчик, начните с трех фактов:
+
+1. `Pythia` уже не просто forecast-пайплайн. Сейчас это связка `forecast stack + decision core + autonomous watchlist engine + dashboard + Telegram`.
+2. В production пока нет live-trading. Система работает в paper/shadow режиме и копит валидный decision dataset.
+3. Главная цель проекта - не "писать reasoning от LLM", а уменьшать когнитивную нагрузку оператора и улучшать качество решений на реальных данных Polymarket.
+
+## Что уже реально работает в production
+
+- daily `forecast` на всем рынке Polymarket;
+- `Research+R1` и `Naked R1`;
+- отбор рынков с дедупликацией и diversity constraints;
+- `decision core`:
+  - `signals`
+  - `decisions`
+  - `positions`
+  - `reviews`
+  - `postmortems`
+- paper/shadow lifecycle без реальных ордеров;
+- отдельный `watchlist refresh` каждые 6 часов;
+- `watch dossiers` и `watch updates`;
+- dashboard как основной интерфейс оператора;
+- Telegram как канал alerts, `watch updates` и fallback-команд.
+
+## Что еще не закончено
+
+Следующие большие куски еще впереди:
+
+- полноценный `attention engine`;
+- Telegram triage inbox;
+- command-center версия `Сводки`;
+- decision-quality метрики поверх operator/shadow performance;
+- любой live execution через Polymarket API.
+
+Это важно: если в старых design-docs что-то выглядит "готовым", а в этом README или `WORKSTREAM` это отмечено как будущее, верить нужно текущему `WORKSTREAM`.
+
+## Как система устроена сейчас
 
 ```text
 Polymarket Gamma API
   -> daily forecast
   -> Research+R1 / Naked R1
   -> predictions + signals
-  -> decision journal + paper/shadow positions
+  -> decision core
   -> autonomous watchlist engine
-  -> SQLite + логи + Brier/PnL
-  -> Dashboard API + Telegram alerts/digests
+  -> SQLite + logs + Brier/PnL
+  -> Dashboard API + Telegram alerts
 ```
 
-В текущем Docker-first пути Pythia запускается на `amper` под отдельным пользователем `pythia`. Основной интерфейс оператора теперь web-dashboard, а Telegram остаётся каналом алертов, `watch updates` и быстрых команд.
+### 1. Daily forecast
 
-Важно: в production сейчас используется собственный research-слой поверх Exa/Tavily и одного LLM-вызова. Нативный runtime `Dexter` в образ не включается и в проде не используется.
+Раз в день Pythia:
 
-Начиная с текущей версии, research brief дополнительно хранит:
+- выбирает рынки;
+- запускает research;
+- строит прогнозы;
+- создает `signals`;
+- при сильных правилах может открыть `shadow` paper-position.
 
-- тип катализатора;
-- главный драйвер вероятности;
-- подтверждающие вторичные сигналы;
-- быстрый опровергающий сигнал.
+Точка входа в коде:
 
-Эти данные используются в `Research+R1` и показываются оператору в `/details`.
+- `src/main.ts`
+- `src/services/market_selector.ts`
+- `src/services/research_runner.ts`
+- `src/services/naked_r1.ts`
+- `src/services/decision_core.ts`
 
-Текущий отбор рынков настроен под реальное предложение Polymarket на конец марта 2026 года и работает ступенчато:
+### 2. Decision core
 
-- сначала используется primary-пул `1-21` дней и `$1K-$100K`
-- затем `1-30` дней и `$500-$250K`
-- затем `1-60` дней и `$500-$250K`
+Это слой действий и paper lifecycle.
 
-После этого включаются два защитных слоя качества:
+Он отвечает за:
 
-- дедупликация по событию, чтобы не брать 20 подрынков одного турнира или выборов
-- diversity constraints: не больше `1` рынка на событие и не больше `3` рынков на категорию/тему
+- создание actionable `signals`;
+- manual/shadow `decisions`;
+- `positions`;
+- `reviews`;
+- `postmortems`.
 
-Новые рынки `<72h` по-прежнему имеют приоритет, но внутри одной выборки выше ставятся более информативные вероятности, а не только самые близкие к `0%` или `100%`. Если после потолка `60` дней набирается мало событий, Pythia пишет предупреждение, но не расширяется на долгосрочные рынки с горизонтом в полгода.
+Главные файлы:
 
-## Быстрый старт на `amper`
+- `src/services/decision_core.ts`
+- `src/services/db.ts`
+- `python/operator_core.py`
 
-Работайте на хосте `amper` под пользователем `pythia`.
+### 3. Autonomous Watchlist Engine
 
-Сначала создайте и заполните `.env` реальными значениями. Нужны:
+Это отдельный мотор сопровождения рынков из `Избранного`.
 
-- ключи LLM backend;
-- `EXA_API_KEY` как primary search provider;
-- `TAVILY_API_KEY` как fallback search provider;
-- Telegram credentials;
-- dashboard credentials и session secret.
+Он:
+
+- создает `watch dossier` при добавлении рынка в `Избранное`;
+- переиспользует свежий forecast snapshot или ставит рынок в `pending_deep_review`;
+- каждые 6 часов запускает `watchlist refresh`;
+- сначала делает дешевую monitoring-проверку;
+- запускает `deep review` только по триггерам;
+- пишет `watch updates` для dashboard и Telegram.
+
+Главные файлы:
+
+- `src/watchlist_refresh.ts`
+- `src/services/watchlist_engine.ts`
+- `python/watchlist_store.py`
+
+### 4. Operator layer
+
+Dashboard - главный интерфейс оператора.
+
+Telegram - канал прерываний и резервных команд.
+
+Главные файлы:
+
+- `python/dashboard_api.py`
+- `python/dashboard_models.py`
+- `python/operator_core.py`
+- `python/telegram_bot.py`
+- `dashboard/src/pages/OverviewPage.tsx`
+- `dashboard/src/pages/LatestRunPage.tsx`
+- `dashboard/src/pages/MarketDetailPage.tsx`
+- `dashboard/src/pages/WatchlistPage.tsx`
+
+## Какой код читать новому разработчику
+
+Лучший маршрут входа за первые 30 минут такой:
+
+1. Прочитать [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
+2. Прочитать [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
+3. Открыть:
+   - `src/main.ts`
+   - `src/services/decision_core.ts`
+   - `src/services/watchlist_engine.ts`
+   - `src/watchlist_refresh.ts`
+   - `python/operator_core.py`
+   - `python/watchlist_store.py`
+4. После этого уже смотреть dashboard pages.
+
+Если нужен внешний взгляд на текущее состояние production, читайте [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md).
+
+## Как думать о документации
+
+Порядок доверия такой:
+
+1. [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
+2. Этот `README`
+3. [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
+4. [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md)
+5. [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
+6. design/spec docs в `docs/superpowers/specs/`
+
+Исторические spec-документы полезны для понимания намерений, но они не равны текущему production-state.
+
+## Быстрый запуск на `amper`
+
+Работайте под пользователем `pythia`.
 
 ```bash
 cd /home/pythia/pythia
 cp .env.example .env
-```
-
-После этого выполняйте команды в таком порядке:
-
-```bash
 bash scripts/day0_check.sh
 docker compose build
 bash scripts/manual_run.sh forecast
 bash scripts/manual_run.sh watchlist-refresh
 bash scripts/manual_run.sh watch-alerts
-bash scripts/manual_run.sh status
 docker compose up -d
 ```
 
-Если нужно проверить поведение после старта, снова используйте `bash scripts/manual_run.sh status` и `bash scripts/manual_run.sh logs`. Для обычной операторской работы после запуска используйте dashboard, а Telegram держите как fallback. Полный технический аудит и описание runtime-потока смотрите в [docs/AUDIT.md](docs/AUDIT.md).
+Подробный production-runbook лежит в [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md).
 
-## Telegram-оператор
+## Ежедневная эксплуатация
 
-Pythia поддерживает операторский Telegram-бот как резервный интерфейс. Он работает в личном чате, принимает команды только от авторизованного пользователя и возвращает ответы на русском языке.
+Главная логика сейчас такая:
 
-Доступные slash-команды:
+- `Сводка` и `Главные сигналы дня` дают новые идеи;
+- `Разбор рынка` показывает состояние тезиса и следующее действие;
+- `Избранное` стало контуром сопровождения, а не списком `market_id`;
+- Telegram нужен для кратких важных alerts, а не для чтения полных разборов.
 
-- `/help`
-- `/status`
-- `/forecast`
-- `/resolve`
-- `/weekly`
-- `/day0`
-- `/edge`
-- `/logs`
-- `/health`
-- `/last_predictions`
-- `/details <номер|market_id>`
+Ручные команды:
 
-Бот также понимает русские алиасы:
+- `bash scripts/manual_run.sh status`
+- `bash scripts/manual_run.sh forecast`
+- `bash scripts/manual_run.sh watchlist-refresh`
+- `bash scripts/manual_run.sh watch-alerts`
+- `bash scripts/manual_run.sh logs`
 
-- `помощь`
-- `статус`
-- `прогноз`
-- `логи`
-- `здоровье`
-- `последние`
-- `детали <номер|market_id>`
+## Расписание
 
-## Операции
-
-`bash scripts/manual_run.sh status` показывает состояние compose-сервиса и сводку по базе. Это полезно для хостовой проверки, но не заменяет dashboard и Telegram.
-
-`bash scripts/manual_run.sh watchlist-refresh` вручную прогоняет отдельный контур сопровождения рынков из `Избранного`.
-
-`bash scripts/manual_run.sh watch-alerts` отправляет накопленные `watch_updates` в Telegram без ожидания следующего cron-слота.
-
-`bash scripts/manual_run.sh logs` открывает журналы `pythia-scheduler`, `pythia-telegram` и `pythia-dashboard`.
-
-`bash scripts/manual_run.sh dashboard-logs` показывает только логи dashboard-сервиса.
-
-`bash scripts/manual_run.sh edge` считает edge и Brier score на накопленных данных.
-
-Планировщик работает по расписанию `supercronic`:
+`supercronic` сейчас запускает:
 
 - `forecast` - 06:00 UTC
 - `watchlist refresh` - каждые 6 часов
@@ -122,45 +200,27 @@ Pythia поддерживает операторский Telegram-бот как 
 - `resolution` - 18:00 UTC
 - `weekly report` - воскресенье, 20:00 UTC
 
-Обновление выполняется так: `git pull`, затем `docker compose build`, затем `docker compose up -d`, после чего проверьте `status` и при необходимости `logs`. Для ручного запуска сценариев используйте dashboard или Telegram, а не прямой bare-metal доступ.
+## Что не надо делать
 
-## Operator Dashboard
+- не хранить реальные trading-ключи на сервере;
+- не превращать dashboard в dump фактов и ссылок;
+- не путать `watchlist engine` с `daily forecast`;
+- не считать старые spec docs источником текущей правды;
+- не воспринимать LLM как "магический источник alpha".
 
-Dashboard поднимается сервисом `pythia-dashboard` и слушает только loopback-порт `127.0.0.1:8787` на хосте `amper`. Публикация наружу делается reverse proxy на `b1w.duckdns.org`.
+## Карта документов
 
-Что даёт dashboard:
+- [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md) - главный source of truth по фазе проекта и roadmap
+- [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md) - как система разрезана на runtime-контуры и модули
+- [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md) - как деплоить и обновлять production на `amper`
+- [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md) - внешний аудит текущего production-state
+- [docs/DECISION_LOG.md](/Users/gerwer/Desktop/Pythia/docs/DECISION_LOG.md) - ключевые архитектурные и продуктовые решения
 
-- `Сводку` как главный decision-first экран: состояние системы, research, последний прогон, что требует внимания, один следующий шаг и быстрые safe actions;
-- `Качество` как отдельный trust-экран: сколько уже `resolved` рынков, как выглядят `Brier` и `edge vs market`, и достаточно ли данных, чтобы доверять этим метрикам;
-- `Главные сигналы дня` на `Сводке`: не просто список рынков, а короткий человеческий digest поверх последнего прогона;
-- `Сигналы` вместо сырой таблицы: рынки из последнего прогона, отсортированные по важности, с фильтрами `Только сильные` и `Только избранное`;
-- `Разбор рынка` в dossier-first форме: сначала состояние тезиса, последнее изменение и что делать сейчас, а тяжёлый анализ и источники спрятаны во второй слой;
-- `Избранное` без ручного `market_id`: не список рынков, а живой board по `watch dossier` и последним `watch updates`;
-- `Действия` с human-summary-first результатами и техническим логом только как вторичным уровнем;
-- hover/tap-подсказки у сложных блоков и метрик в формате `Что это / Почему важно / Как читать`, чтобы оператору не приходилось держать внутреннюю модель системы в голове.
+## Текущий критерий успеха
 
-Trust-layer сейчас строится вокруг трёх вещей:
+На этом этапе мы движемся правильно, если:
 
-- отдельной страницы `Качество`, где видно не только метрики, но и их интерпретацию;
-- human-summary/digest поверх последнего прогона;
-- прозрачного `Разбора рынка`, где оператор сначала видит состояние тезиса и действие, а подробности открывает только при необходимости.
-
-Telegram остаётся для алертов и как fallback-канал управления. Для рынков из `Избранного` туда также приходят короткие `watch updates` вида `что изменилось / почему / что делать`.
-
-## Критерий решения
-
-Через 4 недели работы, когда накопится достаточно данных, запускайте:
-
-```bash
-bash scripts/manual_run.sh edge
-```
-
-Дальше ориентируйтесь на результат:
-
-- `GO` - продолжать текущий подход.
-- `PIVOT` - менять фильтры, промпты или порог отбора.
-- `STOP` - если устойчивого преимущества нет.
-
-## Стоимость
-
-Отдельный VPS для Pythia не нужен: система работает прямо на `amper` в Docker-контейнере. Дополнительные расходы - только API и сервисы вроде Telegram, а не еще одна выделенная машина.
+- paper/shadow-контур копит валидный track record;
+- `Избранное` реально снижает ручной follow-up;
+- Telegram поднимает только важные изменения;
+- новые улучшения можно проверять на реальных paper-результатах, а не на догадках.

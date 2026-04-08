@@ -2,6 +2,29 @@
 
 Дата: 2026-04-07
 
+## Статус на 2026-04-08
+
+Это исторический design-doc, а не описание точного production-state.
+
+Что уже реализовано:
+
+- `decision core`;
+- paper/shadow lifecycle baseline;
+- dashboard как основной интерфейс;
+- `autonomous watchlist engine` baseline.
+
+Что еще не реализовано полностью:
+
+- полноценный `attention engine`;
+- Telegram triage inbox;
+- финальная command-center версия operator UX.
+
+Если нужен текущий ответ "что уже есть в проде", используйте:
+
+1. [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
+2. [README.md](/Users/gerwer/Desktop/Pythia/README.md)
+3. [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
+
 ## 1. Контекст
 
 `Pythia` больше не должна мыслиться как просто система прогнозов для Polymarket.

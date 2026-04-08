@@ -1,223 +1,194 @@
 # Развертывание Pythia на `amper`
 
-Эта инструкция описывает Docker-first развертывание Pythia на хосте `amper` под пользователем `pythia`.
+Дата актуализации: 2026-04-08
 
-Полное описание архитектуры, runtime-потока, ограничений и текущего состояния для внешнего аудита находится в [docs/AUDIT.md](AUDIT.md).
+## Роль документа
 
-## Подготовка хоста
+Это production-runbook: как развернуть, обновить и проверить Pythia на `amper`.
 
-1. Создайте отдельного пользователя:
+Если нужно понять, что система делает и почему она так устроена, сначала читайте:
 
-```bash
-sudo adduser pythia
-```
+- [README.md](/Users/gerwer/Desktop/Pythia/README.md)
+- [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
+- [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
 
-2. Добавьте пользователя в группу `docker`:
+## Что именно вы деплоите
 
-```bash
-sudo usermod -aG docker pythia
-```
+Сейчас production включает:
 
-3. Скопируйте `authorized_keys`, чтобы вход по SSH шел под `pythia`:
+- daily forecast;
+- decision core;
+- autonomous watchlist engine;
+- dashboard;
+- Telegram operator/fallback bot.
 
-```bash
-sudo install -d -m 700 /home/pythia/.ssh
-sudo cp /root/.ssh/authorized_keys /home/pythia/.ssh/authorized_keys
-sudo chown -R pythia:pythia /home/pythia/.ssh
-sudo chmod 600 /home/pythia/.ssh/authorized_keys
-```
+Сейчас production не включает:
 
-4. Перейдите в оболочку пользователя `pythia` и создайте GitHub deploy key для доступа к репозиторию:
+- live trading;
+- хранение реальных trading-ключей;
+- attention engine.
 
-```bash
-sudo -iu pythia
-ssh-keygen -t ed25519 -f ~/.ssh/pythia_github_deploy_key -C "pythia deploy key"
-cat ~/.ssh/pythia_github_deploy_key.pub
-```
+## Где это живет
 
-Добавьте публичный ключ в GitHub как deploy key для нужного репозитория.
+- хост: `amper`
+- пользователь: `pythia`
+- каталог: `/home/pythia/pythia`
+- dashboard: `127.0.0.1:8787`, наружу только через reverse proxy
 
-5. Настройте `~/.ssh/config` в домашнем каталоге `pythia`:
+## Обязательные переменные окружения
 
-```sshconfig
-Host github-pythia
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/pythia_github_deploy_key
-  IdentitiesOnly yes
-```
-
-## Клонирование репозитория
-
-Работайте как пользователь `pythia` и не запускайте развертывание из каталога `SproutSignal`.
-
-```bash
-sudo -iu pythia
-cd /home/pythia
-git clone git@github-pythia:YOUR_ORG/pythia.git
-cd /home/pythia/pythia
-```
-
-## Настройка окружения
-
-Скопируйте пример окружения:
+Скопируйте:
 
 ```bash
 cp .env.example .env
 ```
 
-Заполните реальные ключи LLM, Telegram и поискового слоя. Для нормального research лучше держать сразу оба ключа: `EXA_API_KEY` как primary и `TAVILY_API_KEY` как fallback. Если оба отсутствуют или оба недоступны, Pythia продолжит работать в degraded mode без внешних новостей.
+Заполните как минимум:
 
-Для dashboard обязательно заполните:
+- LLM backend credentials;
+- `EXA_API_KEY`;
+- `TAVILY_API_KEY`;
+- Telegram credentials;
+- `DASHBOARD_USERNAME`;
+- `DASHBOARD_PASSWORD_HASH`;
+- `DASHBOARD_SESSION_SECRET`;
+- `DASHBOARD_PUBLIC_BASE_URL`.
 
-- `DASHBOARD_USERNAME`
-- `DASHBOARD_PASSWORD_HASH`
-- `DASHBOARD_SESSION_SECRET`
-- `DASHBOARD_PUBLIC_BASE_URL`
-- `DASHBOARD_COOKIE_SECURE=true` (для production за reverse proxy с HTTPS)
+## Первый деплой
 
-## Проверка Day 0
-
-Перед первым запуском проверьте доступность рынков:
+Работайте только под пользователем `pythia`.
 
 ```bash
+cd /home/pythia/pythia
 bash scripts/day0_check.sh
-```
-
-## Сборка и ручная проверка
-
-Соберите образ:
-
-```bash
 docker compose build
+bash scripts/manual_run.sh forecast
+bash scripts/manual_run.sh watchlist-refresh
+bash scripts/manual_run.sh watch-alerts
+docker compose up -d
 ```
 
-Запустите ручной прогноз:
+## Что проверить после первого деплоя
+
+### Контейнеры
 
 ```bash
-bash scripts/manual_run.sh forecast
+docker compose ps
 ```
 
-Проверьте отдельный контур сопровождения:
+Ожидаемо:
+
+- `pythia-dashboard` healthy
+- `pythia-scheduler` healthy
+- `pythia-telegram` healthy
+
+### Dashboard
+
+```bash
+docker compose logs --tail=50 pythia-dashboard
+curl -s http://127.0.0.1:8787/api/auth/me
+```
+
+Ожидаемо: API отвечает, dashboard открывается через reverse proxy.
+
+### Telegram
+
+```bash
+docker compose logs --tail=50 pythia-telegram
+```
+
+В личном чате проверьте:
+
+- `/help`
+- `/status`
+- `/health`
+
+### Watchlist engine
 
 ```bash
 bash scripts/manual_run.sh watchlist-refresh
 bash scripts/manual_run.sh watch-alerts
 ```
 
-Проверьте состояние:
+Ожидаемо:
+
+- команда отрабатывает без падения;
+- если есть значимый `watch update`, он доходит в Telegram;
+- `Избранное` в dashboard показывает `watch dossiers` и updates.
+
+## Что должен увидеть оператор
+
+После успешного деплоя руками проверьте:
+
+1. `Сводка` открывается без ошибок.
+2. `Сигналы` показывает рынки последнего прогона.
+3. В `Разборе рынка` верх экрана начинается с dossier-first блоков, а не с dump-страницы.
+4. `Избранное` показывает `watch dossiers`, а не просто список `market_id`.
+5. Telegram присылает короткие `watch updates`, а не сырые логи.
+
+## Обновление production
+
+Стандартный update:
 
 ```bash
+cd /home/pythia/pythia
+git pull
+docker compose build
+docker compose up -d
 bash scripts/manual_run.sh status
 ```
 
-## Фоновый запуск
-
-Когда проверка прошла успешно, поднимите сервис в фоне:
+Если обновление затрагивает watchlist-контур, сразу после этого полезно прогнать:
 
 ```bash
-docker compose up -d
+bash scripts/manual_run.sh watchlist-refresh
+bash scripts/manual_run.sh watch-alerts
 ```
 
-Сервис работает без published ports, без общих сетей с другими проектами и без shared volumes. Pythia держит свои bind-mounted `data` и `logs` внутри `/home/pythia/pythia`.
+## Расписание scheduler
 
-## Проверка Telegram-оператора
+- `forecast` - 06:00 UTC
+- `watchlist refresh` - каждые 6 часов
+- `watch alerts` - через 10 минут после каждого refresh
+- `resolution` - 18:00 UTC
+- `weekly report` - воскресенье, 20:00 UTC
 
-После `docker compose up -d --build` проверьте операторский контейнер:
+## Reverse proxy
 
-```bash
-docker compose ps
-docker compose logs --tail=50 pythia-telegram
-```
+Dashboard не должен публиковаться наружу напрямую из контейнера.
 
-В личном чате с ботом выполните базовые команды:
+Нужна схема:
 
 ```text
-/help
-/health
-/status
+internet -> reverse proxy -> 127.0.0.1:8787 -> pythia-dashboard
 ```
 
-Если ответы не приходят, сначала проверьте, что `pythia-telegram` в `Up` или `healthy`, а затем смотрите его логи. Для повседневной работы используйте dashboard, а Telegram оставьте как резервный канал и канал `watch updates`.
+Текущий production hostname:
 
-## Проверка dashboard
-
-После `docker compose up -d --build` проверьте:
-
-```bash
-docker compose ps
-docker compose logs --tail=50 pythia-dashboard
-curl -I http://127.0.0.1:8787/api/auth/me
-```
-
-Ожидается HTTP 200 от `api/auth/me` и статус `healthy` у `pythia-dashboard`.
-
-После этого проверьте пользовательский UX руками:
-
-- `Сводка` открывается первой и показывает понятный summary, `Главные сигналы дня` и один следующий шаг, а не пустой технический экран;
-- `Качество` честно показывает либо недостаток resolved-данных, либо `Brier / edge / breakdown / glossary`;
-- `Сигналы` позволяет фильтровать `Только сильные` и `Только избранное`, а также добавить рынок в избранное без ручного ввода `market_id`;
-- `Избранное` показывает `watch dossiers` и последние `watch updates`, а не просто список id;
-- `Разбор рынка` начинается с `Состояние тезиса`, `Последнее изменение` и `Что делать сейчас`, а подробный анализ и источники спрятаны в раскрывающиеся секции;
-- `Действия` показывают человеческий итог команды, а сырой лог открывается только по отдельному действию;
-- hover/tap по иконке `i` у сложных блоков открывает короткую подсказку на русском в формате `Что это / Почему важно / Как читать`.
-
-Далее настройте reverse proxy для `b1w.duckdns.org` на upstream `127.0.0.1:8787`.
-
-Пример `nginx`-конфига:
-
-```nginx
-server {
-    listen 80;
-    server_name b1w.duckdns.org;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name b1w.duckdns.org;
-
-    auth_basic "Pythia Private Dashboard";
-    auth_basic_user_file /etc/nginx/.htpasswd-pythia;
-
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy same-origin always;
-    add_header Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none';" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-## Расписание
-
-Встроенный scheduler запускает задачи по UTC:
-
-- `forecast` - 06:00
-- `watchlist refresh` - каждые 6 часов
-- `watch alerts` - каждые 6 часов, через 10 минут после refresh
-- `resolution` - 18:00
-- `weekly report` - воскресенье, 20:00
-
-## Обновление
-
-1. Перейдите в `/home/pythia/pythia` под пользователем `pythia`.
-2. Выполните `git pull`.
-3. Соберите новый образ: `docker compose build`.
-4. Перезапустите стек: `docker compose up -d`.
-5. Проверьте `bash scripts/manual_run.sh status`.
-6. При необходимости прогоните `bash scripts/manual_run.sh watchlist-refresh` и `bash scripts/manual_run.sh watch-alerts`.
-7. При необходимости откройте `bash scripts/manual_run.sh logs`.
+- `https://b1w.duckdns.org`
 
 ## Правила безопасности
 
-- Работайте только как пользователь `pythia`.
-- Не запускайте Pythia из каталога `SproutSignal`.
-- Не делите сети и тома между проектами.
-- Не публикуйте dashboard напрямую наружу. Используйте только loopback-публикацию `127.0.0.1:8787` + reverse proxy.
-- Держите все операции внутри compose-проекта `pythia`.
+- работать только как пользователь `pythia`;
+- не смешивать Pythia с `SproutSignal` по сетям и томам;
+- не публиковать dashboard напрямую наружу;
+- не хранить trading-ключи;
+- не выполнять bare-metal операции вместо предусмотренных `manual_run.sh` и compose-команд.
+
+## Если что-то пошло не так
+
+Минимальный маршрут диагностики:
+
+```bash
+bash scripts/manual_run.sh status
+bash scripts/manual_run.sh logs
+docker compose ps
+```
+
+Если проблема связана с watchlist:
+
+```bash
+bash scripts/manual_run.sh watchlist-refresh
+bash scripts/manual_run.sh watch-alerts
+docker compose logs --tail=100 pythia-scheduler
+```

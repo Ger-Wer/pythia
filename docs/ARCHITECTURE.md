@@ -1,64 +1,176 @@
 # Архитектура Pythia
 
-Pythia спроектирована как Docker-first система, которая запускается на хосте `amper` без отдельного VPS. Публичные порты у backend-сервисов отсутствуют; dashboard публикуется только на loopback и отдаётся наружу через reverse proxy.
+Дата актуализации: 2026-04-08
 
-Для внешнего аудита и полного описания runtime-потока используйте также [docs/AUDIT.md](AUDIT.md).
+## Роль документа
 
-## Основные компоненты
+Этот файл объясняет, как Pythia разрезана на runtime-контуры и где искать соответствующий код.
 
-- `pythia-scheduler` - основной контейнер, который запускает планировщик и ежедневные задания.
-- `pythia-telegram` - polling-бот, который принимает команды оператора в личном чате и запускает существующие сценарии.
-- `pythia-dashboard` - web-консоль оператора (React SPA + FastAPI API), доступная извне только через reverse proxy.
-- TypeScript-приложение - собирает рынки, делает прогнозы, пишет данные в БД и отправляет Telegram-уведомления.
-- `decision core` - отдельный слой `signals / decisions / positions / reviews / postmortems` для paper/shadow lifecycle.
-- `watchlist engine` - отдельный runtime-контур сопровождения рынков из `Избранного`: `watch dossier`, refresh-снимки, operator-facing updates и Telegram delivery.
-- Исследовательский слой - сейчас это собственный news-light research path: Exa используется как primary search provider, Tavily как fallback, а при отсутствии обоих ключей или при отказе обоих провайдеров исследование деградирует до LLM-only режима. Поверх этого работает `Catalyst + Spillover v1`: research brief хранит тип катализатора, главный драйвер, подтверждающие сигналы и быстрый опровергающий сигнал. Нативный runtime Dexter в Phase 1 не используется и в образ не включается.
-- Python-инструменты - считают edge, Brier score, отчеты по разрешению и вспомогательную аналитику.
-- SQLite - локальное хранилище прогнозов и метрик.
-- `logs/` - журналы выполнения.
-- `data/` - база SQLite и связанные файлы состояния.
+Если нужен общий статус проекта, начинайте с [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md). Если нужен production-state для внешнего человека, смотрите [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md).
 
-Текущий dashboard строится как decision-first операторский интерфейс:
+## Система в одном абзаце
 
-- `Сводка` отвечает на вопрос "система жива, что требует внимания прямо сейчас и что мне делать следующим шагом?";
-- `Качество` отвечает на вопрос "можно ли уже доверять накопленным метрикам и что они означают?";
-- `Главные сигналы дня` дают commentary-layer поверх свежего прогона;
-- `Сигналы` показывает рынки последнего прогона, отсортированные по полезности для разбора, и даёт быстрые фильтры для сильных сигналов и избранного;
-- `Разбор рынка` теперь dossier-first: сверху оператор видит состояние тезиса, последнее изменение и следующее действие, а тяжёлый контекст раскрывает только по запросу;
-- `Избранное` превращено в board по `watch dossier` и `watch updates`, а не в список `market_id`;
-- `Действия` показывает человеко-понятный итог запуска, а не сырые логи по умолчанию.
+Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, а затем отдельно сопровождает выбранные рынки через `watchlist engine`. Dashboard - главный интерфейс оператора. Telegram - канал alerts и fallback-команд.
 
-Дополнительно рядом со сложными метриками и блоками используются hover/tap tooltips формата `Что это / Почему важно / Как читать`, чтобы оператор мог понять смысл `Research+R1`, `Edge`, `Key risk`, `Resolved` и других внутренних сущностей без внешней документации.
+## Главные runtime-контуры
 
-Текущая логика отбора рынков выглядит так:
+### 1. Forecast stack
 
-- primary-пул: binary-маркеты с дедлайном `1-21` дней и объёмом `$1K-$100K`
-- fallback-пул: binary-маркеты с дедлайном `1-30` дней и объёмом `$500-$250K`
-- fallback-diverse: binary-маркеты с дедлайном `1-60` дней и объёмом `$500-$250K`
-- дедупликация по событию: один рынок на event group, даже если Gamma отдаёт десятки candidate-подрынков
-- diversity constraints: максимум `1` рынок на событие и максимум `3` рынка на тему/категорию
-- приоритет новых рынков: `<72h`, а среди рынков одинаковой давности выше поднимаются более информативные вероятности
-- если после потолка `60` дней найдено меньше `5` полезных событий, система пишет warning, но не уходит в долгосрочные рынки
+Задача:
 
-Отдельный `Autonomous Watchlist Engine` живёт по своим правилам:
+- искать новые рынки;
+- делать прогнозы;
+- строить первичные `signals`.
 
-- создаёт `watch dossier` сразу при добавлении рынка в `Избранное`;
-- переиспользует свежий forecast snapshot или ставит рынок в `pending_deep_review`;
-- каждые `6` часов запускает `watchlist refresh`;
-- сначала делает дешёвую monitoring-проверку, а `deep review` запускает только по композитным триггерам;
-- после каждого refresh пишет технический snapshot;
-- при значимом изменении создаёт короткий `watch update` для dashboard и Telegram.
+Основные файлы:
 
-## Архитектура размещения на `amper`
+- `src/main.ts`
+- `src/services/market_selector.ts`
+- `src/services/research_runner.ts`
+- `src/services/naked_r1.ts`
+- `src/prompts/synthesis.ts`
 
-Развертывание выполняется под отдельным пользователем `pythia`. Репозиторий клонируется в `/home/pythia/pythia`, а все операции запускаются из этого каталога.
+### 2. Decision core
 
-Compose-проект называется `pythia`, а внутренняя сеть тоже изолирована как `pythia_internal`. Dashboard слушает только `127.0.0.1:8787` на хосте, поэтому прямого внешнего доступа к контейнеру нет.
+Задача:
 
-Pythia использует собственные bind-mounted `data` и `logs` из `/home/pythia/pythia`, а не общие volumes с другими проектами. С `SproutSignal` также не должны разделяться ни volumes, ни сети. Telegram-оператор читает те же `data` и `logs`, но не открывает дополнительных внешних портов.
-Для устойчивого research желательно держать одновременно `EXA_API_KEY` и `TAVILY_API_KEY`: Exa идёт первым, Tavily страхует лимит и отказы, а Telegram `/health` показывает состояние обоих провайдеров отдельно.
+- превращать прогнозы в actionable `signals`;
+- открывать и сопровождать paper/shadow позиции;
+- хранить operator decisions, reviews и postmortems.
 
-Расписание встроенного scheduler'а:
+Сущности:
+
+- `signals`
+- `books`
+- `decisions`
+- `positions`
+- `position_events`
+- `reviews`
+- `postmortems`
+
+Основные файлы:
+
+- `src/services/decision_core.ts`
+- `src/services/db.ts`
+- `python/operator_core.py`
+
+### 3. Autonomous watchlist engine
+
+Задача:
+
+- сопровождать рынки из `Избранного`;
+- создавать `watch dossier`;
+- запускать `watchlist refresh`;
+- делать дешевую monitoring-проверку;
+- запускать `deep review` только по триггерам;
+- создавать короткие `watch updates`.
+
+Сущности:
+
+- `watch_dossiers`
+- `watch_refresh_runs`
+- `watch_refresh_snapshots`
+- `watch_updates`
+
+Основные файлы:
+
+- `src/watchlist_refresh.ts`
+- `src/services/watchlist_engine.ts`
+- `python/watchlist_store.py`
+
+### 4. Operator layer
+
+Задача:
+
+- отдавать данные для dashboard;
+- обеспечивать whitelisted operator actions;
+- отправлять Telegram alerts и updates.
+
+Основные файлы:
+
+- `python/dashboard_api.py`
+- `python/dashboard_models.py`
+- `python/operator_core.py`
+- `python/telegram_bot.py`
+- `dashboard/src/pages/*`
+
+## Как идут данные
+
+### Daily forecast
+
+```text
+Polymarket -> market selection -> research -> synthesis -> predictions
+          -> decision core -> signals / shadow positions
+          -> dashboard + Telegram alerts
+```
+
+### Watchlist refresh
+
+```text
+watch dossier -> current market snapshot -> monitoring mode
+              -> optional deep review -> watch update
+              -> dashboard + Telegram watch alert
+```
+
+### Resolution flow
+
+```text
+resolved market -> update prediction outcome -> close paper positions
+                -> postmortem -> quality metrics
+```
+
+## Code map для нового разработчика
+
+Если нужно быстро понять проект, читайте модули в таком порядке:
+
+1. `src/main.ts`
+2. `src/services/decision_core.ts`
+3. `src/services/watchlist_engine.ts`
+4. `src/watchlist_refresh.ts`
+5. `python/operator_core.py`
+6. `python/watchlist_store.py`
+7. `python/dashboard_api.py`
+8. `dashboard/src/pages/MarketDetailPage.tsx`
+9. `dashboard/src/pages/WatchlistPage.tsx`
+
+## Dashboard-модель
+
+Текущий dashboard строится по принципу `decision-first`, но еще не стал полноценным command center.
+
+Что уже есть:
+
+- `Сводка`
+- `Качество`
+- `Сигналы`
+- dossier-first `Разбор рынка`
+- `Избранное` как board по `watch dossiers`
+- `Действия`
+
+Что еще впереди:
+
+- `Сводка` как настоящий command center;
+- `attention items`;
+- Telegram triage inbox;
+- еще более короткий operator workflow.
+
+## Deployment topology
+
+Production живет на `amper`.
+
+Контейнеры:
+
+- `pythia-scheduler`
+- `pythia-telegram`
+- `pythia-dashboard`
+
+Важные свойства:
+
+- deploy только под пользователем `pythia`;
+- dashboard публикуется только на `127.0.0.1:8787`;
+- наружу он отдается через reverse proxy;
+- данные и логи лежат в bind-mounted `data/` и `logs/`.
+
+## Расписание
 
 - `forecast` - 06:00 UTC
 - `watchlist refresh` - каждые 6 часов
@@ -66,19 +178,13 @@ Pythia использует собственные bind-mounted `data` и `logs`
 - `resolution` - 18:00 UTC
 - `weekly report` - воскресенье, 20:00 UTC
 
-## Изоляция
+## Границы и не-цели
 
-Изоляция строится на комбинации отдельных пользователя, каталога, сети и томов. Это хорошо отделяет Pythia от других рабочих нагрузок, включая `SproutSignal`, если они живут на том же хосте.
+Сейчас Pythia:
 
-Важно помнить, что это не жесткая граница безопасности уровня отдельной машины: общий kernel и общий Docker daemon все еще остаются общими ресурсами. Поэтому нельзя смешивать сети, тома или права доступа между проектами.
+- не ставит реальные ордера;
+- не хранит trading-ключи;
+- не является автотрейдером;
+- не открывает публичный backend без авторизации.
 
-## Дизайнерские решения
-
-- Docker-first вместо bare metal - меньше ручной настройки и меньше расхождений между средами.
-- Один изолированный compose-проект - проще сопровождение и предсказуемый запуск.
-- Loopback-only публикация dashboard (`127.0.0.1:8787`) - доступ только через reverse proxy, без прямого внешнего входа в контейнер.
-- Bind-mounted `data` и `logs` - состояние видно на хосте и не теряется при пересборке.
-- Отдельный пользователь `pythia` - снижает риск пересечения с другими проектами и делает операции воспроизводимыми.
-- Dashboard + Telegram как двойной операторский слой: dashboard для основной работы, Telegram для алертов и fallback-операций.
-- Отдельный `watchlist engine` вместо пассивного `watchlist`: сопровождение тезисов отделено от daily forecast и decision core.
-- `dossier-first UX` в `Разборе рынка`: сначала действие и изменение тезиса, потом подробности.
+Это важно для чтения кода: если вы видите в roadmap разговоры про `attention engine` или более глубокую автоматизацию, это еще не production reality.

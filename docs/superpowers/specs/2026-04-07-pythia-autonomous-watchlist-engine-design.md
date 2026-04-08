@@ -2,6 +2,32 @@
 
 Дата: 2026-04-07
 
+## Статус на 2026-04-08
+
+Это design-doc для целевого `watchlist engine`. Он уже реализован в production в baseline-виде, но не целиком закрыт как финальная стадия продукта.
+
+Что уже в проде:
+
+- `watch dossier`;
+- `watchlist refresh`;
+- monitoring mode;
+- deep review triggers;
+- `watch updates`;
+- Telegram delivery;
+- dossier-first `Разбор рынка`.
+
+Что еще впереди:
+
+- единый `attention_item`;
+- command-center UX вокруг `Сводки` и `Избранного`;
+- более сильный Telegram triage workflow.
+
+Если нужен текущий production-status, используйте:
+
+1. [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
+2. [README.md](/Users/gerwer/Desktop/Pythia/README.md)
+3. [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
+
 ## 1. Контекст
 
 `Pythia v2` уже умеет:
