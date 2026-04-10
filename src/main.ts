@@ -9,6 +9,7 @@ import {
 import { syncDecisionCoreForForecastRun } from './services/decision_core';
 import { initDb, insertPrediction } from './services/db';
 import type { Database } from './services/db';
+import { evaluateMarketPrediction } from './services/forecast_evaluator';
 import {
   buildResearchBrief,
   multiSearch,
@@ -135,28 +136,24 @@ async function processMarket(
   const marketPrice = marketPriceFromYesOutcome(market);
 
   try {
-    const newsResults = await multiSearch(market.question, market.category, 3);
-    const newsSnippets = newsResults.map(
-      (result) => `- ${result.title}: ${result.snippet || result.url}`,
-    );
-
-    const naked = await nakedR1Predict(market, newsSnippets, costTracker);
-    if (naked) {
-      log(`Naked R1: ${naked.probability}% (market: ${marketPrice.toFixed(1)}%)`);
-    }
-
-    let synthesis: SynthesisResult | null = null;
-    const brief = await buildResearchBrief(market, costTracker, newsResults);
-    if (brief) {
-      synthesis = await runSynthesis(
-        market,
-        buildResearchBriefText(brief),
-        costTracker,
-      );
-      if (synthesis) {
-        log(`Research+R1: ${synthesis.probability}% (market: ${marketPrice.toFixed(1)}%)`);
-      }
-    }
+    const {
+      brief,
+      naked,
+      synthesis,
+      hadError,
+    } = await evaluateMarketPrediction({
+      market,
+      costTracker,
+      multiSearch,
+      nakedPredict: nakedR1Predict,
+      buildResearchBrief,
+      buildResearchBriefText,
+      runSynthesis,
+      log,
+      sleep: async (ms) => {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+      },
+    });
 
     if (!naked && !synthesis) {
       log(`Skipping market ${market.id}: both baseline and synthesis failed.`);
@@ -198,7 +195,7 @@ async function processMarket(
       );
     }
 
-    return { saved: true, hadError: false };
+    return { saved: true, hadError };
   } catch (error) {
     if (error instanceof CostLimitError) {
       throw error;
