@@ -1,0 +1,22 @@
+wing: project
+rooms:
+- name: python
+  description: Files from python/
+- name: documentation
+  description: Files from docs/
+- name: dashboard
+  description: Files from dashboard/
+- name: logs
+  description: Files from logs/
+- name: scripts
+  description: Files from scripts/
+- name: data
+  description: Files from data/
+- name: src
+  description: Files from src/
+- name: sql
+  description: Files from sql/
+- name: backend
+  description: Files from services/
+- name: general
+  description: Files that don't fit other rooms
