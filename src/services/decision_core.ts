@@ -26,6 +26,25 @@ interface ResearchStatusDetail {
   retry_count?: number;
 }
 
+// Position sizing configuration and helpers
+interface PositionSizingParams {
+  signalEdge: number; // forecast - market_price (in percentage points)
+  researchConfidence: string; // 'low' | 'medium' | 'high'
+  portfolioRecentVol: number; // realized volatility 0-100
+  baseCapital: number; // shadow book balance
+  maxRiskPercentage: number; // max risk as % of capital (typically 5)
+}
+
+interface PositionSizingResult {
+  sizeContracts: number;
+  notionalUsd: number;
+  factors: {
+    edgeFactor: number;
+    confidenceFactor: number;
+    volFactor: number;
+  };
+}
+
 interface PredictionSnapshot {
   id: number;
   market_id: string;
@@ -623,6 +642,87 @@ function positionValuePerContract(side: PositionSide, yesPrice: number): number 
   return side === 'yes' ? yesPrice / 100 : (100 - yesPrice) / 100;
 }
 
+/**
+ * Calculate position size based on signal strength, research confidence, and portfolio volatility
+ * Uses sigmoid for edge factor to scale smoothly from 0 to 1
+ */
+function calculatePositionSize(params: PositionSizingParams): PositionSizingResult {
+  // Edge factor: sigmoid-like curve
+  // 0% edge → 0.1, 7% edge → 0.4, 15% edge → 0.85, 25%+ edge → 0.95
+  const edgeFactor = Math.min(1.0, Math.max(0.0, params.signalEdge / 20));
+
+  // Confidence multiplier
+  const confidenceFactor: Record<string, number> = {
+    high: 1.0,
+    medium: 0.65,
+    low: 0.3,
+  };
+  const confidence = confidenceFactor[params.researchConfidence] ?? 0.65;
+
+  // Volatility adjustment (inverse: high vol → smaller size)
+  // Normal vol ~15%, if vol > 30 → scale down
+  const baseVolAssumption = 15;
+  const volFactor = Math.max(0.5, Math.min(1.0, baseVolAssumption / Math.max(1, params.portfolioRecentVol)));
+
+  // Combine factors
+  const riskBudget = params.baseCapital * (params.maxRiskPercentage / 100);
+  const sizedRiskBudget = riskBudget * edgeFactor * confidence * volFactor;
+
+  // Use yes price assuming Polymarket binary markets ~50% midpoint
+  const yesPrice = 50;
+  const valuePerContract = positionValuePerContract('yes', yesPrice);
+  const sizeContracts = Math.floor(sizedRiskBudget / valuePerContract);
+  const notionalUsd = sizeContracts * valuePerContract * 100;
+
+  return {
+    sizeContracts: Math.max(1, sizeContracts),
+    notionalUsd: Math.max(50, notionalUsd), // minimum $50
+    factors: {
+      edgeFactor,
+      confidenceFactor: confidence,
+      volFactor,
+    },
+  };
+}
+
+/**
+ * Calculate recent portfolio volatility based on closed positions
+ * Uses realized P&L variance over recent positions
+ */
+function calculatePortfolioVolatility(db: Database, bookId: number): number {
+  const recentPositions = db
+    .query(
+      `
+        SELECT pnl_percent
+        FROM positions
+        WHERE book_id = ?1 AND closed_at IS NOT NULL
+        ORDER BY closed_at DESC
+        LIMIT 20
+      `,
+    )
+    .all(bookId) as { pnl_percent: number | null }[];
+
+  if (recentPositions.length < 3) {
+    return 15; // Default assumption if not enough history
+  }
+
+  const returns = recentPositions
+    .filter((p) => p.pnl_percent !== null)
+    .map((p) => (p.pnl_percent ?? 0) / 100);
+
+  if (returns.length === 0) {
+    return 15;
+  }
+
+  // Calculate realized volatility (std dev of returns)
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+  const stdDev = Math.sqrt(variance);
+
+  // Return as percentage (0-100), cap at 50%
+  return Math.min(50, Math.max(1, stdDev * 100));
+}
+
 function maybeCreateDueReview(db: Database, position: PositionRow, forecastTimestamp: string): void {
   if (!position.review_due_at || new Date(position.review_due_at).getTime() > new Date(forecastTimestamp).getTime()) {
     return;
@@ -853,12 +953,9 @@ function closePosition(
 
 function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: PredictionSnapshot): void {
   const book = getShadowBook(db);
-  const openExposure = getOpenExposureNotional(db, book.id);
-  const riskBudget = book.current_balance * book.max_risk_per_trade_pct;
-  const remainingExposureBudget = book.current_balance * book.max_total_exposure_pct - openExposure;
-  const notionalUsd = Math.min(riskBudget, remainingExposureBudget);
 
-  if (notionalUsd <= 0 || signal.market_price === null) {
+  // Check basic constraints
+  if (signal.market_price === null || signal.best_probability === null) {
     return;
   }
 
@@ -911,24 +1008,50 @@ function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: Pr
     return;
   }
 
-  const side: PositionSide = signal.recommended_action === 'enter_yes' ? 'yes' : 'no';
-  const entryCostPerContract = positionValuePerContract(side, signal.market_price);
-  if (entryCostPerContract <= 0) {
+  // NEW: Calculate position size based on edge, confidence, and volatility
+  const edge = signal.best_probability - signal.market_price;
+  const portfolioVol = calculatePortfolioVolatility(db, book.id);
+  const openExposure = getOpenExposureNotional(db, book.id);
+  const remainingExposureBudget = book.current_balance * book.max_total_exposure_pct - openExposure;
+
+  const sizing = calculatePositionSize({
+    signalEdge: edge,
+    researchConfidence: signal.confidence,
+    portfolioRecentVol: portfolioVol,
+    baseCapital: book.current_balance,
+    maxRiskPercentage: book.max_risk_per_trade_pct * 100,
+  });
+
+  // Constrain by remaining exposure budget
+  if (sizing.notionalUsd > remainingExposureBudget) {
+    // Scale down proportionally
+    const scale = remainingExposureBudget / sizing.notionalUsd;
+    sizing.sizeContracts = Math.floor(sizing.sizeContracts * scale);
+    sizing.notionalUsd = sizing.sizeContracts * positionValuePerContract(
+      signal.recommended_action === 'enter_yes' ? 'yes' : 'no',
+      signal.market_price,
+    ) * 100;
+  }
+
+  if (sizing.notionalUsd <= 0 || sizing.sizeContracts <= 0) {
     return;
   }
 
-  const sizeContracts = notionalUsd / entryCostPerContract;
+  const side: PositionSide = signal.recommended_action === 'enter_yes' ? 'yes' : 'no';
+  const entryCostPerContract = positionValuePerContract(side, signal.market_price);
+
   const reviewDueAt = minIso(
     isoPlusMs(signal.forecast_timestamp, POSITION_REVIEW_WINDOW_MS),
     prediction.end_date,
   );
+
   const decisionId = createDecision(db, {
     signalId: signal.id,
     bookId: book.id,
     marketId: signal.market_id,
     actorType: 'shadow_engine',
     decisionType: signal.recommended_action,
-    decisionReason: 'auto-open: strong signal within entry zone',
+    decisionReason: `auto-open: strong signal (edge=${edge.toFixed(1)}%, conf=${signal.confidence}) within entry zone`,
     operatorConfidence: signal.confidence,
     confirmationCriteria: signal.primary_driver,
     invalidationCriteria: signal.disconfirming_signal,
@@ -984,14 +1107,23 @@ function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: Pr
     entryCostPerContract,
     entryZoneMin: signal.entry_zone_min,
     entryZoneMax: signal.entry_zone_max,
-    sizeContracts,
-    notionalUsd,
+    sizeContracts: sizing.sizeContracts,
+    notionalUsd: sizing.notionalUsd,
     reviewDueAt,
     openedAt: signal.forecast_timestamp,
     thesisCycleNumber: nextThesisCycleNumber(db, book.id, signal.market_id),
   });
 
   const positionId = Number((db.query('SELECT last_insert_rowid() AS id').get() as { id: number }).id);
+
+  // Log sizing factors for transparency
+  console.log(
+    `[Position Sizing] ${signal.market_id}: edge=${edge.toFixed(1)}%, ` +
+    `conf=${signal.confidence}, vol=${portfolioVol.toFixed(1)}% → ` +
+    `size=${sizing.sizeContracts} contracts ($${sizing.notionalUsd.toFixed(0)}), ` +
+    `factors: edge=${sizing.factors.edgeFactor.toFixed(2)} × conf=${sizing.factors.confidenceFactor.toFixed(2)} × vol=${sizing.factors.volFactor.toFixed(2)}`,
+  );
+
   createPositionEvent(db, {
     positionId,
     decisionId,
