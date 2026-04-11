@@ -7,7 +7,7 @@ import {
   CostTracker,
 } from './services/cost_tracker';
 import { syncDecisionCoreForForecastRun } from './services/decision_core';
-import { initDb, insertPrediction } from './services/db';
+import { initDb, insertPrediction, getTodayCost } from './services/db';
 import type { Database } from './services/db';
 import { evaluateMarketPrediction } from './services/forecast_evaluator';
 import {
@@ -227,6 +227,21 @@ async function main(): Promise<void> {
     log(`Selected market: ${formatMarketLog(market)}`);
   }
 
+  // Check hourly burn rate projection
+  const burnProjection = costTracker.getHourlyBurnProjection();
+  if (burnProjection.isWarning && burnProjection.minutesElapsed > 0) {
+    log(
+      `⚠️  Cost burn rate alert: Hourly=$${burnProjection.hourlyRate.toFixed(4)}, ` +
+      `Projected daily=$${burnProjection.projectedDailyTotal.toFixed(4)} (limit=$${CONFIG.limits.dailyCostUsd})`,
+    );
+    await sendTelegramAlert(
+      `*Pythia: ⚠️  Предупреждение о расходах*\n` +
+      `Почасовой темп сжигания: $${burnProjection.hourlyRate.toFixed(4)}\n` +
+      `Прогноз за день: $${burnProjection.projectedDailyTotal.toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
+      `Риск превышить лимит. Сокращаю рынки.`,
+    );
+  }
+
   let processed = 0;
   let errors = 0;
 
@@ -256,7 +271,20 @@ async function main(): Promise<void> {
 
   syncDecisionCoreForForecastRun(db, startedAt);
 
-  log(`${processed} markets processed, total cost: $${costTracker.getSessionCost().toFixed(4)}`);
+  const sessionCost = costTracker.getSessionCost();
+  const finalBurnProjection = costTracker.getHourlyBurnProjection();
+  log(
+    `${processed} markets processed, run cost: $${sessionCost.toFixed(4)}, ` +
+    `today total: $${(sessionCost + getTodayCost(db)).toFixed(4)}/${CONFIG.limits.dailyCostUsd}`,
+  );
+
+  if (finalBurnProjection.isWarning) {
+    await sendTelegramAlert(
+      `*Pythia: расходы приближаются к лимиту*\n` +
+      `Затрачено сегодня: $${(sessionCost + getTodayCost(db)).toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
+      `На сегодня осталось: ${Math.round(CONFIG.limits.dailyCostUsd - (sessionCost + getTodayCost(db))) * 100}% от лимита`,
+    );
+  }
 
   if (errors > 0) {
     await sendTelegramAlert(`*Pythia: уведомление*\nПрогон завершён с ${errors} ошибками на уровне маркетов.`);

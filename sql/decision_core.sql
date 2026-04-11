@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS signals (
     disconfirming_signal TEXT,
     confidence TEXT,
     research_status TEXT NOT NULL,
+    research_status_detail TEXT,
     status TEXT NOT NULL DEFAULT 'new',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,

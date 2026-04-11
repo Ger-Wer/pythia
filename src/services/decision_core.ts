@@ -14,6 +14,18 @@ type PositionCloseReason =
   | 'stop_loss'
   | 'cancelled';
 
+// Research status enum (expanded from binary ON/DEGRADED)
+type ResearchStatus = 'ON' | 'PARTIAL' | 'TIMEOUT' | 'COST_LIMIT' | 'DATA_STALE' | 'RESOLVER_OFFLINE' | 'ERROR';
+
+interface ResearchStatusDetail {
+  status: ResearchStatus;
+  reason: string; // Human-readable explanation
+  error_code?: string;
+  error_message?: string;
+  timestamp: string;
+  retry_count?: number;
+}
+
 interface PredictionSnapshot {
   id: number;
   market_id: string;
@@ -53,7 +65,8 @@ interface SignalSnapshot {
   primary_driver: string;
   disconfirming_signal: string;
   confidence: string | null;
-  research_status: 'ON' | 'DEGRADED';
+  research_status: ResearchStatus;
+  research_status_detail: string | null; // JSON: ResearchStatusDetail
   status: string;
 }
 
@@ -171,7 +184,7 @@ function computeEntryZone(
 function computeRecommendedAction(
   bestProbability: number | null,
   marketPrice: number | null,
-  researchStatus: 'ON' | 'DEGRADED',
+  researchStatus: ResearchStatus,
 ): { action: DecisionAction; edge: number | null; strength: number } {
   if (bestProbability === null || marketPrice === null) {
     return {
@@ -216,7 +229,30 @@ function computeRecommendedAction(
 }
 
 function mapPredictionToSignal(prediction: PredictionSnapshot): Omit<SignalSnapshot, 'id' | 'status'> {
-  const researchStatus: 'ON' | 'DEGRADED' = prediction.dexter_p !== null ? 'ON' : 'DEGRADED';
+  // Determine research status based on available data
+  let researchStatus: ResearchStatus = 'ON';
+  let statusDetail: ResearchStatusDetail = {
+    status: 'ON',
+    reason: 'Research completed successfully',
+    timestamp: new Date().toISOString(),
+  };
+
+  if (prediction.dexter_p === null && prediction.naked_p === null) {
+    researchStatus = 'ERROR';
+    statusDetail = {
+      status: 'ERROR',
+      reason: 'Both research and naked prediction failed; no forecast available',
+      timestamp: new Date().toISOString(),
+    };
+  } else if (prediction.dexter_p === null && prediction.naked_p !== null) {
+    researchStatus = 'PARTIAL';
+    statusDetail = {
+      status: 'PARTIAL',
+      reason: 'Research synthesis failed; using fallback naked R1 only',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   const bestProbability = prediction.dexter_p ?? prediction.naked_p ?? null;
   const reasoning = parseResearchFields(prediction.research_brief_json);
   const { action, edge, strength } = computeRecommendedAction(
@@ -248,6 +284,7 @@ function mapPredictionToSignal(prediction: PredictionSnapshot): Omit<SignalSnaps
     disconfirming_signal: reasoning.disconfirming_signal,
     confidence: prediction.dexter_confidence,
     research_status: researchStatus,
+    research_status_detail: JSON.stringify(statusDetail),
   };
 }
 
@@ -356,6 +393,7 @@ function upsertSignal(db: Database, signal: Omit<SignalSnapshot, 'id' | 'status'
         disconfirming_signal,
         confidence,
         research_status,
+        research_status_detail,
         status,
         created_at,
         updated_at
@@ -378,6 +416,7 @@ function upsertSignal(db: Database, signal: Omit<SignalSnapshot, 'id' | 'status'
         @disconfirming_signal,
         @confidence,
         @research_status,
+        @research_status_detail,
         'new',
         @forecast_timestamp,
         @forecast_timestamp
@@ -400,6 +439,7 @@ function upsertSignal(db: Database, signal: Omit<SignalSnapshot, 'id' | 'status'
         disconfirming_signal = excluded.disconfirming_signal,
         confidence = excluded.confidence,
         research_status = excluded.research_status,
+        research_status_detail = excluded.research_status_detail,
         status = 'new',
         updated_at = excluded.updated_at
     `,
@@ -632,6 +672,21 @@ function maybeCreateDueReview(db: Database, position: PositionRow, forecastTimes
     marketId: position.market_id,
     dueAt: position.review_due_at,
     createdAt: forecastTimestamp,
+  });
+
+  // Create position event for the review being created
+  createPositionEvent(db, {
+    positionId: position.id,
+    decisionId: null,
+    eventType: 'review_due',
+    eventNote: 'Review became due because position_review_window expired without a confirming signal.',
+    marketPrice: null,
+    researchProbability: null,
+    createdAt: forecastTimestamp,
+    payload: {
+      review_due_at: position.review_due_at,
+      review_type: 'time_review',
+    },
   });
 }
 
@@ -983,6 +1038,25 @@ function maybeReviewOrBreakPosition(
     || movedAgainstPosition;
 
   if (shouldBreak) {
+    // Log adverse move if that's the reason for breaking
+    if (movedAgainstPosition) {
+      createPositionEvent(db, {
+        positionId: position.id,
+        decisionId: null,
+        eventType: 'adverse_move',
+        eventNote: 'Market moved beyond adverse_move_threshold. Position thesis breakdown triggered.',
+        marketPrice: signal.market_price,
+        researchProbability: signal.research_probability,
+        createdAt: forecastTimestamp,
+        payload: {
+          market_price: signal.market_price,
+          entry_price: position.entry_yes_price,
+          position_side: position.side,
+          threshold: ADVERSE_MOVE_THRESHOLD,
+        },
+      });
+    }
+
     closePosition(db, position, {
       closedAt: forecastTimestamp,
       closedYesPrice: signal.market_price,

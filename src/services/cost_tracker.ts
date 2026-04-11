@@ -67,6 +67,7 @@ export class CostLimitError extends Error {
 
 export class CostTracker {
   private sessionCost = 0;
+  private sessionStartTime = Date.now();
 
   constructor(
     private readonly db: Database,
@@ -91,5 +92,38 @@ export class CostTracker {
 
   getSessionCost(): number {
     return this.sessionCost;
+  }
+
+  /**
+   * Calculate hourly burn rate and project daily cost
+   * Returns: { hourlyRate, projectedDailyTotal, isWarning, suggestion }
+   */
+  getHourlyBurnProjection(): {
+    hourlyRate: number;
+    projectedDailyTotal: number;
+    isWarning: boolean;
+    minutesElapsed: number;
+  } {
+    const minutesElapsed = (Date.now() - this.sessionStartTime) / 1000 / 60;
+    if (minutesElapsed < 1) {
+      return {
+        hourlyRate: 0,
+        projectedDailyTotal: 0,
+        isWarning: false,
+        minutesElapsed: 0,
+      };
+    }
+
+    const hourlyRate = (this.sessionCost / minutesElapsed) * 60;
+    const alreadySpent = getTodayCost(this.db);
+    const projectedDailyTotal = alreadySpent + hourlyRate * 24;
+    const warningThreshold = this.dailyLimit * 1.1; // Alert at 110% of limit
+
+    return {
+      hourlyRate,
+      projectedDailyTotal,
+      isWarning: projectedDailyTotal > warningThreshold,
+      minutesElapsed,
+    };
   }
 }
