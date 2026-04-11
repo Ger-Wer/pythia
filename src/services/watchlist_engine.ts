@@ -97,6 +97,32 @@ function toJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 0);
 }
 
+/**
+ * Check if market has exceeded update limit (kill-switch)
+ * Returns number of updates in last 24 hours
+ */
+function getRecentUpdateCount(db: Database, dossierId: number): number {
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const result = db.query(`
+    SELECT COUNT(*) as count
+    FROM watch_updates
+    WHERE watch_dossier_id = ?1
+    AND created_at >= ?2
+  `).get(dossierId, twentyFourHoursAgo) as { count: number } | undefined;
+
+  return result?.count ?? 0;
+}
+
+/**
+ * Check if market should be suppressed due to too many updates
+ * Kill-switch: max 2 updates per market per 24h
+ */
+function shouldSuppressUpdate(db: Database, dossierId: number, maxUpdatesPerDay: number = 2): boolean {
+  const recentCount = getRecentUpdateCount(db, dossierId);
+  return recentCount >= maxUpdatesPerDay;
+}
+
 function safeErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -480,9 +506,28 @@ export async function runWatchlistRefresh(
       }
 
       if (effectiveUpdate) {
-        marketsChanged += 1;
-        alertsCreated += 1;
-        createWatchUpdate(db, dossier, runId, updateSnapshot, effectiveUpdate);
+        // Kill-switch: check if market has too many updates in last 24h
+        const isSuppressed = shouldSuppressUpdate(db, dossier.id);
+
+        if (isSuppressed) {
+          const recentCount = getRecentUpdateCount(db, dossier.id);
+          console.warn(
+            `[Watchlist Kill-Switch] Suppressing update for market ${dossier.market_id}: ` +
+            `${recentCount} updates in last 24h (limit: 2)`
+          );
+
+          // Log suppression event
+          appendRunError(
+            db,
+            runId,
+            dossier.market_id,
+            new Error(`Update suppressed: ${recentCount} updates in 24h (kill-switch activated)`)
+          );
+        } else {
+          marketsChanged += 1;
+          alertsCreated += 1;
+          createWatchUpdate(db, dossier, runId, updateSnapshot, effectiveUpdate);
+        }
       }
     } catch (error) {
       hadErrors = true;
