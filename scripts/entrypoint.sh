@@ -7,6 +7,11 @@ export LOG_DIR="${LOG_DIR:-/app/logs}"
 
 mkdir -p /app/data "$LOG_DIR"
 
+# Run database migrations
+if [ -f /app/scripts/migrate_db.sh ]; then
+  /app/scripts/migrate_db.sh
+fi
+
 TODAY="$(date +%Y%m%d)"
 
 case "${1:-}" in
