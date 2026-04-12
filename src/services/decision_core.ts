@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Database } from './db';
+import { createSafetyPipeline } from './safety_pipeline';
+import type { SafetyPipeline } from './safety_pipeline';
+import { fetchMarket, marketPriceFromYesOutcome } from '../tools/polymarket';
+import type { PolymarketMarket } from '../tools/polymarket';
+import { sendTelegramAlert, formatSafetyRejectionAlert } from './telegram_alerts';
 
 type DecisionAction = 'watch' | 'review' | 'enter_yes' | 'enter_no';
 type PositionMode = 'shadow' | 'operator';
@@ -124,6 +129,23 @@ const STRONG_SIGNAL_THRESHOLD = 15;
 const REVIEW_SIGNAL_THRESHOLD = 7;
 const REVIEW_CONFIRMATION_THRESHOLD = 10;
 const ADVERSE_MOVE_THRESHOLD = 10;
+
+// Safety Pipeline - глобальный экземпляр для проверок безопасности
+let globalSafetyPipeline: SafetyPipeline | null = null;
+
+function getSafetyPipeline(): SafetyPipeline {
+  if (!globalSafetyPipeline) {
+    // Импортируем CONFIG для использования настроек
+    const { CONFIG } = require('../config');
+    globalSafetyPipeline = createSafetyPipeline({
+      maxSignalAgeSeconds: CONFIG.safety.maxSignalAgeSeconds,
+      priceDriftTolerance: CONFIG.safety.priceDriftTolerance,
+      cooldownSeconds: CONFIG.safety.cooldownSeconds,
+      dedupWindowMinutes: CONFIG.safety.dedupWindowMinutes,
+    });
+  }
+  return globalSafetyPipeline;
+}
 
 function runSqlScript(db: Database, sql: string): void {
   for (const statement of sql
@@ -951,7 +973,7 @@ function closePosition(
   });
 }
 
-function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: PredictionSnapshot): void {
+async function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: PredictionSnapshot): Promise<void> {
   const book = getShadowBook(db);
 
   // Check basic constraints
@@ -1007,6 +1029,57 @@ function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: Pr
   ) {
     return;
   }
+
+  // SAFETY PIPELINE: Выполнить все проверки безопасности перед открытием позиции
+  const safety = getSafetyPipeline();
+
+  // Функция для получения текущей цены с Polymarket
+  const getCurrentPrice = async (marketId: string): Promise<number | null> => {
+    try {
+      const market = await fetchMarket(marketId);
+      if (!market) {
+        console.warn(`[SafetyPipeline] Market not found: ${marketId}`);
+        return null;
+      }
+      return marketPriceFromYesOutcome(market);
+    } catch (error) {
+      console.error(`[SafetyPipeline] Error fetching market price for ${marketId}:`, error);
+      return null;
+    }
+  };
+
+  const safetyCheck = await safety.preExecutionChecks(
+    {
+      id: signal.id,
+      market_id: signal.market_id,
+      forecast_timestamp: signal.forecast_timestamp,
+      market_price: signal.market_price,
+      best_probability: signal.best_probability,
+      recommended_action: signal.recommended_action,
+    },
+    getCurrentPrice
+  );
+
+  if (!safetyCheck.passed) {
+    console.warn(
+      `[SafetyPipeline] Trade rejected for ${signal.market_id}: ${safetyCheck.reason}`
+    );
+
+    // Отправить уведомление в Telegram
+    await sendTelegramAlert(
+      formatSafetyRejectionAlert(signal.market_id, safetyCheck.reason, {
+        market_price: signal.market_price,
+        best_probability: signal.best_probability,
+        recommended_action: signal.recommended_action,
+      })
+    );
+
+    return;
+  }
+
+  console.log(
+    `[SafetyPipeline] Trade approved for ${signal.market_id}: ${safetyCheck.reason}`
+  );
 
   // NEW: Calculate position size based on edge, confidence, and volatility
   const edge = signal.best_probability - signal.market_price;
@@ -1123,6 +1196,9 @@ function openShadowPosition(db: Database, signal: SignalSnapshot, prediction: Pr
     `size=${sizing.sizeContracts} contracts ($${sizing.notionalUsd.toFixed(0)}), ` +
     `factors: edge=${sizing.factors.edgeFactor.toFixed(2)} × conf=${sizing.factors.confidenceFactor.toFixed(2)} × vol=${sizing.factors.volFactor.toFixed(2)}`,
   );
+
+  // SAFETY PIPELINE: Записать сделку для cooldown и deduplication
+  safety.recordTrade(signal.market_id, signal.recommended_action);
 
   createPositionEvent(db, {
     positionId,
@@ -1271,7 +1347,7 @@ function refreshOverdueReviews(db: Database, forecastTimestamp: string): void {
   }
 }
 
-export function syncDecisionCoreForForecastRun(db: Database, forecastTimestamp: string): void {
+export async function syncDecisionCoreForForecastRun(db: Database, forecastTimestamp: string): Promise<void> {
   ensureDecisionCoreSchema(db);
 
   const predictions = getLatestPredictionRows(db, forecastTimestamp);
@@ -1294,7 +1370,7 @@ export function syncDecisionCoreForForecastRun(db: Database, forecastTimestamp: 
     if (!signal) {
       continue;
     }
-    openShadowPosition(db, signal, prediction);
+    await openShadowPosition(db, signal, prediction);
   }
 
   refreshOverdueReviews(db, forecastTimestamp);

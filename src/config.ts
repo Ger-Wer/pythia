@@ -60,6 +60,12 @@ export const CONFIG = {
     db: env('DB_PATH', './data/pythia.db'),
     logDir: env('LOG_DIR', './logs'),
   },
+  safety: {
+    maxSignalAgeSeconds: numberEnv('SAFETY_MAX_SIGNAL_AGE_SECONDS', '30'),
+    priceDriftTolerance: numberEnv('SAFETY_PRICE_DRIFT_TOLERANCE', '0.03'),
+    cooldownSeconds: numberEnv('SAFETY_COOLDOWN_SECONDS', '60'),
+    dedupWindowMinutes: numberEnv('SAFETY_DEDUP_WINDOW_MINUTES', '5'),
+  },
 } as const;
 
 export type AppConfig = typeof CONFIG;

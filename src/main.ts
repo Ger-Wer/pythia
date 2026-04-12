@@ -269,7 +269,7 @@ async function main(): Promise<void> {
     }
   }
 
-  syncDecisionCoreForForecastRun(db, startedAt);
+  await syncDecisionCoreForForecastRun(db, startedAt);
 
   const sessionCost = costTracker.getSessionCost();
   const finalBurnProjection = costTracker.getHourlyBurnProjection();
