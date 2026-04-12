@@ -6,6 +6,7 @@ import { SignalList } from "../components/SignalList";
 import { TOOLTIP_CONTENT } from "../content/tooltips";
 import type { LatestRunItem, LatestRunResponse } from "../types/api";
 import { formatTimestamp } from "../utils/format";
+import { pluralize } from "../utils/pluralize";
 
 export function LatestRunPage() {
   const [data, setData] = useState<LatestRunResponse | null>(null);
@@ -127,7 +128,7 @@ export function LatestRunPage() {
         <section className="kpi-grid">
           <KpiCard
             label="Рынков в прогоне"
-            value={`${data.markets_processed} рынка`}
+            value={pluralize(data.markets_processed, "рынок", "рынка", "рынков")}
             note="Количество оценённых рынков в последнем forecast."
             tone="accent"
             tooltip={TOOLTIP_CONTENT.signalFeed}
@@ -141,7 +142,7 @@ export function LatestRunPage() {
           />
           <KpiCard
             label="В избранном"
-            value={`${watchedIds.size} рынок`}
+            value={pluralize(watchedIds.size, "рынок", "рынка", "рынков")}
             note="Сколько рынков уже вынесено в ваш рабочий фокус."
             tooltip={TOOLTIP_CONTENT.watchlist}
           />
