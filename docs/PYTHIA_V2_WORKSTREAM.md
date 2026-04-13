@@ -1,6 +1,6 @@
 # Pythia v2 — Workstream и дорожная карта
 
-Дата актуализации: 2026-04-11 (Tier-1 critical fixes deployed)
+Дата актуализации: 2026-04-13 (Phase 2 UX improvements + WCAG 2.1 AA compliance deployed)
 
 ## Роль этого документа
 
@@ -102,6 +102,8 @@
 - [x] `Избранное` как triage-board по `watch dossier`
 - [x] `Сводка` как command-center baseline
 - [x] tooltip/glossary слой
+- [x] Phase 1 UX improvements (Toast, Keyboard shortcuts, Onboarding, Loading states)
+- [x] Phase 2 UX improvements (WCAG 2.1 AA compliance, colorblind-friendly palette, data-ink ratio optimization)
 
 ### Attention engine
 
@@ -192,12 +194,18 @@
 
 - [x] `Сводка` как command-center baseline
 - [x] `Избранное` как основной рабочий экран
-- [ ] оператор видит только:
+- [x] оператор видит только:
   - [x] что изменилось
   - [x] почему это важно
   - [x] что делать
   - [x] когда review
 - [x] тяжелые факты и источники по умолчанию спрятаны во второй слой
+- [x] WCAG 2.1 AA compliance (2026-04-13):
+  - [x] colorblind-friendly palette (blue/orange вместо red/green)
+  - [x] visual icons для status indicators (✓ ⚠ ✕)
+  - [x] data-ink ratio optimization в графиках
+- [ ] еще сильнее сократить шум в `Разборе рынка`
+- [ ] weekly workflow поверх command center
 
 ### Phase 4 — Attention Engine + Telegram Inbox
 
