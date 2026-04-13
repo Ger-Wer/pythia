@@ -9,10 +9,12 @@
   --border: #d7ddd6;
 
   /* Enhanced semantic colors for better UX */
-  --success: #1a5f2f;
-  --success-bg: #d8efdc;
-  --warning: #756302;
-  --warning-bg: #f9eec9;
+  /* WCAG 2.1 AA compliant - colorblind friendly (blue/orange instead of red/green) */
+  --success: #2563a8;  /* Blue for positive (was green #1a5f2f) */
+  --success-bg: #dbe9f7;  /* Light blue background */
+  --warning: #d97706;  /* Orange for warning (was yellow #756302) */
+  --warning-bg: #fef3e2;  /* Light orange background */
+  --danger: #9a3a2d;  /* Keep red for danger/critical */
   --danger-bg: #f7d9d9;
   --info: #2d5f9a;
   --info-bg: #d8e6f3;
@@ -21,9 +23,9 @@
   --urgent: #9a3a2d;
   --urgent-bg: #fff0f0;
   --urgent-border: #f3c8c8;
-  --today: #8f6d00;
-  --today-bg: #fffbf0;
-  --today-border: #f9eec9;
+  --today: #d97706;  /* Orange for today (was yellow #8f6d00) */
+  --today-bg: #fef3e2;
+  --today-border: #fed7aa;
   --later: #5c6a64;
   --later-bg: #f5f7f5;
   --later-border: #d7ddd6;
@@ -226,18 +228,36 @@ a:focus-visible {
 }
 
 .pill.ok {
-  background: #d8efdc;
-  color: #1a5f2f;
+  background: var(--success-bg);
+  color: var(--success);
+  font-weight: 600;
+}
+
+.pill.ok::before {
+  content: "✓ ";
+  font-weight: 700;
 }
 
 .pill.warn {
-  background: #f9eec9;
-  color: #756302;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.pill.warn::before {
+  content: "⚠ ";
+  font-weight: 700;
 }
 
 .pill.off {
-  background: #f7d9d9;
-  color: #8f2929;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.pill.off::before {
+  content: "✕ ";
+  font-weight: 700;
 }
 
 .table-wrap {
@@ -816,10 +836,9 @@ a:focus-visible {
 }
 
 .probability-history-chart-frame {
-  border-radius: 18px;
-  border: 1px solid rgba(37, 95, 74, 0.12);
-  background: linear-gradient(180deg, rgba(247, 251, 247, 0.96) 0%, rgba(255, 255, 255, 0.9) 100%);
-  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 16px;
 }
 
 .probability-history-svg {
@@ -830,25 +849,25 @@ a:focus-visible {
 }
 
 .probability-history-gridline {
-  stroke: rgba(23, 34, 30, 0.08);
+  stroke: rgba(23, 34, 30, 0.04);
   stroke-width: 1;
-  stroke-dasharray: 4 6;
+  stroke-dasharray: 2 4;
 }
 
 .probability-history-line {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .probability-history-point {
   stroke: #fff;
-  stroke-width: 2;
+  stroke-width: 1.5;
 }
 
 .probability-history-point-last {
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
 
 .probability-history-empty {

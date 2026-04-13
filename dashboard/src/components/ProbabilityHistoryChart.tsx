@@ -101,7 +101,7 @@ export function ProbabilityHistoryChart({ history = [] }: ProbabilityHistoryChar
             preserveAspectRatio="none"
           >
             <g aria-hidden="true">
-              {[25, 50, 75].map((tick) => {
+              {[50].map((tick) => {
                 const y = paddingY + ((100 - tick) / 100) * innerHeight;
                 return <line key={tick} className="probability-history-gridline" x1={paddingX} x2={chartWidth - paddingX} y1={y} y2={y} />;
               })}
