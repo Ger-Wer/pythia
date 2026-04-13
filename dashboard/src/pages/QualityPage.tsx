@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { CategoryBreakdownTable } from "../components/CategoryBreakdownTable";
 import { MetricGlossaryPanel } from "../components/MetricGlossaryPanel";
@@ -66,6 +67,24 @@ export function QualityPage() {
       </section>
 
       {quality ? <QualityKpiGrid data={quality} /> : null}
+
+      <section className="panel">
+        <h2>Детальный анализ</h2>
+        <p className="muted">Углублённые дашборды для анализа качества решений</p>
+        <div className="quality-nav-grid">
+          <Link to="/quality/shadow-performance" className="quality-nav-card">
+            <div className="quality-nav-icon">📊</div>
+            <h3>Shadow Performance</h3>
+            <p>Анализ производительности shadow-режима: equity curve, лучшие/худшие позиции, список всех сделок</p>
+          </Link>
+          <Link to="/quality/operator-vs-shadow" className="quality-nav-card">
+            <div className="quality-nav-icon">⚖️</div>
+            <h3>Operator vs Shadow</h3>
+            <p>Сравнение operator и shadow: agreement rate, performance delta, divergence cases</p>
+          </Link>
+        </div>
+      </section>
+
       {quality?.resolved_predictions ? <CategoryBreakdownTable rows={categoryBreakdown} /> : null}
       {quality ? <MetricGlossaryPanel items={quality.glossary} /> : null}
     </main>
