@@ -24,6 +24,11 @@ DEFAULT_LAST_PREDICTIONS = 10
 BOT_COMMANDS = [
     ("help", "Список команд и инструкция"),
     ("status", "Сводный статус системы"),
+    ("inbox", "Показать pending attention items"),
+    ("done", "Закрыть attention item: /done <id>"),
+    ("later", "Отложить на потом: /later <id>"),
+    ("urgent", "Поднять приоритет: /urgent <id>"),
+    ("snooze", "Отложить (алиас /later): /snooze <id>"),
     ("forecast", "Ручной запуск дневного прогона"),
     ("resolve", "Проверка resolved маркетов"),
     ("weekly", "Недельный отчёт и анализ"),
@@ -42,6 +47,16 @@ COMMAND_ALIASES = {
     "помощь": "help",
     "status": "status",
     "статус": "status",
+    "inbox": "inbox",
+    "инбокс": "inbox",
+    "done": "done",
+    "готово": "done",
+    "later": "later",
+    "позже": "later",
+    "urgent": "urgent",
+    "срочно": "urgent",
+    "snooze": "snooze",
+    "отложить": "snooze",
     "forecast": "forecast",
     "прогноз": "forecast",
     "resolve": "resolve",
@@ -112,15 +127,28 @@ def build_help_message() -> str:
             "Команды Pythia Operator:",
             "/help или помощь - показать эту справку",
             "/status или статус - сводка по сервисам и базе",
+            "",
+            "📬 Attention Items:",
+            "/inbox или инбокс - показать открытые attention items",
+            "/inbox urgent - только срочные",
+            "/inbox today - только на сегодня",
+            "/done <id> или готово <id> - закрыть item",
+            "/later <id> или позже <id> - отложить на потом",
+            "/urgent <id> или срочно <id> - поднять приоритет",
+            "/snooze <id> или отложить <id> - отложить (алиас /later)",
+            "",
+            "🔮 Прогнозы:",
             "/forecast или прогноз - вручную запустить forecast",
             "/resolve или резолв - проверить resolved-маркеты",
             "/weekly или недельный отчет - собрать недельную сводку",
             "/day0 или проверка рынка - выполнить day0 check",
             "/edge - посчитать edge и Brier score",
-            "/logs или логи - показать последние строки логов",
-            "/health или здоровье - показать состояние сервисов",
             "/last_predictions или последние - вывести последние прогнозы",
             "/details <номер|market_id> или детали <номер|market_id> - показать полный разбор рынка",
+            "",
+            "🔧 Система:",
+            "/logs или логи - показать последние строки логов",
+            "/health или здоровье - показать состояние сервисов",
         ]
     )
 
@@ -504,6 +532,16 @@ def run_command(command: list[str], timeout: int = 600) -> tuple[int, str, str]:
 def run_operator_command(command_key: str, command_arg: str | None = None) -> str:
     if command_key == "help":
         return build_help_message()
+    if command_key == "inbox":
+        return render_inbox(priority=command_arg)
+    if command_key == "done":
+        return transition_attention_item_command(command_arg, "close")
+    if command_key == "later":
+        return transition_attention_item_command(command_arg, "bump_later")
+    if command_key == "urgent":
+        return transition_attention_item_command(command_arg, "bump_today")
+    if command_key == "snooze":
+        return transition_attention_item_command(command_arg, "bump_later")
     if command_key in {"forecast", "resolve", "weekly"}:
         return _run_entrypoint_command(command_key)
     if command_key == "day0":
@@ -605,6 +643,60 @@ def format_last_predictions_report(db_path: Path | str, limit: int = DEFAULT_LAS
 
 def render_last_predictions(limit: int = DEFAULT_LAST_PREDICTIONS) -> str:
     return format_last_predictions_report(DB_PATH, limit)
+
+
+def render_inbox(priority: str | None = None) -> str:
+    """Показать pending attention items."""
+    core = build_operator_core()
+    items = core.list_attention_items(priority=priority, status="open")
+    
+    if not items:
+        if priority:
+            return f"📭 Нет открытых attention items с приоритетом '{priority}'."
+        return "📭 Нет открытых attention items."
+    
+    lines = ["📬 Открытые attention items:", ""]
+    for item in items:
+        priority_emoji = {"urgent": "🔴", "today": "🟡", "later": "🔵"}.get(item.get("priority"), "⚪")
+        item_id = item.get("id")
+        item_priority = item.get("priority", "unknown")
+        item_title = item.get("title", "")
+        item_detail = item.get("detail", "")
+        lines.append(
+            f"{priority_emoji} #{item_id} [{item_priority}] {item_title}\n"
+            f"   {item_detail}\n"
+            f"   Действия: /done {item_id} | /later {item_id} | /urgent {item_id}"
+        )
+    
+    return "\n".join(lines)
+
+
+def transition_attention_item_command(item_id_str: str | None, action: str) -> str:
+    """Выполнить transition для attention item."""
+    if not item_id_str:
+        action_name = {"close": "done", "bump_later": "later", "bump_today": "urgent"}.get(action, action)
+        return f"❌ Укажите ID attention item. Пример: /{action_name} 123"
+    
+    try:
+        item_id = int(item_id_str)
+    except ValueError:
+        return f"❌ Неверный ID: {item_id_str}. Должно быть число."
+    
+    core = build_operator_core()
+    try:
+        result = core.transition_attention_item(item_id, action)
+        action_text = {
+            "close": "закрыт",
+            "bump_later": "отложен на потом",
+            "bump_today": "поднят в приоритет",
+        }.get(action, action)
+        status = result.get("status", "unknown")
+        priority = result.get("priority", "unknown")
+        return f"✅ Attention item #{item_id} {action_text}.\n\nСтатус: {status}, Приоритет: {priority}"
+    except LookupError:
+        return f"❌ Attention item #{item_id} не найден."
+    except Exception as exc:
+        return f"❌ Ошибка при обработке: {exc}"
 
 
 def build_operator_core(db_path: Path | str = DB_PATH, log_dir: Path | str = LOG_DIR) -> OperatorCore:
