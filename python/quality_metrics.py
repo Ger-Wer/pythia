@@ -82,12 +82,23 @@ def get_best_position(
     to_date: str | None = None,
 ) -> dict[str, Any] | None:
     """Get best performing position."""
-    result = _fetchone_dict(
+    return _fetchone_dict(
         conn,
         """
-        SELECT market_id, pnl_usd, pnl_percent
+        SELECT
+          id,
+          market_id,
+          side,
+          status,
+          entry_yes_price,
+          size_contracts,
+          notional_usd,
+          opened_at,
+          closed_at,
+          pnl_usd,
+          pnl_percent
         FROM positions
-        WHERE mode = ? 
+        WHERE mode = ?
           AND status = 'closed'
           AND pnl_usd IS NOT NULL
           AND (? IS NULL OR opened_at >= ?)
@@ -97,15 +108,6 @@ def get_best_position(
         """,
         (mode, from_date, from_date, to_date, to_date),
     )
-    
-    if result is None:
-        return None
-    
-    return {
-        "market_id": str(result.get("market_id") or ""),
-        "pnl_usd": float(result.get("pnl_usd") or 0.0),
-        "pnl_percent": float(result.get("pnl_percent") or 0.0),
-    }
 
 
 def get_worst_position(
@@ -116,12 +118,23 @@ def get_worst_position(
     to_date: str | None = None,
 ) -> dict[str, Any] | None:
     """Get worst performing position."""
-    result = _fetchone_dict(
+    return _fetchone_dict(
         conn,
         """
-        SELECT market_id, pnl_usd, pnl_percent
+        SELECT
+          id,
+          market_id,
+          side,
+          status,
+          entry_yes_price,
+          size_contracts,
+          notional_usd,
+          opened_at,
+          closed_at,
+          pnl_usd,
+          pnl_percent
         FROM positions
-        WHERE mode = ? 
+        WHERE mode = ?
           AND status = 'closed'
           AND pnl_usd IS NOT NULL
           AND (? IS NULL OR opened_at >= ?)
@@ -131,15 +144,6 @@ def get_worst_position(
         """,
         (mode, from_date, from_date, to_date, to_date),
     )
-    
-    if result is None:
-        return None
-    
-    return {
-        "market_id": str(result.get("market_id") or ""),
-        "pnl_usd": float(result.get("pnl_usd") or 0.0),
-        "pnl_percent": float(result.get("pnl_percent") or 0.0),
-    }
 
 
 def get_equity_curve(
@@ -181,15 +185,18 @@ def get_positions_list(
     return _fetchall_dicts(
         conn,
         """
-        SELECT 
+        SELECT
           id,
           market_id,
-          mode,
+          side,
           status,
-          pnl_usd,
-          pnl_percent,
+          entry_yes_price,
+          size_contracts,
+          notional_usd,
           opened_at,
-          closed_at
+          closed_at,
+          pnl_usd,
+          pnl_percent
         FROM positions
         WHERE mode = ?
           AND (? IS NULL OR opened_at >= ?)
