@@ -253,3 +253,40 @@ class ReviewCompleteResponse(BaseModel):
     review_id: int
     status: str
     market_id: str
+
+
+class PositionSummary(BaseModel):
+    id: int
+    market_id: str
+    question: str | None = None
+    side: str
+    status: str
+    entry_yes_price: float
+    size_contracts: float
+    notional_usd: float
+    opened_at: str
+    closed_at: str | None = None
+    pnl_usd: float | None = None
+    pnl_percent: float | None = None
+
+
+class EquityCurvePoint(BaseModel):
+    date: str
+    cumulative_pnl: float
+
+
+class ShadowPerformanceSummary(BaseModel):
+    total_positions: int
+    open_positions: int
+    closed_positions: int
+    win_rate: float | None = None
+    avg_pnl_usd: float | None = None
+    total_pnl_usd: float | None = None
+    best_position: PositionSummary | None = None
+    worst_position: PositionSummary | None = None
+
+
+class ShadowPerformanceResponse(BaseModel):
+    summary: ShadowPerformanceSummary
+    equity_curve: list[EquityCurvePoint] = Field(default_factory=list)
+    positions: list[PositionSummary] = Field(default_factory=list)

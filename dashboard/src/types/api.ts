@@ -429,3 +429,25 @@ export interface MeResponse {
   authenticated: boolean;
   username: string | null;
 }
+
+export interface EquityCurvePoint {
+  date: string;
+  cumulative_pnl: number;
+}
+
+export interface ShadowPerformanceSummary {
+  total_positions: number;
+  open_positions: number;
+  closed_positions: number;
+  win_rate: number | null;
+  avg_pnl_usd: number | null;
+  total_pnl_usd: number | null;
+  best_position: PositionSummary | null;
+  worst_position: PositionSummary | null;
+}
+
+export interface ShadowPerformanceResponse {
+  summary: ShadowPerformanceSummary;
+  equity_curve: EquityCurvePoint[];
+  positions: PositionSummary[];
+}

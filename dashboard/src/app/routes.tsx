@@ -6,6 +6,7 @@ import { MarketDetailPage } from "../pages/MarketDetailPage";
 import { OperationsPage } from "../pages/OperationsPage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { QualityPage } from "../pages/QualityPage";
+import { ShadowPerformancePage } from "../pages/ShadowPerformancePage";
 import { WatchlistPage } from "../pages/WatchlistPage";
 
 export const router = createBrowserRouter([
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
       { index: true, element: <OverviewPage /> },
       { path: "runs/latest", element: <LatestRunPage /> },
       { path: "quality", element: <QualityPage /> },
+      { path: "quality/shadow-performance", element: <ShadowPerformancePage /> },
       { path: "markets/:marketId", element: <MarketDetailPage /> },
       { path: "watchlist", element: <WatchlistPage /> },
       { path: "operations", element: <OperationsPage /> },

@@ -45,6 +45,15 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${minutes} мин ${restSeconds} сек`;
 }
 
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "$0.00";
+  }
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  return `${sign}$${abs.toFixed(2)}`;
+}
+
 export function shortenQuestion(question: string, maxLength = 90): string {
   if (question.length <= maxLength) {
     return question;

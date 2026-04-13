@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -30,12 +31,14 @@ from python.dashboard_models import (
     QualityResponse,
     ReviewCompleteRequest,
     ReviewCompleteResponse,
+    ShadowPerformanceResponse,
     WatchlistItemRequest,
     WatchDossiersResponse,
     WatchUpdatesResponse,
     WatchlistResponse,
 )
 from python.operator_core import OperatorCore, SAFE_ACTION_NAMES
+from python import quality_metrics
 
 SESSION_COOKIE_NAME = "pythia_dashboard_session"
 
@@ -110,6 +113,23 @@ def create_app(
     def quality(request: Request) -> QualityResponse:
         require_session(request)
         return QualityResponse(**core.get_quality())
+
+    @app.get("/api/quality/shadow-performance", response_model=ShadowPerformanceResponse)
+    def shadow_performance(
+        request: Request,
+        mode: str = "shadow",
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> ShadowPerformanceResponse:
+        require_session(request)
+        with sqlite3.connect(core.db_path) as conn:
+            data = quality_metrics.get_shadow_performance(
+                conn,
+                mode=mode,
+                from_date=from_date,
+                to_date=to_date,
+            )
+        return ShadowPerformanceResponse(**data)
 
     @app.get("/api/logs", response_model=LogsResponse)
     def logs(request: Request) -> LogsResponse:

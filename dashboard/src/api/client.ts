@@ -15,6 +15,7 @@ import type {
   PositionCloseResponse,
   QualityResponse,
   ReviewCompleteResponse,
+  ShadowPerformanceResponse,
   WatchlistResponse,
   WatchDossiersResponse,
   WatchUpdatesResponse,
@@ -42,6 +43,14 @@ export const api = {
   overview: () => request<OverviewResponse>("/api/overview"),
   health: () => request<HealthResponse>("/api/health"),
   quality: () => request<QualityResponse>("/api/quality"),
+  shadowPerformance: (params?: { mode?: string; from_date?: string; to_date?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.mode) searchParams.set("mode", params.mode);
+    if (params?.from_date) searchParams.set("from_date", params.from_date);
+    if (params?.to_date) searchParams.set("to_date", params.to_date);
+    const query = searchParams.toString();
+    return request<ShadowPerformanceResponse>(`/api/quality/shadow-performance${query ? `?${query}` : ""}`);
+  },
   logs: () => request<LogsResponse>("/api/logs"),
   latestRun: () => request<LatestRunResponse>("/api/runs/latest"),
   marketWorkspace: (marketId: string) => request<MarketWorkspaceResponse>(`/api/markets/${marketId}/workspace`),
