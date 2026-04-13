@@ -1607,3 +1607,135 @@ textarea:hover:not(:focus) {
     flex-direction: column;
   }
 }
+
+/* Operator vs Shadow Comparison Styles */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.comparison-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.comparison-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.comparison-delta {
+  background: linear-gradient(135deg, var(--surface-elevated) 0%, var(--surface) 100%);
+  border: 2px solid var(--accent);
+}
+
+.comparison-winner {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--accent-bg);
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.comparison-chart {
+  margin-top: 16px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.legend-color {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.decision-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.decision-accept {
+  background: var(--color-positive-bg);
+  color: var(--color-positive);
+}
+
+.decision-reject {
+  background: var(--color-negative-bg);
+  color: var(--color-negative);
+}
+
+.decision-wait {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.decision-none {
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+}
+
+.outcome-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.outcome-operator_better {
+  background: var(--color-positive-bg);
+  color: var(--color-positive);
+}
+
+.outcome-shadow_better {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.outcome-equal {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.outcome-partial_closed,
+.outcome-pending {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+@media (max-width: 960px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}

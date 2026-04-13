@@ -11,6 +11,7 @@ import type {
   MarketWorkspaceResponse,
   MeResponse,
   OpenPositionsResponse,
+  OperatorVsShadowResponse,
   OverviewResponse,
   PositionCloseResponse,
   QualityResponse,
@@ -50,6 +51,13 @@ export const api = {
     if (params?.to_date) searchParams.set("to_date", params.to_date);
     const query = searchParams.toString();
     return request<ShadowPerformanceResponse>(`/api/quality/shadow-performance${query ? `?${query}` : ""}`);
+  },
+  operatorVsShadow: (params?: { from_date?: string; to_date?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set("from_date", params.from_date);
+    if (params?.to_date) searchParams.set("to_date", params.to_date);
+    const query = searchParams.toString();
+    return request<OperatorVsShadowResponse>(`/api/quality/operator-vs-shadow${query ? `?${query}` : ""}`);
   },
   logs: () => request<LogsResponse>("/api/logs"),
   latestRun: () => request<LatestRunResponse>("/api/runs/latest"),

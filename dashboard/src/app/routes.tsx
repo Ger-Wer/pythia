@@ -4,6 +4,7 @@ import { LatestRunPage } from "../pages/LatestRunPage";
 import { LoginPage } from "../pages/LoginPage";
 import { MarketDetailPage } from "../pages/MarketDetailPage";
 import { OperationsPage } from "../pages/OperationsPage";
+import { OperatorVsShadowPage } from "../pages/OperatorVsShadowPage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { QualityPage } from "../pages/QualityPage";
 import { ShadowPerformancePage } from "../pages/ShadowPerformancePage";
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: "runs/latest", element: <LatestRunPage /> },
       { path: "quality", element: <QualityPage /> },
       { path: "quality/shadow-performance", element: <ShadowPerformancePage /> },
+      { path: "quality/operator-vs-shadow", element: <OperatorVsShadowPage /> },
       { path: "markets/:marketId", element: <MarketDetailPage /> },
       { path: "watchlist", element: <WatchlistPage /> },
       { path: "operations", element: <OperationsPage /> },

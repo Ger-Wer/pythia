@@ -25,6 +25,7 @@ from python.dashboard_models import (
     MarketWorkspaceResponse,
     MeResponse,
     OpenPositionsResponse,
+    OperatorVsShadowResponse,
     OverviewResponse,
     PositionCloseRequest,
     PositionCloseResponse,
@@ -38,7 +39,7 @@ from python.dashboard_models import (
     WatchlistResponse,
 )
 from python.operator_core import OperatorCore, SAFE_ACTION_NAMES
-from python import quality_metrics
+from python import quality_metrics, comparison_metrics
 
 SESSION_COOKIE_NAME = "pythia_dashboard_session"
 
@@ -130,6 +131,21 @@ def create_app(
                 to_date=to_date,
             )
         return ShadowPerformanceResponse(**data)
+
+    @app.get("/api/quality/operator-vs-shadow", response_model=OperatorVsShadowResponse)
+    def operator_vs_shadow(
+        request: Request,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> OperatorVsShadowResponse:
+        require_session(request)
+        with sqlite3.connect(core.db_path) as conn:
+            data = comparison_metrics.get_operator_vs_shadow_comparison(
+                conn,
+                from_date=from_date,
+                to_date=to_date,
+            )
+        return OperatorVsShadowResponse(**data)
 
     @app.get("/api/logs", response_model=LogsResponse)
     def logs(request: Request) -> LogsResponse:

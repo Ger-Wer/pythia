@@ -451,3 +451,55 @@ export interface ShadowPerformanceResponse {
   equity_curve: EquityCurvePoint[];
   positions: PositionSummary[];
 }
+
+export interface ModePerformance {
+  total_positions: number;
+  closed_positions: number;
+  win_rate: number | null;
+  avg_pnl_usd: number | null;
+  total_pnl_usd: number | null;
+}
+
+export interface PerformanceDelta {
+  win_rate_delta: number | null;
+  avg_pnl_delta: number | null;
+  total_pnl_delta: number | null;
+}
+
+export interface ComparisonSummary {
+  total_signals: number;
+  operator_decisions: number;
+  shadow_decisions: number;
+  agreement_rate: number | null;
+  operator_performance: ModePerformance;
+  shadow_performance: ModePerformance;
+  performance_delta: PerformanceDelta;
+}
+
+export interface DivergenceCase {
+  signal_id: number;
+  market_id: string;
+  question: string | null;
+  signal_created_at: string;
+  operator_decision: string | null;
+  shadow_decision: string | null;
+  operator_position_id: number | null;
+  shadow_position_id: number | null;
+  operator_pnl_usd: number | null;
+  shadow_pnl_usd: number | null;
+  operator_status: string | null;
+  shadow_status: string | null;
+  outcome: string;
+}
+
+export interface ComparisonChartPoint {
+  date: string;
+  operator_cumulative_pnl: number;
+  shadow_cumulative_pnl: number;
+}
+
+export interface OperatorVsShadowResponse {
+  summary: ComparisonSummary;
+  divergence_cases: DivergenceCase[];
+  comparison_chart: ComparisonChartPoint[];
+}

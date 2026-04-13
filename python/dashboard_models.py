@@ -290,3 +290,55 @@ class ShadowPerformanceResponse(BaseModel):
     summary: ShadowPerformanceSummary
     equity_curve: list[EquityCurvePoint] = Field(default_factory=list)
     positions: list[PositionSummary] = Field(default_factory=list)
+
+
+class ModePerformance(BaseModel):
+    total_positions: int
+    closed_positions: int
+    win_rate: float | None = None
+    avg_pnl_usd: float | None = None
+    total_pnl_usd: float | None = None
+
+
+class PerformanceDelta(BaseModel):
+    win_rate_delta: float | None = None
+    avg_pnl_delta: float | None = None
+    total_pnl_delta: float | None = None
+
+
+class ComparisonSummary(BaseModel):
+    total_signals: int
+    operator_decisions: int
+    shadow_decisions: int
+    agreement_rate: float | None = None
+    operator_performance: ModePerformance
+    shadow_performance: ModePerformance
+    performance_delta: PerformanceDelta
+
+
+class DivergenceCase(BaseModel):
+    signal_id: int
+    market_id: str
+    question: str | None = None
+    signal_created_at: str
+    operator_decision: str | None = None
+    shadow_decision: str | None = None
+    operator_position_id: int | None = None
+    shadow_position_id: int | None = None
+    operator_pnl_usd: float | None = None
+    shadow_pnl_usd: float | None = None
+    operator_status: str | None = None
+    shadow_status: str | None = None
+    outcome: str
+
+
+class ComparisonChartPoint(BaseModel):
+    date: str
+    operator_cumulative_pnl: float
+    shadow_cumulative_pnl: float
+
+
+class OperatorVsShadowResponse(BaseModel):
+    summary: ComparisonSummary
+    divergence_cases: list[DivergenceCase] = Field(default_factory=list)
+    comparison_chart: list[ComparisonChartPoint] = Field(default_factory=list)
