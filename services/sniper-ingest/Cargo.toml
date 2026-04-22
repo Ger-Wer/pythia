@@ -10,6 +10,10 @@ description = "Fast Loop: mempool subscriber, oracle decoder, trigger matcher."
 name = "sniper-ingest"
 path = "src/main.rs"
 
+[lib]
+name = "sniper_ingest"
+path = "src/lib.rs"
+
 [dependencies]
 dual_loop_common = { path = "../common" }
 tokio.workspace = true
@@ -19,3 +23,8 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 metrics.workspace = true
+dashmap.workspace = true
+prost.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true

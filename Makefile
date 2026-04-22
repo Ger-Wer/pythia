@@ -6,7 +6,8 @@
 .PHONY: help dev-up dev-down dev-logs dev-ps \
         fmt lint test check \
         rust-fmt rust-lint rust-test rust-check rust-build \
-        proto-lint proto-gen proto-breaking \
+        proto-lint proto-gen proto-gen-ts proto-breaking \
+        bus-cross-lang-test \
         clean
 
 # -------- Help --------
@@ -69,8 +70,16 @@ proto-lint: ## buf lint
 proto-breaking: ## buf breaking --against origin/main
 	cd schemas && buf breaking --against '.git#branch=main,subdir=schemas'
 
-proto-gen: ## Сгенерировать Rust + TS клиенты из .proto
-	cd schemas && buf generate
+proto-gen: proto-gen-ts ## Сгенерировать Rust (prost-build) + TS клиенты
+	cd services && cargo build -p dual_loop_common
+
+proto-gen-ts: ## TS-клиенты из .proto (buf + ts-proto). Требует `bun install`.
+	bash scripts/proto-gen-ts.sh
+
+bus-cross-lang-test: ## Cross-language contract test (TS publish → Rust consume). Требует локальный Redis.
+	@REDIS_URL=$${REDIS_URL:-redis://127.0.0.1:6379}; \
+	 echo "Using REDIS_URL=$$REDIS_URL"; \
+	 cd services && REDIS_URL=$$REDIS_URL cargo test -p dual_loop_common --test cross_lang -- --ignored --nocapture
 
 # -------- Umbrella --------
 

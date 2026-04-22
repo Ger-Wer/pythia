@@ -1,13 +1,15 @@
 version: v2
+# Rust clients are produced by `services/common/build.rs` via `prost-build`
+# (see that file) — NOT by buf. Running `buf generate` only writes TS output.
+# If you need to regenerate Rust, run `cargo build -p dual_loop_common`.
 plugins:
-  - remote: buf.build/community/neoeinstein-prost
-    out: ../services/common/src/generated
-    opt:
-      - bytes=.
-  - remote: buf.build/community/stephenh-ts-proto
+  - local: ../node_modules/.bin/protoc-gen-ts_proto
     out: ../src/generated
+    strategy: all
     opt:
       - esModuleInterop=true
       - outputServices=false
       - useOptionals=messages
       - env=node
+      - forceLong=bigint
+      - oneof=unions

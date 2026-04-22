@@ -6,6 +6,10 @@ import type { SafetyPipeline } from './safety_pipeline';
 import { fetchMarket, marketPriceFromYesOutcome } from '../tools/polymarket';
 import type { PolymarketMarket } from '../tools/polymarket';
 import { sendTelegramAlert, formatSafetyRejectionAlert } from './telegram_alerts';
+import {
+  classifyDecision,
+  getWatchlistPublisher,
+} from './watchlist_publisher';
 
 type DecisionAction = 'watch' | 'review' | 'enter_yes' | 'enter_no';
 type PositionMode = 'shadow' | 'operator';
@@ -1374,6 +1378,49 @@ export async function syncDecisionCoreForForecastRun(db: Database, forecastTimes
   }
 
   refreshOverdueReviews(db, forecastTimestamp);
+
+  // Dual-Loop bus hook (Phase 1). Feature-flagged via DUAL_LOOP_BUS_ENABLED;
+  // when off this returns immediately and existing Pythia behaviour is
+  // preserved byte-for-byte. Runs in a post-commit microtask so SQLite
+  // writes are never blocked by Redis I/O.
+  queueMicrotask(() => {
+    void publishDecisionsToWatchlistBus(Array.from(signals.values()), forecastTimestamp);
+  });
+}
+
+async function publishDecisionsToWatchlistBus(
+  signals: SignalSnapshot[],
+  forecastTimestamp: string,
+): Promise<void> {
+  const publisher = getWatchlistPublisher();
+  if (!publisher.enabled) return;
+
+  for (const signal of signals) {
+    const kind = classifyDecision(signal.recommended_action);
+    if (kind === 'skip') continue;
+    try {
+      await publisher.maybePublishDecision({
+        marketId: signal.market_id,
+        ctfAddress: '',
+        recommendedAction: signal.recommended_action,
+        pFundamental: signal.best_probability ?? signal.research_probability ?? 0,
+        pMarket: signal.market_price ?? null,
+        confidence: null,
+        version: signal.id,
+        traceId: `forecast:${forecastTimestamp}:${signal.market_id}`,
+      });
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          component: 'decision_core',
+          msg: 'watchlist publish error',
+          market_id: signal.market_id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    }
+  }
 }
 
 export function ensureDecisionCoreSchemaForPythonCompat(db: Database): void {
