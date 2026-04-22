@@ -15,6 +15,15 @@ on:
       - src/services/watchlist_publisher.ts
       - scripts/contract/**
       - scripts/proto-gen-ts.sh
+      - sql/**
+      - src/db/**
+      - src/services/db_pg.ts
+      - src/services/db_shadow.ts
+      - src/services/db_parity.ts
+      - src/services/__tests__/**
+      - scripts/pg_*.sh
+      - scripts/pg_initial_load.ts
+      - drizzle.config.ts
       - package.json
       - bun.lock
   pull_request:
@@ -30,6 +39,15 @@ on:
       - src/services/watchlist_publisher.ts
       - scripts/contract/**
       - scripts/proto-gen-ts.sh
+      - sql/**
+      - src/db/**
+      - src/services/db_pg.ts
+      - src/services/db_shadow.ts
+      - src/services/db_parity.ts
+      - src/services/__tests__/**
+      - scripts/pg_*.sh
+      - scripts/pg_initial_load.ts
+      - drizzle.config.ts
       - package.json
       - bun.lock
 
@@ -181,3 +199,56 @@ jobs:
             test -f "docs/dual_loop/$f" || { echo "missing docs/dual_loop/$f"; exit 1; }
           done
           echo "All dual_loop docs present."
+
+  shadow-pg-tests:
+    name: Shadow PG (drizzle migrate + bun test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pythia_dev
+          POSTGRES_USER: pythia
+          POSTGRES_PASSWORD: pythia_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pythia -d pythia_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DUAL_LOOP_PG_URL: postgres://pythia:pythia_dev_password@127.0.0.1:5432/pythia_dev
+      DUAL_LOOP_PG_TEST_URL: postgres://pythia:pythia_dev_password@127.0.0.1:5432/pythia_dev
+      DEEPSEEK_API_KEY: ci-stub-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install JS deps
+        run: bun install --frozen-lockfile
+
+      - name: Verify drizzle-kit generate is in sync with schema
+        run: |
+          bun x drizzle-kit generate --name ci_verify
+          # drizzle-kit writes either a no-op marker or an additional SQL file;
+          # fail only when the *schema* snapshot or SQL content drifts.
+          if ! git diff --quiet sql/migrations/; then
+            echo "::error::Schema drift detected. Run 'bun run db:pg:generate' and commit the result."
+            git --no-pager diff sql/migrations/ | head -200
+            exit 1
+          fi
+
+      - name: Apply migrations to Postgres
+        run: bash scripts/pg_migrate.sh
+
+      - name: Bun test (db_pg / db_shadow / db_parity)
+        run: bun test src/services/__tests__/db_pg.test.ts src/services/__tests__/db_shadow.test.ts src/services/__tests__/db_parity.test.ts
+
+      - name: db:parity smoke run on empty shadow
+        run: bun run db:parity

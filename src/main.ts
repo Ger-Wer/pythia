@@ -7,8 +7,10 @@ import {
   CostTracker,
 } from './services/cost_tracker';
 import { syncDecisionCoreForForecastRun } from './services/decision_core';
-import { initDb, insertPrediction, getTodayCost } from './services/db';
-import type { Database } from './services/db';
+// Phase 1 — Track D: writes fan out through db_shadow when
+// DUAL_LOOP_SHADOW_PG=true, otherwise behaviour is identical to ./services/db.
+import { initDb, insertPrediction, getTodayCost } from './services/db_shadow';
+import type { Database } from './services/db_shadow';
 import { evaluateMarketPrediction } from './services/forecast_evaluator';
 import {
   buildResearchBrief,

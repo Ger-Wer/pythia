@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { CONFIG } from './config';
 import { CostTracker } from './services/cost_tracker';
-import { initDb } from './services/db';
+import { initDb } from './services/db_shadow';
 import type {
   DeepReviewInput,
   DeepReviewResult,
