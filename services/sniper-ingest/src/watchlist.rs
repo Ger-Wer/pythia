@@ -20,20 +20,25 @@ use std::time::Duration;
 use dashmap::DashMap;
 use dual_loop_common::bus::ConsumerMessage;
 use dual_loop_common::proto::watchlist::{TriggerPolicy, WatchlistRemove, WatchlistUpsert};
+use dual_loop_common::proto::{ppm_to_prob, PROBABILITY_PPM_PER_UNIT};
 use dual_loop_common::time::StampedTime;
 use tracing::{debug, info, warn};
 
 /// Composite key: (polymarket_id, ctf_address).
 pub type MarketKey = (String, String);
 
-/// One watchlist entry kept in memory.
+/// One watchlist entry kept in memory. All fields are already in integer
+/// fixed-point (no float on the wire — see `schemas/dual_loop/v1/common.proto`).
 #[derive(Debug, Clone)]
 pub struct WatchlistEntry {
     pub market_key: MarketKey,
     pub version: u64,
-    pub edge: f64,
-    pub p_fundamental: f64,
-    pub confidence: f64,
+    /// Signed probability difference in ppm (1_000_000 = 100%).
+    pub edge_ppm: i64,
+    /// 0..1_000_000.
+    pub p_fundamental_ppm: i64,
+    /// 0..1_000_000.
+    pub confidence_ppm: i64,
     pub side_hint: i32,
     pub max_position_micros: i64,
     pub max_slippage_bps: u32,
@@ -45,11 +50,7 @@ pub struct WatchlistEntry {
 impl WatchlistEntry {
     pub fn from_upsert(msg: &WatchlistUpsert) -> Option<Self> {
         let market = msg.market.as_ref()?;
-        let issued_ms = msg
-            .issued_at
-            .as_ref()
-            .map(|t| t.wall_clock_unix_ms)
-            .unwrap_or(0);
+        let issued_ms = msg.issued_at_unix_ms;
         let ttl_ms = msg.ttl_ms.max(0);
         let expires_at_unix_ms = if issued_ms > 0 {
             issued_ms.saturating_add(ttl_ms)
@@ -64,15 +65,35 @@ impl WatchlistEntry {
         Some(Self {
             market_key: (market.polymarket_id.clone(), market.ctf_address.clone()),
             version: msg.version,
-            edge: msg.edge,
-            p_fundamental: msg.p_fundamental,
-            confidence: msg.confidence,
+            edge_ppm: msg.edge_ppm,
+            p_fundamental_ppm: msg.p_fundamental_ppm,
+            confidence_ppm: msg.confidence_ppm,
             side_hint: msg.side_hint,
             max_position_micros,
             max_slippage_bps: msg.max_slippage_bps,
             expires_at_unix_ms,
             trigger_policy: msg.trigger_policy.clone(),
         })
+    }
+
+    /// Convenience: edge as a unit-interval float for display/metrics.
+    #[inline]
+    pub fn edge_unit(&self) -> f64 {
+        ppm_to_prob(self.edge_ppm)
+    }
+
+    /// Convenience: probability as a unit-interval float for display.
+    #[inline]
+    pub fn p_fundamental_unit(&self) -> f64 {
+        ppm_to_prob(self.p_fundamental_ppm)
+    }
+
+    /// True iff the `_ppm` fields are within the valid range.
+    #[inline]
+    pub fn is_sane(&self) -> bool {
+        (-PROBABILITY_PPM_PER_UNIT..=PROBABILITY_PPM_PER_UNIT).contains(&self.edge_ppm)
+            && (0..=PROBABILITY_PPM_PER_UNIT).contains(&self.p_fundamental_ppm)
+            && (0..=PROBABILITY_PPM_PER_UNIT).contains(&self.confidence_ppm)
     }
 }
 
@@ -219,7 +240,7 @@ impl WatchlistStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+    use dual_loop_common::proto::common::{MarketId, Money};
 
     fn sample_upsert(version: u64, ttl_ms: i64, issued_ms: i64) -> WatchlistUpsert {
         WatchlistUpsert {
@@ -229,19 +250,16 @@ mod tests {
                 ctf_address: "0xdead".into(),
             }),
             version,
-            edge: 0.03,
-            p_fundamental: 0.62,
-            confidence: 0.8,
+            edge_ppm: 30_000,
+            p_fundamental_ppm: 620_000,
+            confidence_ppm: 800_000,
             side_hint: 1,
             max_position_usd: Some(Money {
                 amount_micros: 1_000_000,
             }),
             max_slippage_bps: 50,
             ttl_ms,
-            issued_at: Some(Timestamp {
-                wall_clock_unix_ms: issued_ms,
-                monotonic_ns: 0,
-            }),
+            issued_at_unix_ms: issued_ms,
             trigger_policy: None,
         }
     }
@@ -262,7 +280,7 @@ mod tests {
             }),
             version: 1,
             reason: 0,
-            issued_at: None,
+            issued_at_unix_ms: 0,
         });
         assert!(s.is_empty());
     }

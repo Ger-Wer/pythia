@@ -1907,9 +1907,12 @@ name = "sniper-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "dual_loop_common",
+ "futures",
  "metrics",
  "parking_lot",
+ "prost",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

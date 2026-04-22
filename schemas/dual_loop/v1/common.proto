@@ -3,18 +3,21 @@ syntax = "proto3";
 package dual_loop.v1;
 
 // Общие типы, переиспользуемые в других .proto.
+//
+// Wire convention (Phase 1.1):
+//   * Wall-clock время передаётся как `int64 <name>_unix_ms` (Unix epoch ms).
+//     Монотонные per-host наносекунды живут рядом как отдельные `uint64
+//     <name>_ns` поля — в hot-path trigger'ах, где важна latency.
+//   * Финансовые/вероятностные величины хранятся в integer fixed-point:
+//     - Money       → `int64 amount_micros`   (1_000_000 = $1.00, USDC-like).
+//     - Вероятности → `int64 *_ppm`           (1_000_000 = 100%).
+//     - Знаковые    → `sint64` (ZigZag).
+//   * Double/float запрещены на шине: IEEE-754 округления ломают идемпотентность
+//     и эквивалентность сообщений между Rust/TS/Python.
 
 // UUIDv7 в виде 16 bytes. Используется как message_id для idempotency/dedup.
 message Uuid {
   bytes value = 1; // 16 bytes
-}
-
-// Временная метка с раздельным wall-clock (UTC) и monotonic clock (per-host ns).
-// wall_clock_unix_ms — для human-readable correlation.
-// monotonic_ns — для latency-расчётов внутри одного хоста.
-message Timestamp {
-  int64 wall_clock_unix_ms = 1;
-  uint64 monotonic_ns = 2;
 }
 
 // Идентификатор рынка Polymarket.
@@ -26,6 +29,8 @@ message MarketId {
 }
 
 // Цена/деньги в fixed-point (6 decimals, как USDC). 1_000_000 = $1.00.
+// Также используется для цен в USDC-доминированных парах (Polymarket YES/NO
+// тикеры котируются в долларах 0..1 — умножай на 1_000_000).
 message Money {
   int64 amount_micros = 1;
 }
@@ -47,4 +52,17 @@ enum Reason {
   REASON_RESOLVED = 5;
   REASON_KILL_SWITCH = 6;
   REASON_RISK_BLOCKED = 7;
+}
+
+// Константы для конверсии fixed-point ↔ человекочитаемых величин.
+// Определены как message чтобы доехать до клиентов через generated code.
+// Значения захардкожены в consumer'ах и тестах как литералы; этот message —
+// единственное место, где они задокументированы авторитетно.
+message FixedPointScales {
+  // 1_000_000 = 100% вероятности. Используется для *_ppm полей.
+  int64 probability_ppm_per_unit = 1;
+  // 10_000 = 100% доходности (т.е. 1 bps = 0.01%).
+  int64 bps_per_unit = 2;
+  // 1_000_000 = $1.00 (USDC micros).
+  int64 usd_micros_per_unit = 3;
 }

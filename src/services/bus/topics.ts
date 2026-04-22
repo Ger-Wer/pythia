@@ -25,6 +25,10 @@ export const TRIGGERS_FIRED = 'dl.v1.triggers.fired' as const;
 export const CONTROL_KILL = 'dl.v1.control.kill' as const;
 export const CONTROL_KILL_ACK = 'dl.v1.control.kill_ack' as const;
 
+// ---------- Telemetry (sniper-executor → gateway-api, NATS JetStream) ----------
+/** Periodic heartbeat from `sniper-executor`; proxied over WSS to Command Center. */
+export const EXEC_STATUS = 'dl.v1.exec.status' as const;
+
 /**
  * All topics in canonical order. A contract test checks byte-for-byte
  * equivalence with `services/common/src/topics.rs::ALL_TOPICS`.
@@ -36,6 +40,7 @@ export const ALL_TOPICS = [
   TRIGGERS_FIRED,
   CONTROL_KILL,
   CONTROL_KILL_ACK,
+  EXEC_STATUS,
 ] as const;
 
 export type BusTopic = (typeof ALL_TOPICS)[number];

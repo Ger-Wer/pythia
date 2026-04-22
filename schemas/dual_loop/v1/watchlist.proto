@@ -6,21 +6,24 @@ import "dual_loop/v1/common.proto";
 
 // pythia-core → sniper-ingest: добавить/обновить рынок в watchlist.
 // Sniper подписан на CTF-контракт и оракул-события по этому рынку.
+//
+// Integer fixed-point everywhere (см. common.proto): никаких float/double.
 message WatchlistUpsert {
   Uuid message_id = 1;
   MarketId market = 2;
   uint64 version = 3;                      // монотонный per-market
 
-  double edge = 4;                         // P_fundamental - P_market, подписан
-  double p_fundamental = 5;                // 0..1
-  double confidence = 6;                   // 0..1
+  // edge = p_fundamental - p_market, ppm вероятности. Range ±1_000_000, ZigZag.
+  sint64 edge_ppm = 4;
+  int64 p_fundamental_ppm = 5;             // 0..1_000_000
+  int64 confidence_ppm = 6;                // 0..1_000_000
   Side side_hint = 7;
 
   Money max_position_usd = 8;
   uint32 max_slippage_bps = 9;             // 50 = 0.5%
   int64 ttl_ms = 10;                       // watchlist entry expiry
 
-  Timestamp issued_at = 11;
+  int64 issued_at_unix_ms = 11;
 
   // Параметры триггера: какие on-chain события считать триггером.
   TriggerPolicy trigger_policy = 12;
@@ -32,7 +35,7 @@ message WatchlistRemove {
   MarketId market = 2;
   uint64 version = 3;
   Reason reason = 4;
-  Timestamp issued_at = 5;
+  int64 issued_at_unix_ms = 5;
 }
 
 message TriggerPolicy {

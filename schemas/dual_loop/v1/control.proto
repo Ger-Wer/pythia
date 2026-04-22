@@ -36,7 +36,7 @@ message KillAck {
   uint32 active_triggers_cancelled = 6;
   uint32 pending_tx_cancelled = 7;
 
-  Timestamp ack_at = 8;
+  int64 ack_at_unix_ms = 8;
 }
 
 enum KillAckStatus {

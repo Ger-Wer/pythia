@@ -20,3 +20,6 @@ serde.workspace = true
 serde_json.workspace = true
 metrics.workspace = true
 parking_lot.workspace = true
+bytes.workspace = true
+prost.workspace = true
+futures.workspace = true
