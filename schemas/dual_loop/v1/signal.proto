@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package dual_loop.v1;
+
+import "dual_loop/v1/common.proto";
+
+// pythia-core → gateway-api → Command Center:
+// сигнал, ожидающий решения оператора.
+message Signal {
+  Uuid message_id = 1;
+  string signal_id = 2;                    // application-level id (readable)
+  uint64 server_version = 3;               // optimistic concurrency
+
+  MarketId market = 4;
+  string market_question = 5;              // человекочитаемый вопрос
+
+  double edge = 6;
+  double p_fundamental = 7;
+  double p_market = 8;
+  double confidence_low = 9;               // 95% CI low
+  double confidence_high = 10;             // 95% CI high
+  double expected_value_bps = 11;          // EV в bps от position size
+
+  Side side_hint = 12;
+  Money suggested_position = 13;
+  int64 expires_at_unix_ms = 14;
+
+  string llm_rationale = 15;               // plain text, собираемый collapsed в UI
+  repeated string evidence_urls = 16;      // Exa/Tavily sources
+
+  Timestamp issued_at = 17;
+  SignalPriority priority = 18;
+}
+
+enum SignalPriority {
+  SIGNAL_PRIORITY_UNSPECIFIED = 0;
+  SIGNAL_PRIORITY_LOW = 1;
+  SIGNAL_PRIORITY_NORMAL = 2;
+  SIGNAL_PRIORITY_HIGH = 3;
+  SIGNAL_PRIORITY_URGENT = 4;
+}
+
+// gateway-api → pythia-core, sniper-ingest:
+// решение оператора по сигналу.
+message SignalDecision {
+  Uuid message_id = 1;
+  string signal_id = 2;
+  uint64 expected_version = 3;             // для 409 conflict detection
+  string idempotency_key = 4;              // hash(signal_id+action+operator_id)
+
+  DecisionAction action = 5;
+  string operator_id = 6;
+  string rejection_reason = 7;             // только если action=REJECT
+  int64 snooze_until_unix_ms = 8;          // только если action=SNOOZE
+
+  Timestamp decided_at = 9;
+}
+
+enum DecisionAction {
+  DECISION_ACTION_UNSPECIFIED = 0;
+  DECISION_ACTION_ACCEPT = 1;
+  DECISION_ACTION_REJECT = 2;
+  DECISION_ACTION_SNOOZE = 3;
+}

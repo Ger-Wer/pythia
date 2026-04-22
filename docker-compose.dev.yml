@@ -1,0 +1,167 @@
+# Dual-Loop dev infrastructure.
+#
+# Этот файл НЕ заменяет существующий docker-compose.yml (production Pythia).
+# Он поднимает параллельный стек для разработки Dual-Loop архитектуры:
+# bus (Redis + NATS), Postgres, observability (Prometheus/Grafana/Loki/Tempo).
+#
+# Использование:
+#   docker compose -f docker-compose.dev.yml up -d   # поднять
+#   docker compose -f docker-compose.dev.yml down    # остановить
+#   make dev-up / make dev-down                      # удобные обёртки
+#
+# Все сервисы биндятся на 127.0.0.1 чтобы не торчать наружу на dev-машине.
+
+name: pythia-dual-loop-dev
+
+services:
+  # -------- Integration Bus --------
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: dual-loop-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - "allkeys-lru"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - dual-loop
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: dual-loop-nats
+    restart: unless-stopped
+    command:
+      - "-c"
+      - "/etc/nats/nats.conf"
+    ports:
+      - "127.0.0.1:4222:4222"   # client
+      - "127.0.0.1:8222:8222"   # monitoring
+    volumes:
+      - ./infra/nats/nats.conf:/etc/nats/nats.conf:ro
+      - nats-data:/data
+    networks:
+      - dual-loop
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # -------- Persistent Store --------
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: dual-loop-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pythia_dev
+      POSTGRES_USER: pythia
+      POSTGRES_PASSWORD: pythia_dev_password
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    networks:
+      - dual-loop
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pythia -d pythia_dev"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # -------- Observability --------
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: dual-loop-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - dual-loop
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: dual-loop-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - dual-loop
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: dual-loop-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    networks:
+      - dual-loop
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: dual-loop-tempo
+    restart: unless-stopped
+    command: -config.file=/etc/tempo/tempo.yml
+    ports:
+      - "127.0.0.1:3200:3200"   # tempo http
+      - "127.0.0.1:4317:4317"   # otlp grpc
+      - "127.0.0.1:4318:4318"   # otlp http
+    volumes:
+      - ./infra/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    networks:
+      - dual-loop
+
+networks:
+  dual-loop:
+    name: dual-loop
+    driver: bridge
+
+volumes:
+  redis-data:
+  nats-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:

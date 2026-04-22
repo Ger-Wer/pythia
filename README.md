@@ -11,6 +11,7 @@ Pythia - это приватный аналитический `decision desk` д
 1. `Pythia` уже не просто forecast-пайплайн. Сейчас это связка `forecast stack + decision core + autonomous watchlist engine + dashboard + Telegram`.
 2. В production пока нет live-trading. Система работает в paper/shadow режиме и копит валидный decision dataset.
 3. Главная цель проекта - не "писать reasoning от LLM", а уменьшать когнитивную нагрузку оператора и улучшать качество решений на реальных данных Polymarket.
+4. С 2026-04-22 запущен новый workstream — **Dual-Loop architecture** (Slow Loop Pythia + Fast Loop Sniper для latency-арбитража на Polygon). См. [docs/dual_loop/README.md](docs/dual_loop/README.md). В Phase 0 добавляется инфраструктура (Rust workspace, protobuf-схемы, bus/observability в `docker-compose.dev.yml`), существующий production-контур Pythia не меняется.
 
 ## Что уже реально работает в production
 
@@ -218,6 +219,21 @@ docker compose up -d
 - [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md) - как деплоить и обновлять production на `amper`
 - [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md) - внешний аудит текущего production-state
 - [docs/DECISION_LOG.md](/Users/gerwer/Desktop/Pythia/docs/DECISION_LOG.md) - ключевые архитектурные и продуктовые решения
+- [docs/dual_loop/](docs/dual_loop/README.md) - Dual-Loop architecture (Slow Loop Pythia + Fast Loop Sniper); C4, data flow, UI spec, roadmap, risks
+
+## Dual-Loop dev-стек
+
+Отдельный набор команд для нового workstream'а (не пересекается с production Pythia):
+
+```bash
+make dev-up        # Redis, NATS, Postgres, Prometheus, Grafana, Loki, Tempo
+make rust-check    # cargo check services/
+make rust-test     # cargo test services/
+make check         # полный CI-gate локально
+make dev-down      # остановить стек
+```
+
+См. [docs/dual_loop/06-roadmap.md](docs/dual_loop/06-roadmap.md) для текущих фаз и DoD.
 
 ## Текущий критерий успеха
 

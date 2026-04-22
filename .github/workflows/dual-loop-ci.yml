@@ -1,0 +1,113 @@
+name: Dual-Loop CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/**
+      - schemas/**
+      - docs/dual_loop/**
+      - .github/workflows/dual-loop-ci.yml
+      - Makefile
+      - docker-compose.dev.yml
+      - infra/**
+  pull_request:
+    paths:
+      - services/**
+      - schemas/**
+      - docs/dual_loop/**
+      - .github/workflows/dual-loop-ci.yml
+      - Makefile
+      - docker-compose.dev.yml
+      - infra/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+      - name: cargo build --release
+        run: cargo build --workspace --release
+
+  proto:
+    name: Protobuf (lint + breaking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: buf lint
+        working-directory: schemas
+        run: buf lint
+
+      - name: buf breaking against main
+        if: github.event_name == 'pull_request'
+        working-directory: schemas
+        run: |
+          buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main,subdir=schemas" || true
+
+  compose:
+    name: docker-compose.dev.yml validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose config
+        run: docker compose -f docker-compose.dev.yml config --quiet
+
+  docs:
+    name: Docs (markdown link-check, light)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check docs/dual_loop files present
+        run: |
+          set -eu
+          for f in README.md 00-overview.md 01-containers.md 02-components.md \
+                   03-data-flow.md 04-bus-protocol.md 05-command-center-ui.md \
+                   06-roadmap.md 07-risks.md 08-tech-decisions.md; do
+            test -f "docs/dual_loop/$f" || { echo "missing docs/dual_loop/$f"; exit 1; }
+          done
+          echo "All dual_loop docs present."

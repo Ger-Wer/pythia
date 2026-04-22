@@ -1,0 +1,22 @@
+[package]
+name = "sniper-executor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Fast Loop: sign & broadcast transactions, nonce manager, kill switch."
+
+[[bin]]
+name = "sniper-executor"
+path = "src/main.rs"
+
+[dependencies]
+dual_loop_common = { path = "../common" }
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+metrics.workspace = true
+parking_lot.workspace = true

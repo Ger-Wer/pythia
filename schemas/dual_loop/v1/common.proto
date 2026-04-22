@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package dual_loop.v1;
+
+// Общие типы, переиспользуемые в других .proto.
+
+// UUIDv7 в виде 16 bytes. Используется как message_id для idempotency/dedup.
+message Uuid {
+  bytes value = 1; // 16 bytes
+}
+
+// Временная метка с раздельным wall-clock (UTC) и monotonic clock (per-host ns).
+// wall_clock_unix_ms — для human-readable correlation.
+// monotonic_ns — для latency-расчётов внутри одного хоста.
+message Timestamp {
+  int64 wall_clock_unix_ms = 1;
+  uint64 monotonic_ns = 2;
+}
+
+// Идентификатор рынка Polymarket.
+// polymarket_id — hex string из Gamma API (без 0x-префикса).
+// ctf_address — адрес CTF contract.
+message MarketId {
+  string polymarket_id = 1;
+  string ctf_address = 2;
+}
+
+// Цена/деньги в fixed-point (6 decimals, как USDC). 1_000_000 = $1.00.
+message Money {
+  int64 amount_micros = 1;
+}
+
+// Сторона позиции.
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_YES = 1;
+  SIDE_NO = 2;
+}
+
+// Причина событий жизненного цикла.
+enum Reason {
+  REASON_UNSPECIFIED = 0;
+  REASON_TTL_EXPIRED = 1;
+  REASON_OPERATOR_ACTION = 2;
+  REASON_EDGE_DEGRADED = 3;
+  REASON_LIQUIDITY_DEGRADED = 4;
+  REASON_RESOLVED = 5;
+  REASON_KILL_SWITCH = 6;
+  REASON_RISK_BLOCKED = 7;
+}

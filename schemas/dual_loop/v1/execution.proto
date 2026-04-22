@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package dual_loop.v1;
+
+import "dual_loop/v1/common.proto";
+
+// sniper-executor → all: транзакция подписана и отправлена.
+message ExecSubmitted {
+  Uuid message_id = 1;
+  Uuid trigger_id = 2;
+  MarketId market = 3;
+
+  bytes tx_hash = 4;                       // 32 bytes
+  uint64 nonce = 5;
+  Money size = 6;
+  Side side = 7;
+
+  uint64 max_fee_per_gas_wei = 8;
+  uint64 max_priority_fee_per_gas_wei = 9;
+  string relay_used = 10;                  // "bloxroute" | "merkle" | "public"
+
+  Timestamp submitted_at = 11;
+  bool paper_mode = 12;                    // true до Phase 3
+}
+
+// sniper-executor → all: транзакция замайнена, получен fill.
+message ExecFilled {
+  Uuid message_id = 1;
+  bytes tx_hash = 2;
+  MarketId market = 3;
+
+  Money realized_price = 4;                // средняя цена исполнения
+  Money filled_size = 5;
+  Money gas_spent_usd = 6;
+  uint64 block_number = 7;
+
+  Timestamp filled_at = 8;
+  bool paper_mode = 9;
+}
+
+// sniper-executor → all: транзакция revert'нулась / не исполнилась.
+message ExecReverted {
+  Uuid message_id = 1;
+  bytes tx_hash = 2;
+  MarketId market = 3;
+
+  string reason = 4;                       // "out_of_gas" | "revert: …" | "timeout"
+  Money gas_spent_usd = 5;
+  uint64 block_number = 6;                 // 0 если не mined
+
+  Timestamp reverted_at = 7;
+  bool paper_mode = 8;
+}
