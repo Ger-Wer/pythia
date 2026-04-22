@@ -11,6 +11,7 @@ on:
       - Makefile
       - docker-compose.dev.yml
       - infra/**
+      - gateway-api/**
       - sql/**
       - src/db/**
       - src/services/db_pg.ts
@@ -31,6 +32,7 @@ on:
       - Makefile
       - docker-compose.dev.yml
       - infra/**
+      - gateway-api/**
       - sql/**
       - src/db/**
       - src/services/db_pg.ts
@@ -116,6 +118,33 @@ jobs:
 
       - name: Validate compose config
         run: docker compose -f docker-compose.dev.yml config --quiet
+
+  gateway-api:
+    name: gateway-api (Bun — lint + test + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gateway-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+
+      - name: bun install
+        run: bun install --frozen-lockfile || bun install
+
+      - name: bun run lint (tsc --noEmit)
+        run: bun run lint
+
+      - name: bun test
+        run: bun test
+
+      - name: bun run build
+        run: bun run build
 
   docs:
     name: Docs (markdown link-check, light)
