@@ -51,7 +51,9 @@ Pythia - это Docker-first `decision desk` для Polymarket. Она кажд�
 Основные файлы:
 
 - `src/services/decision_core.ts`
-- `src/services/db.ts`
+- `src/services/db.ts` (primary, SQLite)
+- `src/services/db_shadow.ts` (Dual-Loop Phase 1 Track D wrapper — fan-out в Postgres при `DUAL_LOOP_SHADOW_PG=true`; no-op иначе)
+- `src/services/db_pg.ts` + `src/db/pg/schema.ts` (drizzle-orm адаптер для Postgres shadow store; см. `docs/dual_loop/db_migration.md`)
 - `python/operator_core.py`
 
 ### 3. Autonomous watchlist engine
