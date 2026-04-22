@@ -53,6 +53,22 @@
 
 Каждый инвариант имеет unit-test + integration-test + chaos-test сценарий.
 
+## 7.5b. Phase 1 — Track D mitigation notes (data divergence SQLite ↔ Postgres)
+
+Phase 1 Track D (shadow-write миграция) вводит параллельный PG store. Это
+отдельный класс "data divergence" риска поверх общего R13 (nonce race) —
+ниже фиксируем, как он парируется до Phase 2 cutover. Детали и runbook —
+в [db_migration.md](./db_migration.md).
+
+| Подриск | Паттерн |
+|---------|---------|
+| **Shadow error kills primary write** | `db_shadow.ts` использует `Promise.allSettled` + `queueMicrotask` + fire-and-forget; primary commit уже завершён к моменту первого обращения к PG. CI-тест `db_shadow.test.ts` явно проверяет, что `insertPrediction` не бросает даже при исключении в shadow. |
+| **Silent divergence в scalar полях** | Cron `bun run db:parity` раз в час: 100 случайных строк `predictions`, diff по `market_price / dexter_p / naked_p / outcome / is_valid / api_cost_usd`. Weekly full-scan через `bun run db:parity -- --full`. Каждая дивергенция → `PARITY DIVERGE` line + counter `parity_diverge_total`. |
+| **PG offline во время shadow-window** | `pingPg()` на старте + `shadow_pg_errors_total{operation=ping}`; при падении PG primary loop не страдает (SQLite primary), ops видит счётчик в Prometheus. Runbook: отключить флаг, поднять PG, запустить `pg_initial_load.ts` чтобы восстановить потерянные строки. |
+| **Schema drift** между `src/db/pg/schema.ts` и миграциями | CI job `shadow-pg-tests` запускает `drizzle-kit generate` и fail'ит build если `sql/migrations/` diff'ится. |
+| **Python-side deferral** | Полноценный Python shadow отложен; минимальный `python/db_pg_shadow.py` покрывает только `update_outcome` (resolution-checker). Обоснование — в [db_migration.md → Python side scope](./db_migration.md#python-side-scope). Риск принят: parity проверяется по итоговым значениям в таблицах независимо от того, какой стек их произвёл. |
+| **Cutover без 7-дневной тишины** | DoD для Phase 2: `shadow_pg_errors_total{operation=insertPrediction or updateOutcome} == 0` **и** `parity_diverge_total == 0` **и** `parity_missing_*_total == 0` 7 дней подряд. |
+
 ## 7.6. Пре-mortem матрица "если упадёт X, что делать"
 
 | Что упало | Auto-response | Оператор видит | Manual action |
