@@ -32,3 +32,11 @@ bun.lockb
 # OS
 .DS_Store
 Thumbs.db
+
+# Dual-Loop: Rust build artifacts
+services/target/
+services/**/target/
+
+# Dual-Loop: generated protobuf clients (kept out of VCS; regenerate with `make proto-gen`)
+services/common/src/generated/
+src/generated/

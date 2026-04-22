@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package dual_loop.v1;
+
+import "dual_loop/v1/common.proto";
+import "dual_loop/v1/watchlist.proto";
+
+// sniper-ingest → sniper-executor: ончейн-триггер сработал.
+// Hot-path сообщение — держится компактным для sub-µs encode/decode.
+message Trigger {
+  Uuid message_id = 1;
+  MarketId market = 2;
+  TriggerKind kind = 3;
+
+  // Хэш on-chain evidence (tx_hash ++ log_index). Используется для dedup.
+  bytes evidence_hash = 4;
+
+  // Ожидаемый блок исполнения (для expiry checks).
+  uint64 eta_block = 5;
+
+  // Monotonic timestamp момента наблюдения в mempool/log.
+  uint64 observed_at_ns = 6;
+
+  // Цена, которую ожидаем получить при немедленном исполнении.
+  double expected_price = 7;
+
+  // Ожидаемое проскальзывание в bps при size = suggested_position.
+  uint32 slippage_bps = 8;
+
+  // Число независимых источников, подтвердивших событие (>= policy.min).
+  uint32 source_count = 9;
+}
+
+// sniper-risk → audit: триггер заблокирован pre-trade checks.
+message TriggerBlocked {
+  Uuid message_id = 1;
+  Uuid original_trigger_id = 2;
+  MarketId market = 3;
+  Reason reason = 4;
+  string detail = 5;
+  Timestamp blocked_at = 6;
+}
