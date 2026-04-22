@@ -7,11 +7,13 @@
 //! import e.g. `dual_loop_common::proto::watchlist::WatchlistUpsert`
 //! without caring about the underlying file layout.
 
-#[path = "generated/mod.rs"]
-mod generated;
-
-/// Flat re-export of every message/enum in the `dual_loop.v1` package.
-pub use generated::dual_loop_v1 as v1;
+/// All generated types, flat under `dual_loop.v1`. The file is emitted by
+/// `build.rs` into `$OUT_DIR` (not the source tree) so `cargo fmt` can
+/// succeed before the build has been run once.
+#[allow(clippy::all, dead_code, missing_docs)]
+pub mod v1 {
+    include!(concat!(env!("OUT_DIR"), "/dual_loop.v1.rs"));
+}
 
 /// Message types originally declared in `common.proto`.
 pub mod common {

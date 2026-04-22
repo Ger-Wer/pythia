@@ -1,10 +1,9 @@
 //! Build script: generate Rust types from `schemas/dual_loop/v1/*.proto`.
 //!
-//! Generated code lands in `src/generated/` (git-ignored) and is re-exported
-//! via `dual_loop_common::proto::{common, watchlist, signal, trigger, execution, control}`.
-//!
-//! We bundle `protoc` through `protoc-bin-vendored` so the build never
-//! depends on a system-wide protobuf compiler.
+//! Generated code lands in `$OUT_DIR/dual_loop.v1.rs` and is included via
+//! `include!` from `src/proto.rs`. We bundle `protoc` through
+//! `protoc-bin-vendored` so the build never depends on a system-wide
+//! protobuf compiler.
 
 use std::path::PathBuf;
 
@@ -33,29 +32,13 @@ fn main() -> std::io::Result<()> {
     }
     println!("cargo:rerun-if-changed=build.rs");
 
-    let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("generated");
-    std::fs::create_dir_all(&out_dir)?;
-
     let proto_paths: Vec<PathBuf> = proto_files.iter().map(|f| schemas_root.join(f)).collect();
 
+    // Emit into $OUT_DIR so that `cargo fmt` (which doesn't run build scripts)
+    // never requires the generated files to be present on disk.
     let mut config = prost_build::Config::new();
-    config.out_dir(&out_dir);
     config.bytes(["."]);
     config.compile_protos(&proto_paths, &[&schemas_root])?;
-
-    // prost emits a single file per proto package: `dual_loop.v1.rs`.
-    // Write a tiny `mod.rs` that re-exports it under logical module names.
-    let mod_rs = out_dir.join("mod.rs");
-    std::fs::write(
-        &mod_rs,
-        "// @generated — do not edit. See build.rs.\n\
-         #[allow(clippy::all, dead_code, missing_docs)]\n\
-         pub mod dual_loop_v1 {\n    \
-             include!(\"dual_loop.v1.rs\");\n\
-         }\n",
-    )?;
 
     Ok(())
 }
