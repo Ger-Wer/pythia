@@ -152,6 +152,44 @@ services:
     networks:
       - dual-loop
 
+  # -------- Gateway API (Phase 1 Track B) --------
+  #
+  # Bridges Redis Streams / NATS to Command Center UI over WSS + REST.
+
+  gateway-api:
+    build:
+      context: ./gateway-api
+      dockerfile: Dockerfile
+    container_name: dual-loop-gateway-api
+    restart: unless-stopped
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "9103"
+      LOG_LEVEL: "info"
+      REDIS_URL: "redis://redis:6379"
+      NATS_URL: "nats://nats:4222"
+      # DEV-ONLY defaults. Override in staging/prod via a real secrets store.
+      #   GATEWAY_PASETO_KEY: openssl rand -base64 32
+      #   OPERATOR_PASSWORD_HASH: `bun run -e "console.log(require('bcryptjs').hashSync(process.argv[1],10))" -- <password>`
+      GATEWAY_PASETO_KEY: "DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEVA="
+      OPERATOR_ID: "admin"
+      OPERATOR_PASSWORD_HASH: "$$2a$$10$$bR/.j3ziz5BC2vE4dETKLuX8AVPYFY0o5pRRnN.NXj29u9EcAkk1y"
+      KILL_HMAC_SECRET: "dev-kill-hmac-secret-change-me"
+    ports:
+      - "127.0.0.1:9103:9103"
+    networks:
+      - dual-loop
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9103/api/v1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 networks:
   dual-loop:
     name: dual-loop
