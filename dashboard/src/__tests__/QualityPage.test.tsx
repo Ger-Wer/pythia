@@ -1,6 +1,11 @@
+import type { ReactElement } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { QualityPage } from "../pages/QualityPage";
+
+const renderWithRouter = (ui: ReactElement) =>
+  render(<MemoryRouter>{ui}</MemoryRouter>);
 
 const { quality } = vi.hoisted(() => ({
   quality: vi.fn(),
@@ -20,7 +25,7 @@ describe("QualityPage", () => {
   it("shows an error state when the quality request fails", async () => {
     quality.mockRejectedValueOnce(new Error("network down"));
 
-    render(<QualityPage />);
+    renderWithRouter(<QualityPage />);
 
     await waitFor(() => {
       expect(screen.getByText("Не удалось загрузить экран качества.")).toBeInTheDocument();
@@ -53,7 +58,7 @@ describe("QualityPage", () => {
       glossary: [],
     });
 
-    render(<QualityPage />);
+    renderWithRouter(<QualityPage />);
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Качество" })).toBeInTheDocument();
@@ -105,7 +110,7 @@ describe("QualityPage", () => {
       ],
     });
 
-    render(<QualityPage />);
+    renderWithRouter(<QualityPage />);
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Качество" })).toBeInTheDocument();
@@ -141,7 +146,7 @@ describe("QualityPage", () => {
       glossary: [],
     });
 
-    render(<QualityPage />);
+    renderWithRouter(<QualityPage />);
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Разбивка по категориям" })).toBeInTheDocument();

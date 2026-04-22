@@ -9,9 +9,13 @@ import { OverviewPage } from "../pages/OverviewPage";
 import { QualityPage } from "../pages/QualityPage";
 import { ShadowPerformancePage } from "../pages/ShadowPerformancePage";
 import { WatchlistPage } from "../pages/WatchlistPage";
+import { CommandCenterPage } from "../features/command-center/CommandCenterPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  // Dual-Loop Command Center is auth-free and sits outside the Layout shell
+  // so it can take over the full viewport (Phase 1 read-only).
+  { path: "/command-center", element: <CommandCenterPage /> },
   {
     path: "/",
     element: <Layout />,
