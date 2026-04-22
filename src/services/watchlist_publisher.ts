@@ -14,8 +14,40 @@ import { randomUUID } from 'node:crypto';
 
 import { StreamPublisher } from './bus/redis_streams';
 import { WATCHLIST_UPSERT, WATCHLIST_REMOVE } from './bus/topics';
-import { Side } from '../generated/dual_loop/v1/common';
-import { WatchlistRemove, WatchlistUpsert } from '../generated/dual_loop/v1/watchlist';
+// NOTE: proto types are imported *lazily* below so that any file which
+// transitively imports this module (via `decision_core` → `db.ts`) can still
+// load when the ts-proto output in `src/generated/` has not yet been built.
+// Static imports would turn a missing `bun run proto:gen` into a hard parse
+// error for every consumer, including CI jobs that only run Track D tests.
+import type { Side as SideType } from '../generated/dual_loop/v1/common';
+import type {
+  WatchlistRemove as WatchlistRemoveType,
+  WatchlistUpsert as WatchlistUpsertType,
+} from '../generated/dual_loop/v1/watchlist';
+
+type ProtoBundle = {
+  Side: typeof import('../generated/dual_loop/v1/common').Side;
+  WatchlistUpsert: typeof import('../generated/dual_loop/v1/watchlist').WatchlistUpsert;
+  WatchlistRemove: typeof import('../generated/dual_loop/v1/watchlist').WatchlistRemove;
+};
+
+let protoCache: Promise<ProtoBundle> | null = null;
+async function loadProto(): Promise<ProtoBundle> {
+  if (!protoCache) {
+    protoCache = (async () => {
+      const [common, watchlist] = await Promise.all([
+        import('../generated/dual_loop/v1/common'),
+        import('../generated/dual_loop/v1/watchlist'),
+      ]);
+      return {
+        Side: common.Side,
+        WatchlistUpsert: watchlist.WatchlistUpsert,
+        WatchlistRemove: watchlist.WatchlistRemove,
+      };
+    })();
+  }
+  return protoCache;
+}
 
 /**
  * Slim shape of a decision-core signal needed for publishing. Kept narrow so
@@ -87,7 +119,10 @@ export function classifyDecision(
   }
 }
 
-function sideHintFor(action: WatchlistDecisionInput['recommendedAction']): Side {
+function sideHintFor(
+  action: WatchlistDecisionInput['recommendedAction'],
+  Side: ProtoBundle['Side'],
+): SideType {
   switch (action) {
     case 'enter_yes':
       return Side.SIDE_YES;
@@ -137,11 +172,12 @@ export class WatchlistPublisher {
 
   /**
    * Convert a decision-core input → `WatchlistUpsert` proto. Exposed for
-   * testing without a live Redis.
+   * testing without a live Redis. Async because proto types are lazy-loaded.
    */
-  buildUpsert(input: WatchlistDecisionInput): WatchlistUpsert {
+  async buildUpsert(input: WatchlistDecisionInput): Promise<WatchlistUpsertType> {
+    const { Side } = await loadProto();
     const ts = nowTimestamp();
-    const upsert: WatchlistUpsert = {
+    const upsert: WatchlistUpsertType = {
       messageId: { value: uuidBytes() },
       market: {
         polymarketId: input.marketId,
@@ -151,7 +187,7 @@ export class WatchlistPublisher {
       edge: input.pMarket === null ? 0 : input.pFundamental - input.pMarket,
       pFundamental: input.pFundamental,
       confidence: input.confidence ?? 0.5,
-      sideHint: sideHintFor(input.recommendedAction),
+      sideHint: sideHintFor(input.recommendedAction, Side),
       maxPositionUsd: {
         amountMicros: BigInt(Math.round((input.maxPositionUsd ?? 0) * 1_000_000)),
       },
@@ -175,7 +211,8 @@ export class WatchlistPublisher {
     if (kind === 'skip') return null;
     if (!this.publisher) return null;
 
-    const upsert = this.buildUpsert(input);
+    const { WatchlistUpsert } = await loadProto();
+    const upsert = await this.buildUpsert(input);
     try {
       const id = await this.publisher.publish(
         WATCHLIST_UPSERT,
@@ -218,8 +255,9 @@ export class WatchlistPublisher {
     },
   ): Promise<string | null> {
     if (!this.publisher) return null;
+    const { WatchlistRemove } = await loadProto();
     const ts = nowTimestamp();
-    const remove: WatchlistRemove = {
+    const remove: WatchlistRemoveType = {
       messageId: { value: uuidBytes() },
       market: {
         polymarketId: marketId,
