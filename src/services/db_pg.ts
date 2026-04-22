@@ -57,6 +57,11 @@ export function getPgDb(url?: string): PgHandle {
   if (cached && cached.url !== resolvedUrl) {
     void closePgDb().catch(() => {});
   }
+  // When `DUAL_LOOP_PG_NOTIFY=true`, every backend we open has the GUC that
+  // the Phase 1B LISTEN/NOTIFY triggers check set to 'on'. Without it the
+  // trigger function short-circuits, so shadow writes produce no events — by
+  // design, since gateway-api (Track B) is not wired yet.
+  const notifyEnabled = process.env.DUAL_LOOP_PG_NOTIFY === 'true';
   const client = postgres(resolvedUrl, {
     max: 10,
     idle_timeout: 30,
@@ -64,6 +69,9 @@ export function getPgDb(url?: string): PgHandle {
     onnotice: () => {},
     // Disable automatic type parsing surprises; we match SQLite's text/number.
     transform: { undefined: null },
+    connection: notifyEnabled
+      ? { 'dual_loop.pg_notify': 'on' }
+      : undefined,
   });
   const db = drizzle(client, { schema });
   cached = { client, db, url: resolvedUrl };

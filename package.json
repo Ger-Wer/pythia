@@ -13,6 +13,7 @@
     "db:pg:migrate": "drizzle-kit migrate",
     "db:parity": "bun run src/services/db_parity.ts",
     "db:pg:initial-load": "bun run scripts/pg_initial_load.ts",
+    "db:pg:listen": "bun run scripts/pg_listen.ts",
     "proto:gen": "bash scripts/proto-gen-ts.sh",
     "test": "bun test"
   },

@@ -54,6 +54,7 @@ Pythia - это Docker-first `decision desk` для Polymarket. Она кажд�
 - `src/services/db.ts` (primary, SQLite)
 - `src/services/db_shadow.ts` (Dual-Loop Phase 1 Track D wrapper — fan-out в Postgres при `DUAL_LOOP_SHADOW_PG=true`; no-op иначе)
 - `src/services/db_pg.ts` + `src/db/pg/schema.ts` (drizzle-orm адаптер для Postgres shadow store; см. `docs/dual_loop/db_migration.md`)
+- `src/services/pg_listener.ts` + `sql/migrations/0001_listen_notify.sql` (Dual-Loop Phase 1B publisher — AFTER INSERT/UPDATE/DELETE триггеры выбрасывают `pg_notify`-события при `DUAL_LOOP_PG_NOTIFY=true`; см. `docs/dual_loop/pg_listen_notify.md`)
 - `python/operator_core.py`
 
 ### 3. Autonomous watchlist engine

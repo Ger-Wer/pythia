@@ -127,7 +127,9 @@ Before flipping reads to PG the roadmap expects:
 - Zero `PARITY DIVERGE` lines on critical scalar fields for 7 days.
 - `scripts/pg_initial_load.ts` reconciled: `COUNT(*) FROM predictions`
   equal on both stores.
-- `gateway-api` has consumed `LISTEN/NOTIFY` smoke in staging.
+- `gateway-api` has consumed `LISTEN/NOTIFY` smoke in staging
+  (see [`pg_listen_notify.md`](./pg_listen_notify.md) — Phase 1B adds
+  the publisher + `bun run db:pg:listen` operator CLI).
 
 ### 7. Rollback
 

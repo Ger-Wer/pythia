@@ -21,9 +21,10 @@ on:
       - src/services/db_pg.ts
       - src/services/db_shadow.ts
       - src/services/db_parity.ts
+      - src/services/pg_listener.ts
       - src/services/__tests__/**
       - scripts/pg_*.sh
-      - scripts/pg_initial_load.ts
+      - scripts/pg_*.ts
       - drizzle.config.ts
       - package.json
       - bun.lock
@@ -46,9 +47,10 @@ on:
       - src/services/db_pg.ts
       - src/services/db_shadow.ts
       - src/services/db_parity.ts
+      - src/services/pg_listener.ts
       - src/services/__tests__/**
       - scripts/pg_*.sh
-      - scripts/pg_initial_load.ts
+      - scripts/pg_*.ts
       - drizzle.config.ts
       - package.json
       - bun.lock
@@ -276,8 +278,8 @@ jobs:
       - name: Apply migrations to Postgres
         run: bash scripts/pg_migrate.sh
 
-      - name: Bun test (db_pg / db_shadow / db_parity)
-        run: bun test src/services/__tests__/db_pg.test.ts src/services/__tests__/db_shadow.test.ts src/services/__tests__/db_parity.test.ts
+      - name: Bun test (db_pg / db_shadow / db_parity / pg_listener)
+        run: bun test src/services/__tests__/db_pg.test.ts src/services/__tests__/db_shadow.test.ts src/services/__tests__/db_parity.test.ts src/services/__tests__/pg_listener.test.ts
 
       - name: db:parity smoke run on empty shadow
         run: bun run db:parity
