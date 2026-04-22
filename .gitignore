@@ -38,5 +38,5 @@ services/target/
 services/**/target/
 
 # Dual-Loop: generated protobuf clients (kept out of VCS; regenerate with `make proto-gen`)
-services/common/src/generated/
+# Rust output lands in $OUT_DIR (not the source tree); only TS output is written under src/.
 src/generated/

@@ -1,11 +1,18 @@
 //! Общие типы и утилиты для Dual-Loop Fast Loop сервисов.
 //!
-//! В Phase 0 этот крейт содержит только начальные заглушки и базовые
-//! helper'ы (observability, time). Phase 1 добавит сгенерированные из
-//! `schemas/dual_loop/v1/*.proto` типы через `prost-build`.
+//! Phase 1:
+//! * [`proto`] — protobuf-типы, сгенерированные `build.rs` из
+//!   `schemas/dual_loop/v1/*.proto`.
+//! * [`topics`] — имена топиков Redis/NATS (single source of truth в Rust;
+//!   симметрично продублировано в `src/services/bus/topics.ts`).
+//! * [`bus`] — async-обёртки над Redis Streams и NATS JetStream.
+//! * [`observability`], [`time`] — helper'ы из Phase 0.
 
+pub mod bus;
 pub mod observability;
+pub mod proto;
 pub mod time;
+pub mod topics;
 
 /// Семантическая версия wire-протокола.
 ///

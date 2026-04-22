@@ -233,6 +233,20 @@ make check         # полный CI-gate локально
 make dev-down      # остановить стек
 ```
 
+Phase 1 Track A добавил bus (`dl.v1.*`) и protobuf-клиенты для
+`schemas/dual_loop/v1/*.proto`:
+
+```bash
+bun install              # JS-зависимости (включая ts-proto)
+bun run proto:gen        # TS-клиенты: src/generated/dual_loop/
+make proto-gen           # TS + Rust (Rust через services/common/build.rs)
+make bus-cross-lang-test # TS → Rust contract test (требует Redis на :6379)
+```
+
+Публикация watchlist в bus из Pythia отключена по умолчанию:
+`DUAL_LOOP_BUS_ENABLED=false`. Включить — `DUAL_LOOP_BUS_ENABLED=true`
++ `DUAL_LOOP_REDIS_URL=redis://…`. Детали: [docs/dual_loop/04-bus-protocol.md §Implementation (Phase 1)](docs/dual_loop/04-bus-protocol.md#implementation-phase-1).
+
 См. [docs/dual_loop/06-roadmap.md](docs/dual_loop/06-roadmap.md) для текущих фаз и DoD.
 
 ## Текущий критерий успеха

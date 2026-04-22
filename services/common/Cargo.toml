@@ -20,3 +20,20 @@ metrics-exporter-prometheus.workspace = true
 bytes.workspace = true
 once_cell.workspace = true
 parking_lot.workspace = true
+futures.workspace = true
+uuid.workspace = true
+
+# Protobuf
+prost.workspace = true
+prost-types.workspace = true
+
+# Bus clients
+redis.workspace = true
+async-nats.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+protoc-bin-vendored.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true
