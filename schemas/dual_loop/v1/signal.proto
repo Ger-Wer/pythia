@@ -6,6 +6,8 @@ import "dual_loop/v1/common.proto";
 
 // pythia-core → gateway-api → Command Center:
 // сигнал, ожидающий решения оператора.
+//
+// Все финансовые/вероятностные величины — integer fixed-point (см. common.proto).
 message Signal {
   Uuid message_id = 1;
   string signal_id = 2;                    // application-level id (readable)
@@ -14,21 +16,30 @@ message Signal {
   MarketId market = 4;
   string market_question = 5;              // человекочитаемый вопрос
 
-  double edge = 6;
-  double p_fundamental = 7;
-  double p_market = 8;
-  double confidence_low = 9;               // 95% CI low
-  double confidence_high = 10;             // 95% CI high
-  double expected_value_bps = 11;          // EV в bps от position size
+  // edge = p_fundamental - p_market, в parts-per-million вероятности.
+  // Range ±1_000_000. Знаковый: ZigZag-encoded.
+  sint64 edge_ppm = 6;
+
+  // Вероятности в parts-per-million. 1_000_000 = 100%.
+  int64 p_fundamental_ppm = 7;
+  int64 p_market_ppm = 8;
+  int64 confidence_low_ppm = 9;            // 95% CI low
+  int64 confidence_high_ppm = 10;          // 95% CI high
+
+  // Expected value в bps от suggested_position. Знаковый.
+  sint64 expected_value_bps = 11;
 
   Side side_hint = 12;
   Money suggested_position = 13;
+
+  // Wall-clock deadline в Unix epoch ms.
   int64 expires_at_unix_ms = 14;
 
   string llm_rationale = 15;               // plain text, собираемый collapsed в UI
   repeated string evidence_urls = 16;      // Exa/Tavily sources
 
-  Timestamp issued_at = 17;
+  // Wall-clock момент выпуска сигнала в Unix epoch ms.
+  int64 issued_at_unix_ms = 17;
   SignalPriority priority = 18;
 }
 
@@ -53,7 +64,7 @@ message SignalDecision {
   string rejection_reason = 7;             // только если action=REJECT
   int64 snooze_until_unix_ms = 8;          // только если action=SNOOZE
 
-  Timestamp decided_at = 9;
+  int64 decided_at_unix_ms = 9;
 }
 
 enum DecisionAction {

@@ -25,7 +25,11 @@ import {
   KillCommand,
   KillScope,
 } from '../../../generated/dual_loop/v1/control';
-import { ExecSubmitted } from '../../../generated/dual_loop/v1/execution';
+import {
+  ExecStatus,
+  ExecSubmitted,
+  ExecutorState,
+} from '../../../generated/dual_loop/v1/execution';
 import { Trigger } from '../../../generated/dual_loop/v1/trigger';
 import {
   TriggerKind,
@@ -51,14 +55,14 @@ describe('proto roundtrip', () => {
       messageId: { value: Buffer.alloc(16, 1) },
       market: { polymarketId: 'mkt-01', ctfAddress: '0xabc' },
       version: 42n,
-      edge: 0.05,
-      pFundamental: 0.67,
-      confidence: 0.9,
+      edgePpm: 50_000n,
+      pFundamentalPpm: 670_000n,
+      confidencePpm: 900_000n,
       sideHint: Side.SIDE_YES,
       maxPositionUsd: { amountMicros: 10_000_000n },
       maxSlippageBps: 75,
       ttlMs: 60_000n,
-      issuedAt: { wallClockUnixMs: 1_700_000_000_000n, monotonicNs: 123_456_789n },
+      issuedAtUnixMs: 1_700_000_000_000n,
       triggerPolicy: {
         minIndependentSources: 2,
         allowedKinds: [TriggerKind.TRIGGER_KIND_ORACLE_RESOLUTION, TriggerKind.TRIGGER_KIND_LARGE_FILL],
@@ -67,9 +71,10 @@ describe('proto roundtrip', () => {
     };
     const back = roundtrip(WatchlistUpsert, msg);
     expect(back.market?.polymarketId).toBe('mkt-01');
-    expect(back.edge).toBeCloseTo(0.05);
+    expect(back.edgePpm).toBe(50_000n);
     expect(back.version).toBe(42n);
     expect(back.maxPositionUsd?.amountMicros).toBe(10_000_000n);
+    expect(back.issuedAtUnixMs).toBe(1_700_000_000_000n);
     expect(back.triggerPolicy?.allowedKinds).toEqual(msg.triggerPolicy!.allowedKinds);
   });
 
@@ -79,11 +84,12 @@ describe('proto roundtrip', () => {
       market: { polymarketId: 'mkt-02', ctfAddress: '0xdef' },
       version: 7n,
       reason: 1,
-      issuedAt: undefined,
+      issuedAtUnixMs: 1_700_000_001_000n,
     };
     const back = roundtrip(WatchlistRemove, msg);
     expect(back.market?.polymarketId).toBe('mkt-02');
     expect(back.version).toBe(7n);
+    expect(back.issuedAtUnixMs).toBe(1_700_000_001_000n);
   });
 
   it('Signal + SignalDecision', () => {
@@ -93,22 +99,24 @@ describe('proto roundtrip', () => {
       serverVersion: 3n,
       market: { polymarketId: 'm', ctfAddress: 'a' },
       marketQuestion: 'Will X happen?',
-      edge: 0.04,
-      pFundamental: 0.6,
-      pMarket: 0.56,
-      confidenceLow: 0.55,
-      confidenceHigh: 0.65,
-      expectedValueBps: 40,
+      edgePpm: 40_000n,
+      pFundamentalPpm: 600_000n,
+      pMarketPpm: 560_000n,
+      confidenceLowPpm: 550_000n,
+      confidenceHighPpm: 650_000n,
+      expectedValueBps: 40n,
       sideHint: Side.SIDE_YES,
       suggestedPosition: { amountMicros: 500_000n },
       expiresAtUnixMs: 1_700_000_500_000n,
       llmRationale: '...',
       evidenceUrls: ['https://example.com'],
-      issuedAt: undefined,
+      issuedAtUnixMs: 1_700_000_000_000n,
       priority: SignalPriority.SIGNAL_PRIORITY_NORMAL,
     };
     const back = roundtrip(Signal, signal);
     expect(back.signalId).toBe('sig-42');
+    expect(back.edgePpm).toBe(40_000n);
+    expect(back.expectedValueBps).toBe(40n);
     expect(back.evidenceUrls).toEqual(['https://example.com']);
 
     const decision: SignalDecision = {
@@ -120,10 +128,11 @@ describe('proto roundtrip', () => {
       operatorId: 'op-1',
       rejectionReason: '',
       snoozeUntilUnixMs: 0n,
-      decidedAt: undefined,
+      decidedAtUnixMs: 1_700_000_010_000n,
     };
     const backDecision = roundtrip(SignalDecision, decision);
     expect(backDecision.action).toBe(DecisionAction.DECISION_ACTION_ACCEPT);
+    expect(backDecision.decidedAtUnixMs).toBe(1_700_000_010_000n);
   });
 
   it('Trigger', () => {
@@ -134,13 +143,31 @@ describe('proto roundtrip', () => {
       evidenceHash: Buffer.alloc(32, 0xab),
       etaBlock: 123456n,
       observedAtNs: 42n,
-      expectedPrice: 0.55,
+      expectedPrice: { amountMicros: 550_000n },
       slippageBps: 10,
       sourceCount: 2,
     };
     const back = roundtrip(Trigger, msg);
     expect(back.etaBlock).toBe(123456n);
+    expect(back.expectedPrice?.amountMicros).toBe(550_000n);
     expect(back.evidenceHash.length).toBe(32);
+  });
+
+  it('ExecStatus', () => {
+    const msg: ExecStatus = {
+      heartbeatSeq: 17n,
+      emittedAtUnixMs: 1_700_000_030_000n,
+      state: ExecutorState.EXECUTOR_STATE_IDLE,
+      currentMarket: undefined,
+      triggersSeenTotal: 42n,
+      triggersExecutedTotal: 0n,
+      killEngaged: false,
+      paperMode: true,
+    };
+    const back = roundtrip(ExecStatus, msg);
+    expect(back.state).toBe(ExecutorState.EXECUTOR_STATE_IDLE);
+    expect(back.heartbeatSeq).toBe(17n);
+    expect(back.triggersSeenTotal).toBe(42n);
   });
 
   it('ExecSubmitted', () => {
@@ -155,7 +182,7 @@ describe('proto roundtrip', () => {
       maxFeePerGasWei: 100n,
       maxPriorityFeePerGasWei: 1n,
       relayUsed: 'public',
-      submittedAt: undefined,
+      submittedAtUnixMs: 1_700_000_020_000n,
       paperMode: true,
     };
     const back = roundtrip(ExecSubmitted, msg);
@@ -184,7 +211,7 @@ describe('proto roundtrip', () => {
       detail: 'ok',
       activeTriggersCancelled: 0,
       pendingTxCancelled: 0,
-      ackAt: undefined,
+      ackAtUnixMs: 1_700_000_040_000n,
     };
     const backAck = roundtrip(KillAck, ack);
     expect(backAck.status).toBe(KillAckStatus.KILL_ACK_STATUS_ACCEPTED);

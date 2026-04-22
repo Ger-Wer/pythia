@@ -19,6 +19,23 @@
 
 Все protobuf-схемы лежат в `schemas/dual_loop/v1/*.proto`. CI блокирует breaking changes через `buf breaking`.
 
+### Wire conventions (Phase 1.1)
+
+Схемы — integer-only. Float/double на шине **запрещены** (IEEE-754 округления ломают идемпотентность и byte-equivalence между Rust/TS/Python):
+
+| Домен | Тип на шине | Пример |
+|-------|-------------|--------|
+| Деньги / цены | `Money { int64 amount_micros }` | `1_000_000` = $1.00 |
+| Вероятности | `int64 *_ppm` | `1_000_000` = 100% |
+| Знаковые вероятности (edge) | `sint64 *_ppm` (ZigZag) | `-50_000` = -5% |
+| Доходности | `sint64 *_bps` | `40` = 40 bps = 0.40% |
+| Wall-clock | `int64 *_unix_ms` | Unix epoch ms |
+| Монотоники (hot path) | `uint64 *_ns` | `Trigger.observed_at_ns` |
+
+Константы зафиксированы в `dual_loop.v1.FixedPointScales` (common.proto) и продублированы как `proto::{PROBABILITY_PPM_PER_UNIT, BPS_PER_UNIT, USD_MICROS_PER_UNIT}` в Rust-стороне. TS publisher конвертирует float → ppm на границе (см. `probToPpm` в `watchlist_publisher.ts`).
+
+Timestamp-wrapper из Phase 0 **удалён** — унифицированы плоские `int64 *_unix_ms` (распаковка `Timestamp.monotonic_ns` на hot-path'е съедала такты).
+
 Генерация клиентов:
 - **Rust:** `prost-build` → `services/common/src/proto.rs` (через `build.rs`).
 - **TypeScript:** `ts-proto` → `src/generated/dual_loop/v1/*.ts`.
@@ -142,6 +159,7 @@ All Phase 1 topics are prefixed with the protobuf package version:
 | `dl.v1.triggers.fired` | `TRIGGERS_FIRED` | `TRIGGERS_FIRED` |
 | `dl.v1.control.kill` | `CONTROL_KILL` | `CONTROL_KILL` |
 | `dl.v1.control.kill_ack` | `CONTROL_KILL_ACK` | `CONTROL_KILL_ACK` |
+| `dl.v1.exec.status` (NATS JetStream) | `EXEC_STATUS` | `EXEC_STATUS` |
 
 Single source of truth:
 * `services/common/src/topics.rs`

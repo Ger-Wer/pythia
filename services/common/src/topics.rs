@@ -29,6 +29,10 @@ pub const CONTROL_KILL: &str = "dl.v1.control.kill";
 pub const CONTROL_KILL_ACK: &str = "dl.v1.control.kill_ack";
 pub const CONTROL_HEARTBEAT: &str = "dl.v1.control.heartbeat";
 
+// ---------- Telemetry (sniper-executor → gateway-api, NATS JetStream) ----------
+/// Periodic heartbeat from `sniper-executor`; proxied over WSS to Command Center.
+pub const EXEC_STATUS: &str = "dl.v1.exec.status";
+
 /// All topics in a canonical order. The contract test on the TS side
 /// compares this list byte-for-byte with `topics.ts::ALL_TOPICS`.
 pub const ALL_TOPICS: &[&str] = &[
@@ -41,6 +45,7 @@ pub const ALL_TOPICS: &[&str] = &[
     CONTROL_KILL,
     CONTROL_KILL_ACK,
     CONTROL_HEARTBEAT,
+    EXEC_STATUS,
 ];
 
 /// Default consumer group names.

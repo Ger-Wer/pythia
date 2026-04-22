@@ -19,7 +19,7 @@ message ExecSubmitted {
   uint64 max_priority_fee_per_gas_wei = 9;
   string relay_used = 10;                  // "bloxroute" | "merkle" | "public"
 
-  Timestamp submitted_at = 11;
+  int64 submitted_at_unix_ms = 11;
   bool paper_mode = 12;                    // true до Phase 3
 }
 
@@ -29,12 +29,12 @@ message ExecFilled {
   bytes tx_hash = 2;
   MarketId market = 3;
 
-  Money realized_price = 4;                // средняя цена исполнения
+  Money realized_price = 4;                // средняя цена исполнения (USDC micros)
   Money filled_size = 5;
   Money gas_spent_usd = 6;
   uint64 block_number = 7;
 
-  Timestamp filled_at = 8;
+  int64 filled_at_unix_ms = 8;
   bool paper_mode = 9;
 }
 
@@ -48,6 +48,40 @@ message ExecReverted {
   Money gas_spent_usd = 5;
   uint64 block_number = 6;                 // 0 если не mined
 
-  Timestamp reverted_at = 7;
+  int64 reverted_at_unix_ms = 7;
   bool paper_mode = 8;
+}
+
+// sniper-executor → gateway-api: периодический статус для Command Center WSS.
+// Публикуется примерно раз в секунду; gateway-api проксирует через WebSocket.
+message ExecStatus {
+  // Heartbeat counter (monotonically increasing).
+  uint64 heartbeat_seq = 1;
+
+  // Emitted-at Unix epoch ms (host wall-clock).
+  int64 emitted_at_unix_ms = 2;
+
+  ExecutorState state = 3;
+
+  // Текущий market, если state ∈ {IN_TRADE, WAITING_FILL}.
+  MarketId current_market = 4;
+
+  // Сколько триггеров обработано с момента старта.
+  uint64 triggers_seen_total = 5;
+  uint64 triggers_executed_total = 6;
+
+  // Kill-switch engaged. Если true, все поля выше — historic, новых сделок нет.
+  bool kill_engaged = 7;
+
+  // Paper-mode — до Phase 3 всегда true.
+  bool paper_mode = 8;
+}
+
+enum ExecutorState {
+  EXECUTOR_STATE_UNSPECIFIED = 0;
+  EXECUTOR_STATE_IDLE = 1;                 // idle, готов принимать триггеры
+  EXECUTOR_STATE_WAITING_FILL = 2;         // tx submitted, ждём mined/reverted
+  EXECUTOR_STATE_IN_TRADE = 3;             // позиция открыта
+  EXECUTOR_STATE_DRAINING = 4;             // kill engaged, доводим open tx'ы
+  EXECUTOR_STATE_HALTED = 5;               // kill engaged, активных tx нет
 }

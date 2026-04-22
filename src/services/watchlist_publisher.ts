@@ -139,11 +139,17 @@ function uuidBytes(): Buffer {
   return Buffer.from(randomUUID().replace(/-/g, ''), 'hex');
 }
 
-function nowTimestamp() {
-  const wallMs = Date.now();
-  // JS has no cross-platform monotonic clock in ns precision; use `performance.now()`.
-  const monotonicNs = BigInt(Math.round((typeof performance !== 'undefined' ? performance.now() : 0) * 1e6));
-  return { wallClockUnixMs: BigInt(wallMs), monotonicNs };
+/** 1.0 probability = 1_000_000 ppm (matches common.proto `FixedPointScales`). */
+const PROBABILITY_PPM_PER_UNIT = 1_000_000;
+
+/** Convert a unit-interval probability (0..1) to signed int64 ppm. */
+function probToPpm(p: number): bigint {
+  const scaled = Math.round(p * PROBABILITY_PPM_PER_UNIT);
+  const clamped = Math.max(
+    -PROBABILITY_PPM_PER_UNIT,
+    Math.min(PROBABILITY_PPM_PER_UNIT, scaled),
+  );
+  return BigInt(clamped);
 }
 
 /**
@@ -176,7 +182,7 @@ export class WatchlistPublisher {
    */
   async buildUpsert(input: WatchlistDecisionInput): Promise<WatchlistUpsertType> {
     const { Side } = await loadProto();
-    const ts = nowTimestamp();
+    const edge = input.pMarket === null ? 0 : input.pFundamental - input.pMarket;
     const upsert: WatchlistUpsertType = {
       messageId: { value: uuidBytes() },
       market: {
@@ -184,16 +190,16 @@ export class WatchlistPublisher {
         ctfAddress: input.ctfAddress ?? '',
       },
       version: BigInt(Math.max(0, input.version)),
-      edge: input.pMarket === null ? 0 : input.pFundamental - input.pMarket,
-      pFundamental: input.pFundamental,
-      confidence: input.confidence ?? 0.5,
+      edgePpm: probToPpm(edge),
+      pFundamentalPpm: probToPpm(input.pFundamental),
+      confidencePpm: probToPpm(input.confidence ?? 0.5),
       sideHint: sideHintFor(input.recommendedAction, Side),
       maxPositionUsd: {
         amountMicros: BigInt(Math.round((input.maxPositionUsd ?? 0) * 1_000_000)),
       },
       maxSlippageBps: input.maxSlippageBps ?? 50,
       ttlMs: BigInt(input.ttlMs ?? DEFAULT_TTL_MS),
-      issuedAt: ts,
+      issuedAtUnixMs: BigInt(Date.now()),
       triggerPolicy: undefined,
     };
     return upsert;
@@ -256,7 +262,6 @@ export class WatchlistPublisher {
   ): Promise<string | null> {
     if (!this.publisher) return null;
     const { WatchlistRemove } = await loadProto();
-    const ts = nowTimestamp();
     const remove: WatchlistRemoveType = {
       messageId: { value: uuidBytes() },
       market: {
@@ -265,7 +270,7 @@ export class WatchlistPublisher {
       },
       version: BigInt(Math.max(0, opts.version)),
       reason: opts.reason ?? 0,
-      issuedAt: ts,
+      issuedAtUnixMs: BigInt(Date.now()),
     };
     try {
       const id = await this.publisher.publish(

@@ -3,9 +3,9 @@
 //! For the cross-language (TS ↔ Rust) test see `tests/cross_lang.rs`
 //! which is gated on a live Redis instance.
 
-use dual_loop_common::proto::common::{MarketId, Money, Side, Timestamp, Uuid};
+use dual_loop_common::proto::common::{MarketId, Money, Side, Uuid};
 use dual_loop_common::proto::control::{KillAck, KillAckStatus, KillCommand, KillScope};
-use dual_loop_common::proto::execution::ExecSubmitted;
+use dual_loop_common::proto::execution::{ExecStatus, ExecSubmitted, ExecutorState};
 use dual_loop_common::proto::signal::{DecisionAction, Signal, SignalDecision, SignalPriority};
 use dual_loop_common::proto::trigger::Trigger;
 use dual_loop_common::proto::watchlist::{
@@ -34,19 +34,16 @@ fn watchlist_upsert_roundtrip() {
             ctf_address: "0xabc".into(),
         }),
         version: 42,
-        edge: 0.05,
-        p_fundamental: 0.67,
-        confidence: 0.9,
+        edge_ppm: 50_000,
+        p_fundamental_ppm: 670_000,
+        confidence_ppm: 900_000,
         side_hint: Side::Yes as i32,
         max_position_usd: Some(Money {
             amount_micros: 10_000_000,
         }),
         max_slippage_bps: 75,
         ttl_ms: 60_000,
-        issued_at: Some(Timestamp {
-            wall_clock_unix_ms: 1_700_000_000_000,
-            monotonic_ns: 123_456_789,
-        }),
+        issued_at_unix_ms: 1_700_000_000_000,
         trigger_policy: Some(TriggerPolicy {
             min_independent_sources: 2,
             allowed_kinds: vec![
@@ -69,7 +66,7 @@ fn watchlist_remove_roundtrip() {
         }),
         version: 7,
         reason: 1,
-        issued_at: None,
+        issued_at_unix_ms: 1_700_000_001_000,
     };
     assert_roundtrip(msg);
 }
@@ -85,12 +82,12 @@ fn signal_and_decision_roundtrip() {
             ctf_address: "a".into(),
         }),
         market_question: "Will X happen?".into(),
-        edge: 0.04,
-        p_fundamental: 0.6,
-        p_market: 0.56,
-        confidence_low: 0.55,
-        confidence_high: 0.65,
-        expected_value_bps: 40.0,
+        edge_ppm: 40_000,
+        p_fundamental_ppm: 600_000,
+        p_market_ppm: 560_000,
+        confidence_low_ppm: 550_000,
+        confidence_high_ppm: 650_000,
+        expected_value_bps: 40,
         side_hint: Side::Yes as i32,
         suggested_position: Some(Money {
             amount_micros: 500_000,
@@ -98,7 +95,7 @@ fn signal_and_decision_roundtrip() {
         expires_at_unix_ms: 1_700_000_500_000,
         llm_rationale: "…".into(),
         evidence_urls: vec!["https://example.com".into()],
-        issued_at: None,
+        issued_at_unix_ms: 1_700_000_000_000,
         priority: SignalPriority::Normal as i32,
     };
     assert_roundtrip(signal);
@@ -112,7 +109,7 @@ fn signal_and_decision_roundtrip() {
         operator_id: "op-1".into(),
         rejection_reason: String::new(),
         snooze_until_unix_ms: 0,
-        decided_at: None,
+        decided_at_unix_ms: 1_700_000_010_000,
     };
     assert_roundtrip(decision);
 }
@@ -129,7 +126,9 @@ fn trigger_roundtrip() {
         evidence_hash: prost::bytes::Bytes::from_static(&[0xAB; 32]),
         eta_block: 123456,
         observed_at_ns: 42,
-        expected_price: 0.55,
+        expected_price: Some(Money {
+            amount_micros: 550_000,
+        }),
         slippage_bps: 10,
         source_count: 2,
     };
@@ -149,7 +148,22 @@ fn exec_submitted_roundtrip() {
         max_fee_per_gas_wei: 100,
         max_priority_fee_per_gas_wei: 1,
         relay_used: "public".into(),
-        submitted_at: None,
+        submitted_at_unix_ms: 1_700_000_020_000,
+        paper_mode: true,
+    };
+    assert_roundtrip(msg);
+}
+
+#[test]
+fn exec_status_roundtrip() {
+    let msg = ExecStatus {
+        heartbeat_seq: 17,
+        emitted_at_unix_ms: 1_700_000_030_000,
+        state: ExecutorState::Idle as i32,
+        current_market: None,
+        triggers_seen_total: 42,
+        triggers_executed_total: 0,
+        kill_engaged: false,
         paper_mode: true,
     };
     assert_roundtrip(msg);
@@ -176,7 +190,7 @@ fn kill_command_and_ack_roundtrip() {
         detail: "ok".into(),
         active_triggers_cancelled: 0,
         pending_tx_cancelled: 0,
-        ack_at: None,
+        ack_at_unix_ms: 1_700_000_040_000,
     };
     assert_roundtrip(ack);
 }

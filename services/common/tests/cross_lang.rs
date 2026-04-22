@@ -98,14 +98,15 @@ async fn ts_publishes_rust_consumes_watchlist_upsert() {
     assert_eq!(market.polymarket_id, "cross-lang-001");
     assert_eq!(market.ctf_address, "0xfeed");
     assert_eq!(upsert.version, 7);
-    assert!((upsert.edge - 0.042).abs() < 1e-9);
-    assert!((upsert.p_fundamental - 0.7).abs() < 1e-9);
-    assert!((upsert.confidence - 0.95).abs() < 1e-9);
+    assert_eq!(upsert.edge_ppm, 42_000);
+    assert_eq!(upsert.p_fundamental_ppm, 700_000);
+    assert_eq!(upsert.confidence_ppm, 950_000);
     assert_eq!(upsert.side_hint, 1); // SIDE_YES
     let money = upsert.max_position_usd.as_ref().expect("max_position_usd");
     assert_eq!(money.amount_micros, 5_000_000);
     assert_eq!(upsert.max_slippage_bps, 25);
     assert_eq!(upsert.ttl_ms, 60_000);
+    assert_eq!(upsert.issued_at_unix_ms, 1_700_000_000_000);
     assert_eq!(msg.trace_id.as_deref(), Some("cross-lang-test"));
 
     cg.ack(&msg.id).await.expect("ack");
