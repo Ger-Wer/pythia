@@ -127,9 +127,7 @@ pub async fn engage(state: &SharedKillState, command: &KillCommand, in_flight: u
 
 pub async fn complete_if_drained(state: &SharedKillState) -> Option<KillAck> {
     let mut guard = state.write().await;
-    let Some(active) = guard.as_mut() else {
-        return None;
-    };
+    let active = guard.as_mut()?;
     if active.final_ack_sent {
         return None;
     }
@@ -263,10 +261,11 @@ fn verify_signature(command: &KillCommand, secret: &str) -> bool {
     .join("|");
     mac.update(payload.as_bytes());
     let expected = mac.finalize().into_bytes();
-    let expected_hex = hex_encode(expected.as_slice());
+    let expected_bytes = &expected[..];
+    let expected_hex = hex_encode(expected_bytes);
     let provided = command.signature.as_ref();
 
-    provided == expected.as_slice() || provided.eq_ignore_ascii_case(expected_hex.as_bytes())
+    provided == expected_bytes || provided.eq_ignore_ascii_case(expected_hex.as_bytes())
 }
 
 fn scope_from_i32(value: i32) -> KillScope {

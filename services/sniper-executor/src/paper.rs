@@ -153,7 +153,7 @@ pub fn plan_paper_execution(
         market: trigger.market.clone(),
         tx_hash: tx_hash.clone(),
         nonce,
-        size: Some(size.clone()),
+        size: Some(size),
         side: Side::Unspecified as i32,
         max_fee_per_gas_wei: cfg.max_fee_per_gas_wei,
         max_priority_fee_per_gas_wei: cfg.max_priority_fee_per_gas_wei,
@@ -166,10 +166,10 @@ pub fn plan_paper_execution(
         message_id: Some(new_uuid_v7()),
         tx_hash: tx_hash.clone(),
         market: trigger.market.clone(),
-        realized_price: trigger.expected_price.clone().or(Some(Money {
+        realized_price: trigger.expected_price.or(Some(Money {
             amount_micros: 0,
         })),
-        filled_size: Some(size.clone()),
+        filled_size: Some(size),
         gas_spent_usd: Some(Money { amount_micros: 0 }),
         block_number: 0,
         filled_at_unix_ms,
