@@ -658,10 +658,16 @@ function createPositionEvent(
         @payloadJson
       )
     `,
-  ).run({
-    ...params,
+  ).run(
+    params.positionId,
+    params.decisionId,
+    params.eventType,
+    params.eventNote,
+    params.marketPrice,
+    params.researchProbability,
+    params.createdAt,
     payloadJson,
-  });
+  );
 }
 
 function positionValuePerContract(side: PositionSide, yesPrice: number): number {
@@ -1216,7 +1222,7 @@ async function openShadowPosition(db: Database, signal: SignalSnapshot, predicti
       recommended_action: signal.recommended_action,
       entry_zone_min: signal.entry_zone_min,
       entry_zone_max: signal.entry_zone_max,
-      notional_usd: notionalUsd,
+      notional_usd: sizing.notionalUsd,
     },
   });
 }

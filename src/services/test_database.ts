@@ -313,7 +313,9 @@ export function seedOpenOperatorPosition(
     `,
   ).run(predictionId, input.market_id, `Question for ${input.market_id}`);
 
-  const signalId = Number(db.query('SELECT last_insert_rowid() as id').get()?.id ?? 0);
+  const signalId = Number(
+    (db.query('SELECT last_insert_rowid() as id').get() as { id: number } | undefined)?.id ?? 0,
+  );
 
   db.query(
     `
@@ -327,7 +329,9 @@ export function seedOpenOperatorPosition(
     `,
   ).run(signalId, bookId, input.market_id);
 
-  const decisionId = Number(db.query('SELECT last_insert_rowid() as id').get()?.id ?? 0);
+  const decisionId = Number(
+    (db.query('SELECT last_insert_rowid() as id').get() as { id: number } | undefined)?.id ?? 0,
+  );
 
   db.query(
     `
