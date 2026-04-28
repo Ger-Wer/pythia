@@ -20,9 +20,14 @@ pub const SIGNALS_EMITTED: &str = "dl.v1.signals.emitted";
 // ---------- Triggers (sniper-ingest → sniper-executor) ----------
 pub const TRIGGERS_FIRED: &str = "dl.v1.triggers.fired";
 
+// ---------- Execution (sniper-executor → all) ----------
+pub const EXEC_FILLED: &str = "dl.v1.exec.filled";
+pub const EXEC_REVERTED: &str = "dl.v1.exec.reverted";
+
 // ---------- Control plane (gateway → sniper-executor) ----------
 pub const CONTROL_KILL: &str = "dl.v1.control.kill";
 pub const CONTROL_KILL_ACK: &str = "dl.v1.control.kill_ack";
+pub const CONTROL_HEARTBEAT: &str = "dl.v1.control.heartbeat";
 
 /// All topics in a canonical order. The contract test on the TS side
 /// compares this list byte-for-byte with `topics.ts::ALL_TOPICS`.
@@ -31,14 +36,18 @@ pub const ALL_TOPICS: &[&str] = &[
     WATCHLIST_REMOVE,
     SIGNALS_EMITTED,
     TRIGGERS_FIRED,
+    EXEC_FILLED,
+    EXEC_REVERTED,
     CONTROL_KILL,
     CONTROL_KILL_ACK,
+    CONTROL_HEARTBEAT,
 ];
 
 /// Default consumer group names.
 pub mod consumer_groups {
     pub const SNIPER_INGEST: &str = "sniper-ingest";
     pub const SNIPER_EXECUTOR: &str = "sniper-executor";
+    pub const SNIPER_RISK: &str = "sniper-risk";
     pub const GATEWAY: &str = "gateway-api";
     pub const PYTHIA_CORE: &str = "pythia-core";
 }

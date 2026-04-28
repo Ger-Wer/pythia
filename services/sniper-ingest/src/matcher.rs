@@ -103,7 +103,7 @@ impl TriggerMatcher {
         if let Some(ref policy) = entry.trigger_policy {
             if !policy.allowed_kinds.is_empty() {
                 let kind_i32 = kind as i32;
-                if !policy.allowed_kinds.iter().any(|k| *k == kind_i32) {
+                if !policy.allowed_kinds.contains(&kind_i32) {
                     return None;
                 }
             }

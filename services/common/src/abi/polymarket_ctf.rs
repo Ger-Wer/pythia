@@ -75,7 +75,7 @@ pub fn try_decode_token_registered(log: &LogData) -> Option<DecodedEvent> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{address, b256, Address, Bytes, LogData, U256};
+    use alloy_primitives::{address, b256, Address, LogData, U256};
 
     fn build_order_filled_log() -> (Address, LogData) {
         let addr = address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E");

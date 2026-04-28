@@ -23,17 +23,17 @@
 
 | # | Риск | Паттерн |
 |---|------|---------|
-| R10 | **Stale watchlist**: Pythia сняла рынок, Sniper ещё исполняет | Каждый entry имеет `valid_until` (TTL) + `version`. Sniper проверяет TTL ДО broadcast; просроченный entry → auto-disarm. `watchlist.remove` — идемпотентно, с `reason`. |
+| R10 | **Stale watchlist**: Pythia сняла рынок, Sniper ещё исполняет | ✅ **Mitigated (Phase 2 Track C).** Каждый entry имеет `valid_until` (TTL) + `version`. `PreTradeChecks.evaluate()` проверяет TTL + stale signal (>60s) ДО broadcast; просроченный entry → auto-disarm + `RiskError::WatchlistExpired` / `RiskError::StaleSignal`. `watchlist.remove` — идемпотентно, с `reason`. |
 | R11 | **Double-fire trigger** (тот же оракул матчится дважды) | Idempotency key = `hash(market_id \|\| tx_hash \|\| log_index)`, дедуп в executor LRU cache (size=10k). |
 | R12 | **Race Accept ↔ auto-expire** | Signal имеет `server_version`. Decision включает `expected_version`; conflict → 409 + UI показывает новую версию. |
 | R13 | **Nonce race** при параллельных сделках одного ключа | Single-writer NonceManager (actor model, tokio mpsc channel), reservation pool, на timeout — automatic release + alert. |
-| R14 | **Split-brain на kill-switch** (UI считает killed, executor ещё нет) | Kill = two-phase: REST ACK после `AtomicBool=true` + подтверждение от executor через `control.kill.ack`. UI показывает `KILLING` до ack, `KILLED` после. Visible timestamp разницы между phases. |
+| R14 | **Split-brain на kill-switch** (UI считает killed, executor ещё нет) | ✅ **Mitigated (Phase 2 Track C).** Kill = two-phase: REST ACK после `AtomicBool=true` + подтверждение от executor через `control.kill.ack`. UI показывает `KILLING` до ack, `KILLED` после. Visible timestamp разницы между phases. Дополнительно: `DeadManSwitch` блокирует все новые сделки если operator heartbeat не получен >5 мин (`dl.v1.control.heartbeat`). |
 
 ## 7.4. Operational / security
 
 | # | Риск | Паттерн |
 |---|------|---------|
-| R15 | **Компрометация hot-wallet ключа** | HSM-signing (YubiHSM 2 / Fireblocks); per-session ephemeral approval; hard cap по суточному notional в контракте-мультисиге; ключ не покидает HSM. |
+| R15 | **Компрометация hot-wallet ключа** | ✅ **Partially mitigated (Phase 2 Track C).** HSM-signing (YubiHSM 2 / Fireblocks); per-session ephemeral approval; hard cap по суточному notional в контракте-мультисиге; ключ не покидает HSM. Дополнительно: `DailyBudget` ($100k default cap) блокирует сделки при превышении суточного лимита потерь (gas + realized PnL). State persisted в Redis. |
 | R16 | **Ошибочный Kill оператором** | Two-key confirm + 3s abort countdown + post-mortem log. Кнопка физически разнесена с остальными (нижний-правый угол). Audit log запись включает hash state системы до/после. |
 | R17 | **LLM hallucination → ложный Edge** | Multi-source grounding (Exa + on-chain history + Polymarket comments); JSON-schema валидация вывода; confidence < threshold → сигнал помечается LOW_CONF и не попадает в Active Watchlist автоматически, только в Triage Queue. |
 | R18 | **Oracle manipulation / flash news** | Минимум 2 независимых источника подтверждения для авто-триггера; при одиночном источнике — only alert, no auto-exec; оператор видит в UI, какие источники подтвердили. |
