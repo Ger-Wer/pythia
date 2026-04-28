@@ -1,0 +1,40 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "requester", "type": "address"},
+      {"indexed": true, "name": "proposer", "type": "address"},
+      {"indexed": false, "name": "questionId", "type": "bytes32"},
+      {"indexed": false, "name": "proposedPrice", "type": "int256"},
+      {"indexed": false, "name": "expirationTimestamp", "type": "uint256"},
+      {"indexed": false, "name": "ancillaryData", "type": "bytes"}
+    ],
+    "name": "ProposePrice",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "requester", "type": "address"},
+      {"indexed": true, "name": "proposer", "type": "address"},
+      {"indexed": true, "name": "disputer", "type": "address"},
+      {"indexed": false, "name": "questionId", "type": "bytes32"},
+      {"indexed": false, "name": "proposedPrice", "type": "int256"},
+      {"indexed": false, "name": "ancillaryData", "type": "bytes"}
+    ],
+    "name": "DisputePrice",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "requester", "type": "address"},
+      {"indexed": true, "name": "proposer", "type": "address"},
+      {"indexed": false, "name": "questionId", "type": "bytes32"},
+      {"indexed": false, "name": "settledPrice", "type": "int256"},
+      {"indexed": false, "name": "ancillaryData", "type": "bytes"}
+    ],
+    "name": "Settle",
+    "type": "event"
+  }
+]

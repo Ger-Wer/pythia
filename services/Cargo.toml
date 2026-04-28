@@ -55,6 +55,27 @@ protoc-bin-vendored = "3.1"
 redis = { version = "0.27", default-features = false, features = ["aio", "tokio-comp", "streams", "script"] }
 async-nats = "0.38"
 
+# Alloy (EVM)
+alloy = { version = "0.8", features = ["full", "provider-ws", "provider-ipc", "pubsub", "rpc-types-trace"] }
+alloy-sol-types = "0.8"
+alloy-contract = "0.8"
+alloy-primitives = { version = "0.8", features = ["serde"] }
+alloy-node-bindings = "0.8"
+
+# Hot-path data structures
+smallvec = { version = "1.13", features = ["union", "serde"] }
+ahash = "0.8"
+arc-swap = "1.7"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Hex encoding
+hex = "0.4"
+
+# Benchmarks
+criterion = { version = "0.5", features = ["html_reports"] }
+
 # Testing
 tokio-test = "0.4"
 

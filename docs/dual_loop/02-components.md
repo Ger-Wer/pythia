@@ -13,13 +13,14 @@
 
 ## 2.2. `sniper-ingest` (Fast Loop)
 
-| Компонент | Отв. | Файлы |
-|-----------|------|-------|
-| `MempoolSubscriber` | `eth_subscribe("newPendingTransactions", {fullTx: true})` через **IPC** (не WS) к локальной ноде | `services/sniper-ingest/src/mempool.rs` |
-| `OracleDecoder` | ABI-декодер для контрактов оракулов (UMA, Chainlink, Pyth) + таргет-контрактов Polymarket CTF | `services/sniper-ingest/src/decoder.rs` |
-| `OrderBookTracker` | In-memory L2 стакан для каждого рынка из watchlist; hot path — zero-alloc ring buffer | `services/sniper-ingest/src/orderbook.rs` |
-| `TriggerMatcher` | SIMD-оптимизированный matcher: `if (decoded_event ∈ watchlist) && (price_impact < slippage_max) → emit trigger` | `services/sniper-ingest/src/trigger.rs` |
-| `WatchlistConsumer` | Подписчик на `watchlist.upsert`/`remove`, hot-reload без рестарта | `services/sniper-ingest/src/watchlist.rs` |
+| Компонент | Отв. | Файлы | Phase 2 status |
+|-----------|------|-------|----------------|
+| `MempoolSubscriber` | WS (Anvil, dev/CI) + IPC (Bor/Erigon, staging/prod) mempool stream with auto-reconnect | `services/sniper-ingest/src/mempool.rs` | **implemented** |
+| `OracleDecoder` | ABI-декодер: Polymarket CTF Exchange, UMA Oracle V3, Chainlink Aggregator via `alloy_sol_types::sol!` | `services/common/src/abi/` | **implemented** |
+| `OrderBookTracker` | In-memory L2 стакан для каждого рынка из watchlist; hot path — zero-alloc ring buffer | `services/sniper-ingest/src/orderbook.rs` | Phase 2-D |
+| `TriggerMatcher` | Hot-path matcher: decoded event × watchlist × TriggerPolicy → `dl.v1.triggers.fired` | `services/sniper-ingest/src/matcher.rs` | **implemented** |
+| `WatchlistConsumer` | Подписчик на `watchlist.upsert`/`remove`, hot-reload без рестарта | `services/sniper-ingest/src/watchlist.rs` | **implemented** (Phase 1) |
+| `ReplayHarness` | Deterministic replay of mempool dumps through the matcher | `services/sniper-ingest/src/bin/replay.rs` | **implemented** |
 
 ## 2.3. `sniper-executor`
 
