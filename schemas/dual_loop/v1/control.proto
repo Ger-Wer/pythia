@@ -48,3 +48,11 @@ enum KillAckStatus {
   KILL_ACK_STATUS_REJECTED_STALE = 5;      // issued_at outside window
   KILL_ACK_STATUS_REJECTED_REPLAY = 6;     // same nonce seen before
 }
+
+// operator → sniper-risk: периодический heartbeat для dead-man switch.
+// Если heartbeat не получен в течение DEAD_MAN_TIMEOUT_MS, новые сделки блокируются.
+message Heartbeat {
+  Uuid message_id = 1;
+  string operator_id = 2;
+  Timestamp ts = 3;
+}

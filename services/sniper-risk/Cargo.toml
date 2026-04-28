@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Fast Loop: pre-trade risk checks (position caps, circuit breaker, dead-man)."
+description = "Fast Loop: pre-trade risk checks (position caps, circuit breaker, dead-man, daily budget)."
 
 [lib]
 name = "sniper_risk"
@@ -15,3 +15,15 @@ dual_loop_common = { path = "../common" }
 tracing.workspace = true
 thiserror.workspace = true
 parking_lot.workspace = true
+dashmap.workspace = true
+tokio.workspace = true
+metrics.workspace = true
+redis.workspace = true
+prost.workspace = true
+bytes.workspace = true
+time.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true
+proptest = "1.5"

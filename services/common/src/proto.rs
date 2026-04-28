@@ -42,7 +42,7 @@ pub mod execution {
 
 /// Message types originally declared in `control.proto`.
 pub mod control {
-    pub use super::v1::{KillAck, KillAckStatus, KillCommand, KillScope};
+    pub use super::v1::{Heartbeat, KillAck, KillAckStatus, KillCommand, KillScope};
 }
 
 /// Helper: UUIDv7 wrapped in the generated `Uuid` proto.
