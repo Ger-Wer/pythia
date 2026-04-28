@@ -256,8 +256,8 @@ fn revert_records_gas_and_trips_breaker() {
         guard.record_revert(&rev);
     }
 
-    // Budget should track gas spent (500 * 3 = 1500) + pnl loss (500 * 3 = 1500).
-    assert_eq!(guard.budget.spent_today(), 3_000);
+    // Budget should track gas spent only (500 * 3 = 1500).
+    assert_eq!(guard.budget.spent_today(), 1_500);
     assert!(matches!(guard.breaker.state(), CircuitState::Open { .. }));
 }
 

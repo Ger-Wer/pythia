@@ -160,6 +160,11 @@ impl RiskLimits {
                 limits.dead_man_timeout_ms = n;
             }
         }
+        if let Ok(v) = std::env::var("RISK_STALE_SIGNAL_MS") {
+            if let Ok(n) = v.parse() {
+                limits.stale_signal_threshold_ms = n;
+            }
+        }
         limits
     }
 }
@@ -328,7 +333,6 @@ impl RiskGuard {
             .unwrap_or(0);
 
         self.budget.record_gas(gas_usd);
-        self.budget.record_pnl(-gas_usd);
 
         let reason = &rev.reason;
         self.breaker.record_failure(reason);
