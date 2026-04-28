@@ -28,8 +28,6 @@ services:
       - "256mb"
       - --maxmemory-policy
       - "allkeys-lru"
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     networks:
@@ -71,8 +69,6 @@ services:
       POSTGRES_DB: pythia_dev
       POSTGRES_USER: pythia
       POSTGRES_PASSWORD: pythia_dev_password
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
