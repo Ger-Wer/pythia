@@ -9,8 +9,9 @@ COPY package.json ./
 COPY tsconfig.json ./
 COPY bunfig.toml ./
 
-# Install deps (no lockfile yet in MVP; `bun install` produces one).
-RUN bun install --production=false
+# Install deps for the dev/runtime image. `bun install` is compatible with
+# current Bun CLI, while `--production=false` is not.
+RUN bun install
 
 COPY src ./src
 

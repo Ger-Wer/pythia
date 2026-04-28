@@ -155,6 +155,17 @@ bash scripts/manual_run.sh watch-alerts
 
 Эта проверка не заменяет production deploy Slow Loop, а дополняет его.
 
+Если сервер shared и локальные порты `127.0.0.1:5432` или `127.0.0.1:6379` уже заняты другим проектом, поднимайте Dual-Loop dev stack через:
+
+```bash
+docker compose \
+  -f docker-compose.dev.yml \
+  -f docker-compose.dev.shared-server.yml \
+  up -d redis nats postgres gateway-api sniper-ingest sniper-executor
+```
+
+Этот override убирает host-публикацию у `redis` и `postgres`, оставляя их доступными только внутри compose-сети.
+
 ## Reverse proxy
 
 Наружу dashboard должен идти только так:
