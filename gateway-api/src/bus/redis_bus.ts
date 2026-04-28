@@ -17,6 +17,14 @@ const AUTOCLAIM_INTERVAL_MS = 10_000;
 const BLOCK_MS = 5_000;
 const BATCH_SIZE = 32;
 
+interface SubscriptionRedisClient {
+  connect?: () => Promise<unknown>;
+}
+
+interface DuplicatingRedisClient<T extends SubscriptionRedisClient> {
+  duplicate(): T;
+}
+
 interface StreamEntry {
   id: string;
   fields: Array<string | Buffer>;
@@ -86,6 +94,16 @@ function fieldsToPayload(fields: Array<string | Buffer>): {
   return { payload, payloadBytes };
 }
 
+export async function openSubscriptionRedis<T extends SubscriptionRedisClient>(
+  redis: DuplicatingRedisClient<T>,
+): Promise<T> {
+  const subscriptionRedis = redis.duplicate();
+  if (typeof subscriptionRedis.connect === "function") {
+    await subscriptionRedis.connect();
+  }
+  return subscriptionRedis;
+}
+
 export class RedisBusClient implements BusClient {
   private readonly redis: Redis;
   private readonly log: Logger;
@@ -115,10 +133,12 @@ export class RedisBusClient implements BusClient {
     consumer: string,
     handler: (msg: BusMessage) => Promise<void>,
   ): Promise<BusSubscription> {
+    const subscriptionRedis = await openSubscriptionRedis(this.redis);
+
     // Create the group (idempotent). MKSTREAM so we don't need the stream
     // to exist ahead of time.
     try {
-      await this.redis.xgroup("CREATE", stream, group, "$", "MKSTREAM");
+      await subscriptionRedis.xgroup("CREATE", stream, group, "$", "MKSTREAM");
     } catch (err) {
       const msg = (err as Error).message;
       if (!msg.includes("BUSYGROUP")) throw err;
@@ -127,6 +147,10 @@ export class RedisBusClient implements BusClient {
     const log = this.log.child({ stream, group, consumer });
     let stopped = false;
     const consumerName = `${consumer}-${randomUUID().slice(0, 8)}`;
+    let resolveStopWait = () => {};
+    const stopWait = new Promise<void>((resolve) => {
+      resolveStopWait = resolve;
+    });
 
     const loop = async () => {
       while (!stopped) {
@@ -135,7 +159,7 @@ export class RedisBusClient implements BusClient {
           // client boundary intact. Fall back to the normal helper if the
           // runtime client does not expose `callBuffer`.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const client: any = this.redis as any;
+          const client: any = subscriptionRedis as any;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const raw: any =
             typeof client.callBuffer === "function"
@@ -176,7 +200,7 @@ export class RedisBusClient implements BusClient {
               const { payload, payloadBytes } = fieldsToPayload(entry.fields);
               try {
                 await handler({ id: entry.id, payload, payloadBytes });
-                await this.redis.xack(stream, group, entry.id);
+                await subscriptionRedis.xack(stream, group, entry.id);
               } catch (err) {
                 log.warn("handler failed; leaving message pending", {
                   id: entry.id,
@@ -197,12 +221,15 @@ export class RedisBusClient implements BusClient {
 
     const autoclaim = async () => {
       while (!stopped) {
-        await new Promise((r) => setTimeout(r, AUTOCLAIM_INTERVAL_MS));
+        await Promise.race([
+          new Promise((r) => setTimeout(r, AUTOCLAIM_INTERVAL_MS)),
+          stopWait,
+        ]);
         if (stopped) break;
         try {
           // XAUTOCLAIM <stream> <group> <consumer> <min-idle-ms> 0-0
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (this.redis as any).xautoclaim(
+          await (subscriptionRedis as any).xautoclaim(
             stream,
             group,
             consumerName,
@@ -222,6 +249,16 @@ export class RedisBusClient implements BusClient {
 
     const stop = async () => {
       stopped = true;
+      resolveStopWait();
+      try {
+        await subscriptionRedis.quit();
+      } catch {
+        try {
+          subscriptionRedis.disconnect(false);
+        } catch {
+          /* ignore */
+        }
+      }
       await Promise.allSettled([loopPromise, autoclaimPromise]);
     };
     this.running.add(stop);
