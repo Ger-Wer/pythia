@@ -4121,14 +4121,18 @@ dependencies = [
  "bytes",
  "dual_loop_common",
  "futures",
+ "hex",
+ "hmac",
  "metrics",
  "parking_lot",
  "prost",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
