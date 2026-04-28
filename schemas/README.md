@@ -11,7 +11,7 @@ schemas/
 ├── buf.yaml             # buf module config (lint + breaking)
 ├── buf.gen.yaml         # генерация клиентов для Rust (prost) и TS (ts-proto)
 └── dual_loop/v1/
-    ├── common.proto     # общие типы (Timestamp, Money, MarketId)
+    ├── common.proto     # общие типы (Money, MarketId, fixed-point scales)
     ├── watchlist.proto  # pythia → sniper: управление watchlist
     ├── signal.proto     # pythia → gateway → UI: сигналы и решения
     ├── trigger.proto    # sniper-ingest → sniper-executor: ончейн триггеры

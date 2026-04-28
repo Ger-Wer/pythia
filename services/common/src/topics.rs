@@ -21,6 +21,7 @@ pub const SIGNALS_EMITTED: &str = "dl.v1.signals.emitted";
 pub const TRIGGERS_FIRED: &str = "dl.v1.triggers.fired";
 
 // ---------- Execution (sniper-executor → all) ----------
+pub const EXEC_SUBMITTED: &str = "dl.v1.exec.submitted";
 pub const EXEC_FILLED: &str = "dl.v1.exec.filled";
 pub const EXEC_REVERTED: &str = "dl.v1.exec.reverted";
 
@@ -40,6 +41,7 @@ pub const ALL_TOPICS: &[&str] = &[
     WATCHLIST_REMOVE,
     SIGNALS_EMITTED,
     TRIGGERS_FIRED,
+    EXEC_SUBMITTED,
     EXEC_FILLED,
     EXEC_REVERTED,
     CONTROL_KILL,

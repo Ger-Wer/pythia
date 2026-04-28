@@ -23,3 +23,7 @@ parking_lot.workspace = true
 bytes.workspace = true
 prost.workspace = true
 futures.workspace = true
+hex.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+uuid.workspace = true

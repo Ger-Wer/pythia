@@ -1,58 +1,64 @@
 # Развертывание Pythia на `amper`
 
-Дата актуализации: 2026-04-08
+Дата актуализации: 2026-04-28
 
 ## Роль документа
 
-Это production-runbook: как развернуть, обновить и проверить Pythia на `amper`.
+Это production-runbook для текущей Pythia.
 
-Если нужно понять, что система делает и почему она так устроена, сначала читайте:
+Сначала прочитайте:
 
-- [README.md](/Users/gerwer/Desktop/Pythia/README.md)
-- [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
-- [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
+- [README.md](../README.md)
+- [docs/README.md](./README.md)
+- [docs/PYTHIA_V2_WORKSTREAM.md](./PYTHIA_V2_WORKSTREAM.md)
 
-## Что именно вы деплоите
+## Базовая топология
 
-Сейчас production включает:
+- хост: `amper`
+- системный пользователь проекта: `pythia`
+- рабочая директория: `/home/pythia/pythia`
+- Pythia обновляется только через локальный `docker compose` из этой директории
+- dashboard публикуется на `127.0.0.1:8787` и наружу идёт только через reverse proxy
+
+На этом же сервере живёт отдельный проект `sproutsignal`.
+
+Критичное правило:
+
+- никаких глобальных Docker-команд по всему хосту;
+- никаких `docker system prune`, `docker stop $(docker ps -q)` и похожих действий;
+- управлять только контейнерами Pythia из `/home/pythia/pythia`.
+
+## Что сейчас считается production Pythia
+
+В production-контур сейчас входят:
 
 - daily forecast;
 - decision core;
+- paper/shadow lifecycle;
 - autonomous watchlist engine;
+- attention queue;
 - dashboard;
-- Telegram operator/fallback bot.
+- Telegram operator loop.
 
-Сейчас production не включает:
+В production-контур пока не входят:
 
 - live trading;
-- хранение реальных trading-ключей;
-- attention engine.
+- реальные trading-ключи;
+- live-capital execution;
+- Dual-Loop Fast Loop как отдельный постоянно работающий production stack.
 
-## Где это живет
+Fast Loop код уже в репозитории, но его verification/deployment нужно считать отдельным workstream поверх основного Pythia runtime.
 
-- хост: `amper`
-- пользователь: `pythia`
-- каталог: `/home/pythia/pythia`
-- dashboard: `127.0.0.1:8787`, наружу только через reverse proxy
+## `.env` и секреты
 
-## Обязательные переменные окружения
+Файл `.env` на сервере считается источником секретов.
 
-Скопируйте:
+Правила:
 
-```bash
-cp .env.example .env
-```
-
-Заполните как минимум:
-
-- LLM backend credentials;
-- `EXA_API_KEY`;
-- `TAVILY_API_KEY`;
-- Telegram credentials;
-- `DASHBOARD_USERNAME`;
-- `DASHBOARD_PASSWORD_HASH`;
-- `DASHBOARD_SESSION_SECRET`;
-- `DASHBOARD_PUBLIC_BASE_URL`.
+- не удалять `.env`;
+- не перетирать `.env` шаблоном;
+- перед обновлением убедиться, что файл на месте;
+- новые переменные добавлять вручную или через безопасное слияние.
 
 ## Первый деплой
 
@@ -68,7 +74,30 @@ bash scripts/manual_run.sh watch-alerts
 docker compose up -d
 ```
 
-## Что проверить после первого деплоя
+## Стандартное обновление production
+
+Если нужно обновить сервер на конкретную ветку:
+
+```bash
+cd /home/pythia/pythia
+git fetch origin
+git checkout <target-branch>
+git pull --ff-only origin <target-branch>
+test -f .env
+docker compose down
+docker compose build
+docker compose up -d
+bash scripts/manual_run.sh status
+```
+
+Если обновление затрагивает watchlist-контур, полезно сразу прогнать:
+
+```bash
+bash scripts/manual_run.sh watchlist-refresh
+bash scripts/manual_run.sh watch-alerts
+```
+
+## Что проверить после обновления
 
 ### Контейнеры
 
@@ -89,21 +118,19 @@ docker compose logs --tail=50 pythia-dashboard
 curl -s http://127.0.0.1:8787/api/auth/me
 ```
 
-Ожидаемо: API отвечает, dashboard открывается через reverse proxy.
-
 ### Telegram
 
 ```bash
 docker compose logs --tail=50 pythia-telegram
 ```
 
-В личном чате проверьте:
+Проверьте в личном чате:
 
 - `/help`
 - `/status`
 - `/health`
 
-### Watchlist engine
+### Watchlist / attention
 
 ```bash
 bash scripts/manual_run.sh watchlist-refresh
@@ -112,72 +139,33 @@ bash scripts/manual_run.sh watch-alerts
 
 Ожидаемо:
 
-- команда отрабатывает без падения;
-- если есть значимый `watch update`, он доходит в Telegram;
-- `Избранное` в dashboard показывает `watch dossiers` и updates.
+- refresh проходит без падений;
+- если есть значимый `watch update`, он доходит до Telegram;
+- `Избранное` и `Сводка` в dashboard отвечают без ошибок.
 
-## Что должен увидеть оператор
+## Отдельная проверка Fast Loop на сервере
 
-После успешного деплоя руками проверьте:
+Если локальная toolchain-среда недоступна, Fast Loop можно проверять на сервере временными контейнерами, примонтировав `/home/pythia/pythia`.
 
-1. `Сводка` открывается без ошибок.
-2. `Сигналы` показывает рынки последнего прогона.
-3. В `Разборе рынка` верх экрана начинается с dossier-first блоков, а не с dump-страницы.
-4. `Избранное` показывает `watch dossiers`, а не просто список `market_id`.
-5. Telegram присылает короткие `watch updates`, а не сырые логи.
+Минимальные цели проверки:
 
-## Обновление production
+- `cargo check` и `cargo clippy` для `services/`;
+- `bun run lint` и `tsc --noEmit` для TypeScript-кода;
+- запуск инфраструктуры без panic/throw.
 
-Стандартный update:
-
-```bash
-cd /home/pythia/pythia
-git pull
-docker compose build
-docker compose up -d
-bash scripts/manual_run.sh status
-```
-
-Если обновление затрагивает watchlist-контур, сразу после этого полезно прогнать:
-
-```bash
-bash scripts/manual_run.sh watchlist-refresh
-bash scripts/manual_run.sh watch-alerts
-```
-
-## Расписание scheduler
-
-- `forecast` - 06:00 UTC
-- `watchlist refresh` - каждые 6 часов
-- `watch alerts` - через 10 минут после каждого refresh
-- `resolution` - 18:00 UTC
-- `weekly report` - воскресенье, 20:00 UTC
+Эта проверка не заменяет production deploy Slow Loop, а дополняет его.
 
 ## Reverse proxy
 
-Dashboard не должен публиковаться наружу напрямую из контейнера.
-
-Нужна схема:
+Наружу dashboard должен идти только так:
 
 ```text
 internet -> reverse proxy -> 127.0.0.1:8787 -> pythia-dashboard
 ```
 
-Текущий production hostname:
+## Диагностика
 
-- `https://b1w.duckdns.org`
-
-## Правила безопасности
-
-- работать только как пользователь `pythia`;
-- не смешивать Pythia с `SproutSignal` по сетям и томам;
-- не публиковать dashboard напрямую наружу;
-- не хранить trading-ключи;
-- не выполнять bare-metal операции вместо предусмотренных `manual_run.sh` и compose-команд.
-
-## Если что-то пошло не так
-
-Минимальный маршрут диагностики:
+Минимальный маршрут:
 
 ```bash
 bash scripts/manual_run.sh status
@@ -185,7 +173,7 @@ bash scripts/manual_run.sh logs
 docker compose ps
 ```
 
-Если проблема связана с watchlist:
+Если проблема в scheduler/watchlist-контуре:
 
 ```bash
 bash scripts/manual_run.sh watchlist-refresh

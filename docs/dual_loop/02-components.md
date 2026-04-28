@@ -8,7 +8,7 @@
 | `ContextBuilder` | Агрегирует Exa/Tavily результаты + on-chain историю рынка | `src/services/research_runner.ts` (существует) |
 | `LlmPipeline` | `Retriever → Prompter → DeepSeek → Validator(JSON schema) → Scorer` | `src/services/naked_r1.ts`, `src/prompts/*` |
 | `SignalEngine` | Рассчитывает `Edge = P_fundamental − P_market`, confidence band, expected value | `src/services/decision_core.ts` (существует) |
-| `WatchlistPublisher` | Публикует в `watchlist.upsert` только рынки с `|Edge| > θ` и `liquidity > L_min` | **новый** `src/services/watchlist_publisher.ts`, Phase 1 |
+| `WatchlistPublisher` | Публикует в `dl.v1.watchlist.upsert` только рынки с `|Edge| > θ` и `liquidity > L_min` | **новый** `src/services/watchlist_publisher.ts`, Phase 1 |
 | `PaperPortfolio` | Хранит гипотетические позиции, расчёт hit-rate, Brier score | `src/services/decision_core.ts` (существует, shadow positions) |
 
 ## 2.2. `sniper-ingest` (Fast Loop)
@@ -19,7 +19,7 @@
 | `OracleDecoder` | ABI-декодер: Polymarket CTF Exchange, UMA Oracle V3, Chainlink Aggregator via `alloy_sol_types::sol!` | `services/common/src/abi/` | **implemented** |
 | `OrderBookTracker` | In-memory L2 стакан для каждого рынка из watchlist; hot path — zero-alloc ring buffer | `services/sniper-ingest/src/orderbook.rs` | Phase 2-D |
 | `TriggerMatcher` | Hot-path matcher: decoded event × watchlist × TriggerPolicy → `dl.v1.triggers.fired` | `services/sniper-ingest/src/matcher.rs` | **implemented** |
-| `WatchlistConsumer` | Подписчик на `watchlist.upsert`/`remove`, hot-reload без рестарта | `services/sniper-ingest/src/watchlist.rs` | **implemented** (Phase 1) |
+| `WatchlistConsumer` | Подписчик на `dl.v1.watchlist.upsert` / `dl.v1.watchlist.remove`, hot-reload без рестарта | `services/sniper-ingest/src/watchlist.rs` | **implemented** (Phase 1) |
 | `ReplayHarness` | Deterministic replay of mempool dumps through the matcher | `services/sniper-ingest/src/bin/replay.rs` | **implemented** |
 
 ## 2.3. `sniper-executor`
@@ -47,7 +47,7 @@
 | Виджет | Данные | Update rate |
 |--------|--------|-------------|
 | Status Bar | `telem.ping`, `telem.mempool`, WS heartbeat | 250ms |
-| Triage Queue | `signals.pending` → WS `ui.signals` | on push |
+| Triage Queue | `dl.v1.signals.emitted` → gateway snapshot/patch feed | on push |
 | Active Sniper Watchlist | NATS `telem.ob.<market>`, `triggers.*` | 50–100ms |
 | Edge Heatmap | Pythia digest snapshot | 1s |
 | Execution Panel | REST + WS confirm | sync |

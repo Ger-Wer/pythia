@@ -4,15 +4,16 @@
 // spec (04-bus-protocol.md) dictates Redis Streams for control + NATS for
 // telemetry; the abstraction below mirrors that split.
 //
-// Wire format note: Phase 1 uses JSON-encoded payloads on Redis Streams.
-// Protobuf codegen for TypeScript is wired in `buf.gen.yaml` but is not yet
-// integrated into this service (out of scope for Track B MVP — see PR body).
-// Downstream Rust consumers in Phase 2 switch to protobuf once the ts-proto
-// pipeline is stable.
+// Wire format note: the gateway keeps a UI-friendly JSON projection in memory,
+// but Redis Stream entries may now arrive either as legacy JSON payloads or as
+// protobuf bytes in the `payload` field. Consumers should prefer
+// `payloadBytes` when present and fall back to `payload` for tests / legacy
+// writers.
 
 export interface BusMessage {
   id: string;
   payload: Record<string, unknown>;
+  payloadBytes?: Uint8Array;
 }
 
 export interface BusSubscription {

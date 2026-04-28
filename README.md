@@ -1,259 +1,113 @@
 # Pythia
 
-Дата актуализации: 2026-04-11 (Tier-1 audit fixes deployed)
+Дата актуализации: 2026-04-28
 
-Pythia - это приватный аналитический `decision desk` для Polymarket. Система ежедневно ищет новые сильные рынки, строит прогнозы, ведет `decision journal` и paper/shadow-позиции, а для рынков из `Избранного` запускает отдельный `watchlist refresh`, который сам отслеживает изменения тезиса, цены и новостей и поднимает оператору только важные обновления.
+Pythia - это приватный `decision desk` для Polymarket. В репозитории сейчас живут два связанных контура:
 
-## Что важно понять сразу
+- `Slow Loop`: production-система на TypeScript/Python для daily forecast, decision journal, paper/shadow lifecycle, watchlist follow-up, dashboard и Telegram.
+- `Fast Loop`: новый Dual-Loop контур для latency-sensitive watch/trigger/execution pipeline на Rust/TypeScript, пока без live trading.
 
-Если вы новый разработчик, начните с трех фактов:
+## Что это за проект
 
-1. `Pythia` уже не просто forecast-пайплайн. Сейчас это связка `forecast stack + decision core + autonomous watchlist engine + dashboard + Telegram`.
-2. В production пока нет live-trading. Система работает в paper/shadow режиме и копит валидный decision dataset.
-3. Главная цель проекта - не "писать reasoning от LLM", а уменьшать когнитивную нагрузку оператора и улучшать качество решений на реальных данных Polymarket.
-4. С 2026-04-22 запущен новый workstream — **Dual-Loop architecture** (Slow Loop Pythia + Fast Loop Sniper для latency-арбитража на Polygon). См. [docs/dual_loop/README.md](docs/dual_loop/README.md). В Phase 0 добавляется инфраструктура (Rust workspace, protobuf-схемы, bus/observability в `docker-compose.dev.yml`), существующий production-контур Pythia не меняется.
+Если коротко, Pythia решает три задачи:
 
-## Что уже реально работает в production
+1. Находит новые сильные рынки и формирует сигналы.
+2. Сопровождает уже выбранные рынки через watchlist и operator triage.
+3. Копит paper/shadow dataset для улучшения decision quality до любого live execution.
 
-- daily `forecast` на всем рынке Polymarket;
-- `Research+R1` и `Naked R1`;
-- отбор рынков с дедупликацией и diversity constraints;
-- `decision core`:
-  - `signals`
-  - `decisions`
-  - `positions`
-  - `reviews`
-  - `postmortems`
-- paper/shadow lifecycle без реальных ордеров;
-- отдельный `watchlist refresh` каждые 6 часов;
-- `watch dossiers` и `watch updates`;
-- `attention_items` и triage-очередь `urgent / today / later`;
-- `Сводка` как command-center baseline;
-- `Избранное` как triage-board по watched-рынкам;
-- dashboard как основной интерфейс оператора;
-- Telegram как outbound inbox для `urgent/today` attention updates и fallback-команд.
+Проект уже давно не является "просто forecast-скриптом". Это гибридная система: зрелый operator desk + строящийся Fast Loop.
 
-## Что еще не закончено
+## На какой стадии проект
 
-Следующие большие куски еще впереди:
+Состояние репозитория на сегодня:
 
-- inbound Telegram triage;
-- decision-quality метрики поверх operator/shadow performance;
-- любой live execution через Polymarket API.
+- `Slow Loop` уже работает как production runtime на `amper`.
+- `Phase 0` Dual-Loop завершена.
+- `Phase 1` Dual-Loop по сути собрана: contracts, bus topics, `gateway-api`, Command Center preview, shadow PostgreSQL.
+- `Phase 2` Dual-Loop частично реализована: `sniper-ingest`, `sniper-risk` и paper/control foundation в `sniper-executor` уже в коде.
+- Live trading в production нет. Реальные trading-ключи не используются.
 
-Это важно: если в старых design-docs что-то выглядит "готовым", а в этом README или `WORKSTREAM` это отмечено как будущее, верить нужно текущему `WORKSTREAM`.
+Практический вывод для нового разработчика:
 
-## Как система устроена сейчас
+- `src/`, `python/` и `dashboard/` не являются "старым кодом" - это действующий Slow Loop.
+- `gateway-api/`, `services/`, `schemas/` и `infra/` не являются экспериментальным мусором - это активный Fast Loop workstream.
+- Исторические отчёты и устаревшие design-docs вынесены в [`archive/`](./archive/README.md).
+
+## С чего начинать новому разработчику
+
+Прочитайте документы в таком порядке:
+
+1. [docs/README.md](./docs/README.md)
+2. [docs/PYTHIA_V2_WORKSTREAM.md](./docs/PYTHIA_V2_WORKSTREAM.md)
+3. [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+4. [docs/dual_loop/README.md](./docs/dual_loop/README.md)
+5. [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+
+Если вы работаете именно с Fast Loop, после этого сразу откройте [docs/dual_loop/06-roadmap.md](./docs/dual_loop/06-roadmap.md).
+
+## Карта репозитория
 
 ```text
-Polymarket Gamma API
-  -> daily forecast
-  -> Research+R1 / Naked R1
-  -> predictions + signals
-  -> decision core
-  -> autonomous watchlist engine
-  -> SQLite + logs + Brier/PnL
-  -> Dashboard API + Telegram alerts
+src/                 Slow Loop runtime (forecast, decision core, watchlist)
+python/              Dashboard/Telegram/operator API layer
+dashboard/           React UI for Pythia v2
+gateway-api/         Fast Loop gateway and command/control bridge
+services/            Rust services: sniper-ingest / sniper-risk / sniper-executor
+schemas/             Protobuf contracts for Dual-Loop
+infra/               Observability and local/dev infrastructure
+docs/                Active documentation
+archive/             Historical reports, design docs and session artifacts
 ```
 
-### 1. Daily forecast
+## Что реально работает сейчас
 
-Раз в день Pythia:
+### Slow Loop
 
-- выбирает рынки;
-- запускает research;
-- строит прогнозы;
-- создает `signals`;
-- при сильных правилах может открыть `shadow` paper-position.
+- daily forecast по рынкам Polymarket;
+- `Research+R1` и `Naked R1`;
+- `decision core` с `signals`, `decisions`, `positions`, `reviews`, `postmortems`;
+- paper/shadow lifecycle;
+- autonomous watchlist engine;
+- attention queue и operator triage;
+- dashboard как основной интерфейс;
+- Telegram как inbox/fallback operator surface.
 
-Точка входа в коде:
+### Fast Loop
 
-- `src/main.ts`
-- `src/services/market_selector.ts`
-- `src/services/research_runner.ts`
-- `src/services/naked_r1.ts`
-- `src/services/decision_core.ts`
+- protobuf contracts с fixed-point wire format;
+- canonical topics `dl.v1.*`;
+- `gateway-api` + inbound protobuf bridge;
+- Command Center preview;
+- `sniper-ingest`;
+- `sniper-risk`;
+- paper/control foundation в `sniper-executor`.
 
-### 2. Decision core
+## Что ещё не закончено
 
-Это слой действий и paper lifecycle.
+- end-to-end verification Fast Loop на реальном toolchain;
+- live feed alignment между `gateway-api` и Command Center;
+- полный protobuf control-plane без transitional JSON publish-side;
+- long-running paper execution verification;
+- любой live execution на Polymarket.
 
-Он отвечает за:
+## Source of truth
 
-- создание actionable `signals`;
-- manual/shadow `decisions`;
-- `positions`;
-- `reviews`;
-- `postmortems`.
+Если документы расходятся, порядок доверия такой:
 
-Главные файлы:
+1. [docs/PYTHIA_V2_WORKSTREAM.md](./docs/PYTHIA_V2_WORKSTREAM.md)
+2. [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+3. [docs/dual_loop/06-roadmap.md](./docs/dual_loop/06-roadmap.md)
+4. [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+5. [docs/DECISION_LOG.md](./docs/DECISION_LOG.md)
 
-- `src/services/decision_core.ts`
-- `src/services/db.ts`
-- `python/operator_core.py`
+Всё, что вынесено в [`archive/`](./archive/README.md), полезно только как исторический контекст.
 
-### 3. Autonomous Watchlist Engine
+## Быстрый operational context
 
-Это отдельный мотор сопровождения рынков из `Избранного`.
+- production-хост: `amper`
+- системный пользователь: `pythia`
+- рабочая директория: `/home/pythia/pythia`
+- действующий Pythia deploy: `docker compose`
+- соседний независимый проект на этом же сервере: `sproutsignal`
 
-Он:
-
-- создает `watch dossier` при добавлении рынка в `Избранное`;
-- переиспользует свежий forecast snapshot или ставит рынок в `pending_deep_review`;
-- каждые 6 часов запускает `watchlist refresh`;
-- сначала делает дешевую monitoring-проверку;
-- запускает `deep review` только по триггерам;
-- пишет `watch updates` для dashboard и Telegram.
-
-Главные файлы:
-
-- `src/watchlist_refresh.ts`
-- `src/services/watchlist_engine.ts`
-- `python/watchlist_store.py`
-
-### 4. Attention + operator layer
-
-Dashboard - главный интерфейс оператора.
-
-`attention engine` поднимает operator-facing triage-объекты из `watch updates`, `reviews` и system degradation. Dashboard показывает полную очередь внимания. Telegram рассылает только `urgent/today`.
-
-Главные файлы:
-
-- `python/attention_store.py`
-- `python/dashboard_api.py`
-- `python/dashboard_models.py`
-- `python/operator_core.py`
-- `python/telegram_bot.py`
-- `dashboard/src/pages/OverviewPage.tsx`
-- `dashboard/src/pages/LatestRunPage.tsx`
-- `dashboard/src/pages/MarketDetailPage.tsx`
-- `dashboard/src/pages/WatchlistPage.tsx`
-
-## Какой код читать новому разработчику
-
-Лучший маршрут входа за первые 30 минут такой:
-
-1. Прочитать [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
-2. Прочитать [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
-3. Открыть:
-   - `src/main.ts`
-   - `src/services/decision_core.ts`
-   - `src/services/watchlist_engine.ts`
-   - `src/watchlist_refresh.ts`
-   - `python/operator_core.py`
-   - `python/watchlist_store.py`
-4. После этого уже смотреть dashboard pages.
-
-Если нужен внешний взгляд на текущее состояние production, читайте [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md).
-
-## Как думать о документации
-
-Порядок доверия такой:
-
-1. [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md)
-2. Этот `README`
-3. [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
-4. [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md)
-5. [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md)
-6. design/spec docs в `docs/superpowers/specs/`
-
-Исторические spec-документы полезны для понимания намерений, но они не равны текущему production-state.
-
-## Быстрый запуск на `amper`
-
-Работайте под пользователем `pythia`.
-
-```bash
-cd /home/pythia/pythia
-cp .env.example .env
-bash scripts/day0_check.sh
-docker compose build
-bash scripts/manual_run.sh forecast
-bash scripts/manual_run.sh watchlist-refresh
-bash scripts/manual_run.sh watch-alerts
-docker compose up -d
-```
-
-Подробный production-runbook лежит в [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md).
-
-## Ежедневная эксплуатация
-
-Главная логика сейчас такая:
-
-- `Сводка` показывает очередь внимания и ближайшие действия;
-- `Сигналы` дают новые идеи;
-- `Разбор рынка` показывает состояние тезиса, triage и следующее действие;
-- `Избранное` стало triage-board контуром сопровождения, а не списком `market_id`;
-- Telegram нужен для кратких `urgent/today` alerts, а не для чтения полных разборов.
-
-Ручные команды:
-
-- `bash scripts/manual_run.sh status`
-- `bash scripts/manual_run.sh forecast`
-- `bash scripts/manual_run.sh watchlist-refresh`
-- `bash scripts/manual_run.sh watch-alerts`
-- `bash scripts/manual_run.sh logs`
-
-## Расписание
-
-`supercronic` сейчас запускает:
-
-- `forecast` - 06:00 UTC
-- `watchlist refresh` - каждые 6 часов
-- `watch alerts` - через 10 минут после каждого refresh
-- `resolution` - 18:00 UTC
-- `weekly report` - воскресенье, 20:00 UTC
-
-## Что не надо делать
-
-- не хранить реальные trading-ключи на сервере;
-- не превращать dashboard в dump фактов и ссылок;
-- не путать `watchlist engine` с `daily forecast`;
-- не считать старые spec docs источником текущей правды;
-- не воспринимать LLM как "магический источник alpha".
-
-## Карта документов
-
-- [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md) - главный source of truth по фазе проекта и roadmap
-- [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md) - как система разрезана на runtime-контуры и модули
-- [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md) - как деплоить и обновлять production на `amper`
-- [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md) - внешний аудит текущего production-state
-- [docs/DECISION_LOG.md](/Users/gerwer/Desktop/Pythia/docs/DECISION_LOG.md) - ключевые архитектурные и продуктовые решения
-- [docs/dual_loop/](docs/dual_loop/README.md) - Dual-Loop architecture (Slow Loop Pythia + Fast Loop Sniper); C4, data flow, UI spec, roadmap, risks
-
-## Dual-Loop dev-стек
-
-Отдельный набор команд для нового workstream'а (не пересекается с production Pythia):
-
-```bash
-make dev-up        # Redis, NATS, Postgres, Prometheus, Grafana, Loki, Tempo
-make rust-check    # cargo check services/
-make rust-test     # cargo test services/
-make check         # полный CI-gate локально
-make dev-down      # остановить стек
-```
-
-Phase 1 Track A добавил bus (`dl.v1.*`) и protobuf-клиенты для
-`schemas/dual_loop/v1/*.proto`:
-
-```bash
-bun install              # JS-зависимости (включая ts-proto)
-bun run proto:gen        # TS-клиенты: src/generated/dual_loop/
-make proto-gen           # TS + Rust (Rust через services/common/build.rs)
-make bus-cross-lang-test # TS → Rust contract test (требует Redis на :6379)
-```
-
-Публикация watchlist в bus из Pythia отключена по умолчанию:
-`DUAL_LOOP_BUS_ENABLED=false`. Включить — `DUAL_LOOP_BUS_ENABLED=true`
-+ `DUAL_LOOP_REDIS_URL=redis://…`. Детали: [docs/dual_loop/04-bus-protocol.md §Implementation (Phase 1)](docs/dual_loop/04-bus-protocol.md#implementation-phase-1).
-
-См. [docs/dual_loop/06-roadmap.md](docs/dual_loop/06-roadmap.md) для текущих фаз и DoD.
-
-## Текущий критерий успеха
-
-На этом этапе мы движемся правильно, если:
-
-- paper/shadow-контур копит валидный track record;
-- `Избранное` реально снижает ручной follow-up;
-- Telegram поднимает только важные изменения;
-- новые улучшения можно проверять на реальных paper-результатах, а не на догадках.
+Критичное правило: любые Docker-действия для Pythia выполнять только из `/home/pythia/pythia` через локальный `docker compose`, без глобальной очистки Docker host.

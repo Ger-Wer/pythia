@@ -23,11 +23,11 @@
 
 | # | Риск | Паттерн |
 |---|------|---------|
-| R10 | **Stale watchlist**: Pythia сняла рынок, Sniper ещё исполняет | ✅ **Mitigated (Phase 2 Track C).** Каждый entry имеет `valid_until` (TTL) + `version`. `PreTradeChecks.evaluate()` проверяет TTL + stale signal (>60s) ДО broadcast; просроченный entry → auto-disarm + `RiskError::WatchlistExpired` / `RiskError::StaleSignal`. `watchlist.remove` — идемпотентно, с `reason`. |
+| R10 | **Stale watchlist**: Pythia сняла рынок, Sniper ещё исполняет | ✅ **Mitigated (Phase 2 Track C).** Каждый entry имеет `valid_until` (TTL) + `version`. `PreTradeChecks.evaluate()` проверяет TTL + stale signal (>60s) ДО broadcast; просроченный entry → auto-disarm + `RiskError::WatchlistExpired` / `RiskError::StaleSignal`. `dl.v1.watchlist.remove` — идемпотентно, с `reason`. |
 | R11 | **Double-fire trigger** (тот же оракул матчится дважды) | Idempotency key = `hash(market_id \|\| tx_hash \|\| log_index)`, дедуп в executor LRU cache (size=10k). |
 | R12 | **Race Accept ↔ auto-expire** | Signal имеет `server_version`. Decision включает `expected_version`; conflict → 409 + UI показывает новую версию. |
 | R13 | **Nonce race** при параллельных сделках одного ключа | Single-writer NonceManager (actor model, tokio mpsc channel), reservation pool, на timeout — automatic release + alert. |
-| R14 | **Split-brain на kill-switch** (UI считает killed, executor ещё нет) | ✅ **Mitigated (Phase 2 Track C).** Kill = two-phase: REST ACK после `AtomicBool=true` + подтверждение от executor через `control.kill.ack`. UI показывает `KILLING` до ack, `KILLED` после. Visible timestamp разницы между phases. Дополнительно: `DeadManSwitch` блокирует все новые сделки если operator heartbeat не получен >5 мин (`dl.v1.control.heartbeat`). |
+| R14 | **Split-brain на kill-switch** (UI считает killed, executor ещё нет) | ✅ **Mitigated (foundation path landed).** Kill = two-phase: gateway публикует `dl.v1.control.kill`, executor валидирует HMAC/staleness/replay, включает scoped kill state и отвечает через `dl.v1.control.kill_ack`. UI держит промежуточное состояние до ack. В paper-mode heartbeat/state projection пока coarse на уровне всего executor'а, а не per-market. Дополнительно: `DeadManSwitch` блокирует все новые сделки если operator heartbeat не получен >5 мин (`dl.v1.control.heartbeat`). |
 
 ## 7.4. Operational / security
 
@@ -43,7 +43,7 @@
 
 Эти инварианты проверяются runtime-assertions и exported в metrics; при нарушении — paging alert и auto-DRAIN.
 
-1. `executor.active = true ⇒ kill_switch.engaged = false` (проверяется каждые 10ms).
+1. `kill(scope=GLOBAL or NEW_TRIGGERS) ⇒ no new trigger execution`; `kill(scope=MARKET) ⇒ matching market blocked`.
 2. `∀ trigger fired ⇒ ∃ watchlist entry with valid TTL`.
 3. `∀ tx broadcast ⇒ nonce ∈ reserved_set AND size ≤ position_cap`.
 4. `bus_lag(any_topic) > 500 ⇒ auto_drain()`.

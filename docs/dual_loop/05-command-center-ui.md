@@ -40,7 +40,7 @@
 | # | Виджет | Назначение | Данные (источник → канал) | Update rate |
 |---|--------|------------|---------------------------|-------------|
 | W1 | **Status Bar** | Health one-liner | `telem.ping`, `telem.mempool`, WS heartbeat | 250ms |
-| W2 | **Triage Queue** | Очередь сигналов на approve | `signals.pending` → WS `ui.signals` | on push |
+| W2 | **Triage Queue** | Очередь сигналов на approve | `dl.v1.signals.emitted` → gateway snapshot/patch feed | on push |
 | W3 | **Signal Card** | Одна единица решения: Edge, P_fund, P_market, EV, confidence band, LLM rationale (collapsed) | snapshot из card DTO | static until updated |
 | W4 | **Active Watchlist Row** | Рынок в работе Sniper'а: OB depth (sparkline), current market price, computed edge, slippage at size, trigger state (IDLE/ARMED/FIRED/COOLDOWN) | NATS `telem.ob.<market>`, `triggers.*` | 50–100ms |
 | W5 | **Edge Heatmap** | Тепловая карта всех наблюдаемых рынков: ось X = liquidity, Y = abs(edge), color = staleness LLM-прогноза | Pythia digest | 1s |

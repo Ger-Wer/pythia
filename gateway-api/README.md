@@ -23,9 +23,14 @@ curl http://127.0.0.1:9103/metrics | grep gateway_
 
 Gateway listens on `127.0.0.1:9103`. In the default dev compose stack the hardcoded operator is `admin` / `changeme` (bcrypt hash baked into `docker-compose.dev.yml`). **Change these before any non-local deployment.**
 
+For live Dual-Loop projection you also need the root repository TS protobuf clients generated into `src/generated/`. `gateway-api` can still boot without them, but then the bus bridge falls back to JSON-only behaviour and will not decode protobuf Redis payloads from the Rust/TS writers.
+
 ### Locally with Bun
 
 ```bash
+cd ..
+bun install
+bun run proto:gen
 cd gateway-api
 bun install
 export GATEWAY_PASETO_KEY="$(openssl rand -base64 32)"
@@ -151,6 +156,13 @@ NATS JetStream (telemetry)┘                │
 ```
 
 ### Bus bridge
+
+Current behaviour on `main`:
+
+- inbound streams may arrive either as raw protobuf bytes in `payload` or as legacy JSON envelopes;
+- the bridge prefers protobuf decode for `signals/watchlist/triggers/exec/kill_ack`;
+- tests and local mocks still use JSON payload objects;
+- gateway publish-side for `dl.v1.signals.decisions` and `dl.v1.control.kill` is still a JSON compatibility envelope.
 
 Consumer group: **`gateway`** on every subscribed stream:
 

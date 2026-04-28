@@ -4,7 +4,7 @@
 //! which is gated on a live Redis instance.
 
 use dual_loop_common::proto::common::{MarketId, Money, Side, Uuid};
-use dual_loop_common::proto::control::{KillAck, KillAckStatus, KillCommand, KillScope};
+use dual_loop_common::proto::control::{Heartbeat, KillAck, KillAckStatus, KillCommand, KillScope};
 use dual_loop_common::proto::execution::{ExecStatus, ExecSubmitted, ExecutorState};
 use dual_loop_common::proto::signal::{DecisionAction, Signal, SignalDecision, SignalPriority};
 use dual_loop_common::proto::trigger::Trigger;
@@ -193,4 +193,14 @@ fn kill_command_and_ack_roundtrip() {
         ack_at_unix_ms: 1_700_000_040_000,
     };
     assert_roundtrip(ack);
+}
+
+#[test]
+fn heartbeat_roundtrip() {
+    let msg = Heartbeat {
+        message_id: None,
+        operator_id: "op-1".into(),
+        heartbeat_at_unix_ms: 1_700_000_050_000,
+    };
+    assert_roundtrip(msg);
 }

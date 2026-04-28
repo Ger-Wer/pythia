@@ -22,6 +22,7 @@ export const SIGNALS_EMITTED = 'dl.v1.signals.emitted' as const;
 export const TRIGGERS_FIRED = 'dl.v1.triggers.fired' as const;
 
 // ---------- Execution (sniper-executor → all) ----------
+export const EXEC_SUBMITTED = 'dl.v1.exec.submitted' as const;
 export const EXEC_FILLED = 'dl.v1.exec.filled' as const;
 export const EXEC_REVERTED = 'dl.v1.exec.reverted' as const;
 
@@ -43,6 +44,7 @@ export const ALL_TOPICS = [
   WATCHLIST_REMOVE,
   SIGNALS_EMITTED,
   TRIGGERS_FIRED,
+  EXEC_SUBMITTED,
   EXEC_FILLED,
   EXEC_REVERTED,
   CONTROL_KILL,

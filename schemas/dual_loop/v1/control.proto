@@ -54,5 +54,5 @@ enum KillAckStatus {
 message Heartbeat {
   Uuid message_id = 1;
   string operator_id = 2;
-  Timestamp ts = 3;
+  int64 heartbeat_at_unix_ms = 3;
 }

@@ -3,6 +3,10 @@
 // Each subscription creates a dedicated consumer in the `gateway` consumer
 // group and loops on XREADGROUP. XAUTOCLAIM every 10s reclaims pending
 // messages from dead consumers (task spec §4; 04-bus-protocol.md §77).
+//
+// Receive-side: preserves raw protobuf bytes when the `payload` field is not
+// parseable JSON. Publish-side: still writes JSON compatibility envelopes for
+// gateway-originated operator mutations.
 
 import { randomUUID } from "node:crypto";
 import type { Redis } from "ioredis";
@@ -15,7 +19,7 @@ const BATCH_SIZE = 32;
 
 interface StreamEntry {
   id: string;
-  fields: string[];
+  fields: Array<string | Buffer>;
 }
 interface ReadResult {
   stream: string;
@@ -27,29 +31,59 @@ function parseEntries(raw: unknown): StreamEntry[] {
   const out: StreamEntry[] = [];
   for (const e of raw) {
     if (!Array.isArray(e) || e.length < 2) continue;
-    const [id, fields] = e as [string, string[]];
-    out.push({ id, fields });
+    const [id, fields] = e as [string | Buffer, Array<string | Buffer>];
+    out.push({
+      id: Buffer.isBuffer(id) ? id.toString("utf8") : String(id),
+      fields,
+    });
   }
   return out;
 }
 
-function fieldsToPayload(fields: string[]): Record<string, unknown> {
+function maybeParseJson(input: string): Record<string, unknown> | null {
+  const trimmed = input.trim();
+  if (!(trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function fieldsToPayload(fields: Array<string | Buffer>): {
+  payload: Record<string, unknown>;
+  payloadBytes?: Uint8Array;
+} {
   const payload: Record<string, unknown> = {};
+  let payloadBytes: Uint8Array | undefined;
   for (let i = 0; i < fields.length; i += 2) {
     const k = fields[i];
     const v = fields[i + 1];
     if (k === undefined || v === undefined) continue;
-    if (k === "payload") {
-      try {
-        Object.assign(payload, JSON.parse(v) as Record<string, unknown>);
-      } catch {
-        payload[k] = v;
+    const key = Buffer.isBuffer(k) ? k.toString("utf8") : String(k);
+    if (key === "payload") {
+      if (Buffer.isBuffer(v)) {
+        const maybeJson = maybeParseJson(v.toString("utf8"));
+        if (maybeJson) {
+          Object.assign(payload, maybeJson);
+        } else {
+          payloadBytes = new Uint8Array(v);
+        }
+      } else {
+        const maybeJson = maybeParseJson(String(v));
+        if (maybeJson) {
+          Object.assign(payload, maybeJson);
+        } else {
+          payload[key] = String(v);
+        }
       }
     } else {
-      payload[k] = v;
+      payload[key] = Buffer.isBuffer(v) ? v.toString("utf8") : v;
     }
   }
-  return payload;
+  return { payload, payloadBytes };
 }
 
 export class RedisBusClient implements BusClient {
@@ -97,31 +131,51 @@ export class RedisBusClient implements BusClient {
     const loop = async () => {
       while (!stopped) {
         try {
+          // Force Buffer replies so protobuf payload bytes survive the Redis
+          // client boundary intact. Fall back to the normal helper if the
+          // runtime client does not expose `callBuffer`.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const raw: any = await this.redis.xreadgroup(
-            "GROUP",
-            group,
-            consumerName,
-            "COUNT",
-            BATCH_SIZE,
-            "BLOCK",
-            BLOCK_MS,
-            "STREAMS",
-            stream,
-            ">",
-          );
+          const client: any = this.redis as any;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const raw: any =
+            typeof client.callBuffer === "function"
+              ? await client.callBuffer(
+                  "XREADGROUP",
+                  "GROUP",
+                  group,
+                  consumerName,
+                  "COUNT",
+                  BATCH_SIZE,
+                  "BLOCK",
+                  BLOCK_MS,
+                  "STREAMS",
+                  stream,
+                  ">",
+                )
+              : await this.redis.xreadgroup(
+                  "GROUP",
+                  group,
+                  consumerName,
+                  "COUNT",
+                  BATCH_SIZE,
+                  "BLOCK",
+                  BLOCK_MS,
+                  "STREAMS",
+                  stream,
+                  ">",
+                );
           if (!raw) continue;
           const results: ReadResult[] = raw.map(
-            ([s, entries]: [string, unknown]) => ({
-              stream: s,
+            ([s, entries]: [string | Buffer, unknown]) => ({
+              stream: Buffer.isBuffer(s) ? s.toString("utf8") : String(s),
               entries: parseEntries(entries),
             }),
           );
           for (const r of results) {
             for (const entry of r.entries) {
-              const payload = fieldsToPayload(entry.fields);
+              const { payload, payloadBytes } = fieldsToPayload(entry.fields);
               try {
-                await handler({ id: entry.id, payload });
+                await handler({ id: entry.id, payload, payloadBytes });
                 await this.redis.xack(stream, group, entry.id);
               } catch (err) {
                 log.warn("handler failed; leaving message pending", {

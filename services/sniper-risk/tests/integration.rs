@@ -30,7 +30,7 @@ fn make_intent(market: &str, size: i64, now: i64) -> TradeIntent {
 }
 
 fn make_fill(market: &str, size: i64, price: i64, gas: i64) -> ExecFilled {
-    use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+    use dual_loop_common::proto::common::{MarketId, Money};
 
     ExecFilled {
         message_id: None,
@@ -47,16 +47,13 @@ fn make_fill(market: &str, size: i64, price: i64, gas: i64) -> ExecFilled {
         }),
         gas_spent_usd: Some(Money { amount_micros: gas }),
         block_number: 1,
-        filled_at: Some(Timestamp {
-            wall_clock_unix_ms: 1_000_000,
-            monotonic_ns: 0,
-        }),
+        filled_at_unix_ms: 1_000_000,
         paper_mode: true,
     }
 }
 
 fn make_revert(market: &str, gas: i64, reason: &str) -> ExecReverted {
-    use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+    use dual_loop_common::proto::common::{MarketId, Money};
 
     ExecReverted {
         message_id: None,
@@ -68,10 +65,7 @@ fn make_revert(market: &str, gas: i64, reason: &str) -> ExecReverted {
         reason: reason.to_string(),
         gas_spent_usd: Some(Money { amount_micros: gas }),
         block_number: 0,
-        reverted_at: Some(Timestamp {
-            wall_clock_unix_ms: 1_000_000,
-            monotonic_ns: 0,
-        }),
+        reverted_at_unix_ms: 1_000_000,
         paper_mode: true,
     }
 }
