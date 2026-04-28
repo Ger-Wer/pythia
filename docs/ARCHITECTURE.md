@@ -1,16 +1,16 @@
 # Архитектура Pythia
 
-Дата актуализации: 2026-04-08
+Дата актуализации: 2026-04-28
 
 ## Роль документа
 
 Этот файл объясняет, как Pythia разрезана на runtime-контуры и где искать соответствующий код.
 
-Если нужен общий статус проекта, начинайте с [docs/PYTHIA_V2_WORKSTREAM.md](/Users/gerwer/Desktop/Pythia/docs/PYTHIA_V2_WORKSTREAM.md). Если нужен production-state для внешнего человека, смотрите [docs/AUDIT.md](/Users/gerwer/Desktop/Pythia/docs/AUDIT.md).
+Если нужен общий статус проекта, начинайте с [docs/PYTHIA_V2_WORKSTREAM.md](./PYTHIA_V2_WORKSTREAM.md). Если нужен полный набор активных документов, начинайте с [docs/README.md](./README.md).
 
 ## Система в одном абзаце
 
-Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, отдельно сопровождает выбранные рынки через `watchlist engine`, а затем поднимает operator-facing triage-очередь через `attention engine`. Dashboard - главный интерфейс оператора. Telegram - outbound inbox и fallback-команды.
+Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, отдельно сопровождает выбранные рынки через `watchlist engine`, а затем поднимает operator-facing triage-очередь через `attention engine`. Dashboard - главный интерфейс оператора. Telegram уже работает не только как outbound inbox, но и как inbound operator-command surface для attention/triage workflow.
 
 ## Главные runtime-контуры
 
@@ -150,6 +150,8 @@ resolved market -> update prediction outcome -> close paper positions
 
 - `Сводка` как command-center baseline
 - `Качество`
+- `Shadow performance`
+- `Operator vs shadow`
 - `Сигналы`
 - dossier-first `Разбор рынка`
 - `Избранное` как triage-board по `watch dossiers`
@@ -158,8 +160,11 @@ resolved market -> update prediction outcome -> close paper positions
 
 Что еще впереди:
 
-- inbound Telegram triage;
-- еще более короткий operator workflow.
+- weekly discipline/review loop поверх quality layer;
+- еще более короткий operator workflow;
+- real-time live Command Center feed для Dual-Loop preview route.
+
+Текущее важное transitional замечание по Dual-Loop: inbound bus-события (`watchlist/signals/triggers/exec/kill_ack`) уже сведены к protobuf-first projection в `gateway-api`, но outbound operator-mutation path из `gateway-api` (`signals.decisions`, `control.kill`) пока еще живет как compatibility JSON envelope. Это не целевая архитектура, а промежуточная стадия миграции.
 
 ## Deployment topology
 
@@ -195,4 +200,4 @@ Production живет на `amper`.
 - не является автотрейдером;
 - не открывает публичный backend без авторизации.
 
-Это важно для чтения кода: foundation `attention engine` уже в production, но inbound Telegram triage, decision-quality слой и любая live execution-автоматизация еще не production reality.
+Это важно для чтения кода: foundation `attention engine` уже в production, inbound Telegram triage и quality pages уже есть в коде, а вот live execution-автоматизация и paper executor Fast Loop пока еще не production reality.

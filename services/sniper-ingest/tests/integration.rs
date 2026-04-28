@@ -13,7 +13,7 @@ use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::monotonic_ns;
 use sniper_ingest::watchlist::WatchlistStore;
 
-use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+use dual_loop_common::proto::common::{MarketId, Money};
 use dual_loop_common::proto::watchlist::{TriggerKind, TriggerPolicy, WatchlistUpsert};
 
 fn setup_watchlist(store: &WatchlistStore) {
@@ -28,19 +28,16 @@ fn setup_watchlist(store: &WatchlistStore) {
             ctf_address: ctf_str,
         }),
         version: 1,
-        edge: 0.15,
-        p_fundamental: 0.72,
-        confidence: 0.9,
+        edge_ppm: 150_000,
+        p_fundamental_ppm: 720_000,
+        confidence_ppm: 900_000,
         side_hint: 1,
         max_position_usd: Some(Money {
             amount_micros: 10_000_000,
         }),
         max_slippage_bps: 50,
         ttl_ms: 3_600_000,
-        issued_at: Some(Timestamp {
-            wall_clock_unix_ms: dual_loop_common::time::StampedTime::now().wall_clock_unix_ms,
-            monotonic_ns: 0,
-        }),
+        issued_at_unix_ms: dual_loop_common::time::StampedTime::now().wall_clock_unix_ms,
         trigger_policy: Some(TriggerPolicy {
             min_independent_sources: 1,
             allowed_kinds: vec![TriggerKind::LargeFill as i32],
@@ -76,6 +73,10 @@ fn matcher_fires_on_ctf_order_filled() {
     assert!(trigger.is_some(), "trigger should fire");
     let trigger = trigger.unwrap();
     assert_eq!(trigger.kind, TriggerKind::LargeFill as i32);
+    assert_eq!(
+        trigger.expected_price.as_ref().map(|money| money.amount_micros),
+        Some(720_000)
+    );
     // Matcher latency should be well under 10ms.
     assert!(latency < 10_000_000, "latency_ns={latency} > 10ms");
 }

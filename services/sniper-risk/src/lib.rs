@@ -310,11 +310,7 @@ impl RiskGuard {
             .as_ref()
             .map(|m| m.amount_micros)
             .unwrap_or(0);
-        let filled_at = fill
-            .filled_at
-            .as_ref()
-            .map(|t| t.wall_clock_unix_ms)
-            .unwrap_or(0);
+        let filled_at = fill.filled_at_unix_ms;
 
         self.positions
             .record_fill(&market_id, Side::Yes, size_usd, price_micros, filled_at);

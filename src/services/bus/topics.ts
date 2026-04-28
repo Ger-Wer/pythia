@@ -22,6 +22,7 @@ export const SIGNALS_EMITTED = 'dl.v1.signals.emitted' as const;
 export const TRIGGERS_FIRED = 'dl.v1.triggers.fired' as const;
 
 // ---------- Execution (sniper-executor → all) ----------
+export const EXEC_SUBMITTED = 'dl.v1.exec.submitted' as const;
 export const EXEC_FILLED = 'dl.v1.exec.filled' as const;
 export const EXEC_REVERTED = 'dl.v1.exec.reverted' as const;
 
@@ -29,6 +30,10 @@ export const EXEC_REVERTED = 'dl.v1.exec.reverted' as const;
 export const CONTROL_KILL = 'dl.v1.control.kill' as const;
 export const CONTROL_KILL_ACK = 'dl.v1.control.kill_ack' as const;
 export const CONTROL_HEARTBEAT = 'dl.v1.control.heartbeat' as const;
+
+// ---------- Telemetry (sniper-executor → gateway-api, NATS JetStream) ----------
+/** Periodic heartbeat from `sniper-executor`; proxied over WSS to Command Center. */
+export const EXEC_STATUS = 'dl.v1.exec.status' as const;
 
 /**
  * All topics in canonical order. A contract test checks byte-for-byte
@@ -39,11 +44,13 @@ export const ALL_TOPICS = [
   WATCHLIST_REMOVE,
   SIGNALS_EMITTED,
   TRIGGERS_FIRED,
+  EXEC_SUBMITTED,
   EXEC_FILLED,
   EXEC_REVERTED,
   CONTROL_KILL,
   CONTROL_KILL_ACK,
   CONTROL_HEARTBEAT,
+  EXEC_STATUS,
 ] as const;
 
 export type BusTopic = (typeof ALL_TOPICS)[number];

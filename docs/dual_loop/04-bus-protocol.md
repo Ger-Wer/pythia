@@ -12,16 +12,40 @@
 | Канал | Формат | Почему |
 |-------|--------|--------|
 | Hot path (`triggers.*`, `telem.mempool`, `telem.ob.*`) | **Protobuf** (`prost` / `ts-proto`) | < 1µs encode/decode, schema evolution |
-| Control plane (`watchlist.*`, `signals.*`, `exec.*`, `control.*`) | **Protobuf** (тот же registry) | единый реестр контрактов |
+| Control plane contracts (`watchlist.*`, `signals.*`, `exec.*`, `control.*`) | **Protobuf** (канонический registry) | единый wire contract для Rust/TS/Python |
+| Gateway operator mutations (`signals.decisions`, `control.kill`) | **JSON compatibility envelope** поверх тех же полей | transition-режим до полного ts-proto plumbing внутри `gateway-api` |
 | Debug / UI | JSON | читаемость, DevTools |
+
+Актуально на `2026-04-28`:
+
+- inbound Redis Streams в `gateway-api` уже могут приходить как raw protobuf bytes в поле `payload`; bridge декодирует их в UI-friendly JSON projection;
+- для hermetic тестов и legacy-path bridge сохраняет JSON fallback;
+- outbound publish из `gateway-api` для `dl.v1.signals.decisions` и `dl.v1.control.kill` пока остается JSON envelope, а не raw protobuf bytes.
 
 ## Schema registry
 
 Все protobuf-схемы лежат в `schemas/dual_loop/v1/*.proto`. CI блокирует breaking changes через `buf breaking`.
 
+### Wire conventions (Phase 1.1)
+
+Схемы — integer-only. Float/double на шине **запрещены** (IEEE-754 округления ломают идемпотентность и byte-equivalence между Rust/TS/Python):
+
+| Домен | Тип на шине | Пример |
+|-------|-------------|--------|
+| Деньги / цены | `Money { int64 amount_micros }` | `1_000_000` = $1.00 |
+| Вероятности | `int64 *_ppm` | `1_000_000` = 100% |
+| Знаковые вероятности (edge) | `sint64 *_ppm` (ZigZag) | `-50_000` = -5% |
+| Доходности | `sint64 *_bps` | `40` = 40 bps = 0.40% |
+| Wall-clock | `int64 *_unix_ms` | Unix epoch ms |
+| Монотоники (hot path) | `uint64 *_ns` | `Trigger.observed_at_ns` |
+
+Константы зафиксированы в `dual_loop.v1.FixedPointScales` (common.proto) и продублированы как `proto::{PROBABILITY_PPM_PER_UNIT, BPS_PER_UNIT, USD_MICROS_PER_UNIT}` в Rust-стороне. TS publisher конвертирует float → ppm на границе (см. `probToPpm` в `watchlist_publisher.ts`).
+
+Timestamp-wrapper из Phase 0 **удалён** — унифицированы плоские `int64 *_unix_ms` (распаковка `Timestamp.monotonic_ns` на hot-path'е съедала такты).
+
 Генерация клиентов:
 - **Rust:** `prost-build` → `services/common/src/proto.rs` (через `build.rs`).
-- **TypeScript:** `ts-proto` → `src/generated/dual_loop/v1/*.ts`.
+- **TypeScript:** `ts-proto` → `src/generated/dual_loop/v1/*.ts` (обязателен для live protobuf bridge; генерируется из корня репозитория через `bun run proto:gen`).
 
 См. `buf.yaml` и `buf.gen.yaml` в `schemas/`.
 
@@ -29,20 +53,18 @@
 
 | Topic | Transport | Producer | Consumer (cg) | Payload | QoS |
 |-------|-----------|----------|---------------|---------|-----|
-| `watchlist.upsert` | Redis Stream | pythia-core | sniper-ingest (`cg:sniper`) | `WatchlistEntry` | at-least-once, dedup by `market_id+version` |
-| `watchlist.remove` | Redis Stream | pythia-core | sniper-ingest | `WatchlistRemove` | at-least-once |
-| `signals.pending` | Redis Stream | pythia-core | gateway-api (`cg:ui`) | `Signal` | at-least-once |
-| `signals.decision` | Redis Stream | gateway-api | pythia-core, sniper-ingest | `SignalDecision` | exactly-once (idempotency key) |
-| `triggers.fired` | NATS JetStream | sniper-ingest | sniper-executor, gateway-api | `Trigger` | at-most-once (hot path) |
-| `triggers.blocked` | Redis Stream | sniper-risk | audit | `TriggerBlocked` | at-least-once |
-| `exec.submitted` | Redis Stream | sniper-executor | gateway-api, pythia-core | `ExecSubmitted` | at-least-once |
-| `exec.filled` | Redis Stream | sniper-executor | all | `ExecFilled` | at-least-once |
-| `exec.reverted` | Redis Stream | sniper-executor | all | `ExecReverted` | at-least-once |
-| `telem.mempool` | NATS | sniper-ingest | gateway-api | `MempoolTick` | fire-and-forget |
-| `telem.ob.<market>` | NATS | sniper-ingest | gateway-api | `OrderBookUpdate` | fire-and-forget |
-| `telem.ping` | NATS | sniper-ingest | gateway-api | `Ping` | fire-and-forget |
-| `control.kill` | Redis Stream | gateway-api | sniper-executor | `KillCommand` | exactly-once, подписан HMAC |
-| `control.kill.ack` | Redis Stream | sniper-executor | gateway-api | `KillAck` | at-least-once |
+| `dl.v1.watchlist.upsert` | Redis Stream | pythia-core | sniper-ingest (`cg:sniper-ingest`) | `WatchlistUpsert` | at-least-once, dedup by `market_id+version` |
+| `dl.v1.watchlist.remove` | Redis Stream | pythia-core | sniper-ingest | `WatchlistRemove` | at-least-once |
+| `dl.v1.signals.emitted` | Redis Stream | pythia-core | gateway-api (`cg:gateway-api`) | `Signal` | at-least-once |
+| `dl.v1.signals.decisions` | Redis Stream | gateway-api | pythia-core | `SignalDecision` (канон) / JSON compatibility envelope (текущий publish-side) | exactly-once (idempotency key) |
+| `dl.v1.triggers.fired` | NATS JetStream | sniper-ingest | sniper-executor | `Trigger` | at-most-once (hot path) |
+| `dl.v1.exec.submitted` | Redis Stream | sniper-executor | gateway-api, pythia-core | `ExecSubmitted` | at-least-once |
+| `dl.v1.exec.filled` | Redis Stream | sniper-executor | all | `ExecFilled` | at-least-once |
+| `dl.v1.exec.reverted` | Redis Stream | sniper-executor | all | `ExecReverted` | at-least-once |
+| `dl.v1.control.kill` | Redis Stream | gateway-api | sniper-executor | `KillCommand` (канон) / JSON compatibility envelope (текущий publish-side) | exactly-once, подписан HMAC |
+| `dl.v1.control.kill_ack` | Redis Stream | sniper-executor | gateway-api | `KillAck` | at-least-once |
+| `dl.v1.control.heartbeat` | Redis Stream | gateway-api / operator plane | sniper-risk | `Heartbeat` | at-least-once |
+| `dl.v1.exec.status` | NATS JetStream | sniper-executor | gateway-api | `ExecStatus` | fire-and-forget / latest-state telemetry |
 
 ## Идемпотентность и дедупликация
 
@@ -51,13 +73,14 @@
 - `version` — монотонный per-entity (`market_id` для watchlist, `signal_id` для signals).
 - Consumer ведёт LRU-cache последних 10k `message_id`'ов; дубликаты отбрасываются.
 
-Для `signals.decision`:
+Для `dl.v1.signals.decisions`:
 - `idempotency_key = hash(signal_id + action + operator_id)`.
 - Gateway отбивает 409 Conflict, если тот же `idempotency_key` уже обработан.
 
-Для `control.kill`:
+Для `dl.v1.control.kill`:
 - Подпись HMAC-SHA256 на `{operator_id, nonce, scope, issued_at}` секретом, хранимым в HSM.
 - Executor проверяет подпись и `issued_at ∈ [now-5s, now+5s]` (защита от replay).
+- На переходном пути executor принимает и protobuf `KillCommand`, и текущий gateway JSON envelope с теми же полями.
 
 ## Версионирование схем
 
@@ -88,37 +111,40 @@
 
 ## Пример сообщений (Protobuf → JSON для debug)
 
-### `watchlist.upsert`
+### `dl.v1.watchlist.upsert`
 
 ```json
 {
   "message_id": "01939b3e-7f8a-7123-bf45-0123456789ab",
-  "market_id": "polymarket:0xabc123...",
-  "ctf_address": "0x1234567890abcdef...",
+  "market": {
+    "polymarket_id": "abc123",
+    "ctf_address": "0x1234567890abcdef..."
+  },
   "version": 7,
-  "edge": 0.173,
-  "p_fundamental": 0.723,
-  "side_hint": "YES",
+  "edge_ppm": 173000,
+  "p_fundamental_ppm": 723000,
+  "confidence_ppm": 820000,
+  "side_hint": "SIDE_YES",
   "ttl_ms": 86400000,
-  "confidence": 0.82,
-  "max_position_usd": 5000,
+  "max_position_usd": { "amount_micros": 5000000000 },
   "max_slippage_bps": 50,
-  "issued_at": "2026-04-22T11:54:00Z"
+  "issued_at_unix_ms": 1713786840000
 }
 ```
 
-### `triggers.fired` (hot path, wire-level protobuf)
+### `dl.v1.triggers.fired` (hot path, wire-level protobuf)
 
 ```
 message Trigger {
-  bytes message_id = 1;           // UUIDv7, 16 bytes
-  bytes market_id = 2;            // hashed, 32 bytes
-  TriggerType trigger_type = 3;
+  Uuid message_id = 1;
+  MarketId market = 2;
+  TriggerKind kind = 3;
   bytes evidence_hash = 4;        // 32 bytes
   uint64 eta_block = 5;
   uint64 observed_at_ns = 6;      // monotonic clock
-  double expected_price = 7;
-  double slippage_bps = 8;
+  Money expected_price = 7;       // USDC micros
+  uint32 slippage_bps = 8;
+  uint32 source_count = 9;
 }
 ```
 
@@ -140,8 +166,13 @@ All Phase 1 topics are prefixed with the protobuf package version:
 | `dl.v1.watchlist.remove` | `WATCHLIST_REMOVE` | `WATCHLIST_REMOVE` |
 | `dl.v1.signals.emitted` | `SIGNALS_EMITTED` | `SIGNALS_EMITTED` |
 | `dl.v1.triggers.fired` | `TRIGGERS_FIRED` | `TRIGGERS_FIRED` |
+| `dl.v1.exec.submitted` | `EXEC_SUBMITTED` | `EXEC_SUBMITTED` |
+| `dl.v1.exec.filled` | `EXEC_FILLED` | `EXEC_FILLED` |
+| `dl.v1.exec.reverted` | `EXEC_REVERTED` | `EXEC_REVERTED` |
 | `dl.v1.control.kill` | `CONTROL_KILL` | `CONTROL_KILL` |
 | `dl.v1.control.kill_ack` | `CONTROL_KILL_ACK` | `CONTROL_KILL_ACK` |
+| `dl.v1.control.heartbeat` | `CONTROL_HEARTBEAT` | `CONTROL_HEARTBEAT` |
+| `dl.v1.exec.status` (NATS JetStream) | `EXEC_STATUS` | `EXEC_STATUS` |
 
 Single source of truth:
 * `services/common/src/topics.rs`
@@ -194,8 +225,11 @@ gitignored.
 
 Both `StreamPublisher` implementations use the same Redis Streams framing:
 
-* Entry field `payload` holds raw protobuf bytes (`prost::Message::encode`
+* Entry field `payload` обычно holds raw protobuf bytes (`prost::Message::encode`
   or ts-proto `.encode().finish()`).
+* Исключение текущего transition-периода: `gateway-api` publish-side для
+  `dl.v1.signals.decisions` и `dl.v1.control.kill` пока пишет JSON string в тот
+  же `payload`, а consumers этих тем должны уметь принять compatibility envelope.
 * Optional entry field `trace_id` carries a correlation id for structured
   logs / OpenTelemetry.
 * `XADD` is called with `MAXLEN ~ 10000` by default to cap stream length.

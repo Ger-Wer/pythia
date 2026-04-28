@@ -1,7 +1,7 @@
 # Dual-Loop Architecture
 
-Дата создания: 2026-04-22
-Статус: Design v1.0, Phase 0 (Foundations) in progress
+Дата актуализации: 2026-04-28
+Статус: Design v1.1, Phase 0 completed, Phase 1 mostly merged, Phase 2 partially implemented
 
 ## Роль документа
 
@@ -29,12 +29,16 @@ Dual-Loop — это следующая фаза развития. Пока су
 
 ## Статус реализации
 
-- [x] Design v1.0 написан.
-- [~] **Phase 0 (Foundations)** — в работе. Репозиторий, bus, observability, CI-скелет.
-- [ ] Phase 1 — Bus & Contracts.
-- [ ] Phase 2 — Sniper MVP (paper-execution).
+- [x] Design v1.0/v1.1 написан.
+- [x] **Phase 0 (Foundations)** завершена.
+- [~] **Phase 1 — Bus & Contracts** в основном уже в `main`.
+- [~] **Phase 2 — Sniper MVP** частично уже в `main`: `sniper-ingest` и `sniper-risk` реализованы, в `sniper-executor` уже есть paper lifecycle/control foundation, но end-to-end paper verification еще впереди.
 - [ ] Phase 3 — Live Execution (hardened).
 - [ ] Phase 4 — Scale & Optimization.
+
+Важное архитектурное решение на текущий момент: `phase1b-pg-listen-notify` не считается каноническим transport-path. Межсервисный source of truth остается Redis/NATS bus; LISTEN/NOTIFY допускается только как best-effort side-channel.
+
+Текущее transitional состояние шины: `gateway-api` уже умеет ingest'ить protobuf Redis payloads на receive-side, но его outbound operator mutations (`signals.decisions`, `control.kill`) пока еще публикуются как JSON compatibility envelope.
 
 См. [`06-roadmap.md`](./06-roadmap.md) для деталей.
 

@@ -152,6 +152,57 @@ services:
     networks:
       - dual-loop
 
+  # -------- Fast Loop (Rust) --------
+  #
+  # Oба сервиса собираются из services/Dockerfile с разными BIN build-arg.
+  # Для изоляции от хоста metrics-порты пробрасываются только на 127.0.0.1.
+  # В Phase 1 оба контейнера пока только поднимают observability + bus-connect;
+  # реальная execution-логика появится в Phase 2.
+
+  sniper-ingest:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        BIN: sniper-ingest
+    container_name: dual-loop-sniper-ingest
+    restart: unless-stopped
+    environment:
+      METRICS_ADDR: "0.0.0.0:9101"
+      REDIS_URL: "redis://redis:6379"
+      NATS_URL: "nats://nats:4222"
+      RUST_LOG: "info"
+    ports:
+      - "127.0.0.1:9101:9101"
+    networks:
+      - dual-loop
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  sniper-executor:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        BIN: sniper-executor
+    container_name: dual-loop-sniper-executor
+    restart: unless-stopped
+    environment:
+      METRICS_ADDR: "0.0.0.0:9102"
+      NATS_URL: "nats://nats:4222"
+      PAPER_MODE: "true"
+      RUST_LOG: "info"
+    ports:
+      - "127.0.0.1:9102:9102"
+    networks:
+      - dual-loop
+    depends_on:
+      nats:
+        condition: service_healthy
+
   # -------- Gateway API (Phase 1 Track B) --------
   #
   # Bridges Redis Streams / NATS to Command Center UI over WSS + REST.

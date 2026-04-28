@@ -1,13 +1,16 @@
 // Bus → State bridge.
 //
 // Consumes Redis Stream messages and folds them into the EventStore.
-// Payload shapes follow docs/dual_loop/04-bus-protocol.md (JSON debug form of
-// the protobuf contracts). Unknown/malformed fields are logged and skipped.
+// On `main`, inbound stream entries may carry either raw protobuf bytes or
+// legacy JSON envelopes in the `payload` field. The bridge normalizes both
+// into the same UI-friendly state projection; unknown/malformed fields are
+// logged and skipped.
 
 import type { Logger } from "../logger.ts";
 import type { EventStore } from "../state/store.ts";
 import type { GatewayState, Side } from "../types.ts";
 import type { BusClient, BusMessage, BusSubscription } from "./types.ts";
+import { decodeProtoPayload } from "./proto.ts";
 import {
   CONSUMER_GROUP,
   STREAM_EXEC_FILLED,
@@ -35,6 +38,19 @@ function side(v: unknown): Side {
   const s = str(v).toUpperCase();
   if (s === "YES" || s === "NO") return s;
   return "UNSPECIFIED";
+}
+
+async function resolvePayload(
+  stream: string,
+  msg: BusMessage,
+  log: Logger,
+): Promise<Record<string, unknown> | null> {
+  if (msg.payloadBytes && msg.payloadBytes.length > 0) {
+    const decoded = await decodeProtoPayload(stream, msg.payloadBytes, log);
+    if (decoded) return decoded;
+  }
+  if (Object.keys(msg.payload).length > 0) return msg.payload;
+  return null;
 }
 
 export interface BridgeHandle {
@@ -67,7 +83,8 @@ export async function startBridge(opts: {
 
   const handlers: Record<string, (m: BusMessage) => Promise<void>> = {
     [STREAM_SIGNALS_EMITTED]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_SIGNALS_EMITTED, m, log);
+      if (!p) return;
       const sid = str(p.signal_id);
       if (!sid) return;
       store.apply("signals", (s) => {
@@ -103,7 +120,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_WATCHLIST_UPSERT]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_WATCHLIST_UPSERT, m, log);
+      if (!p) return;
       const mid = str(p.market_id);
       if (!mid) return;
       store.apply("watchlist", (s) => {
@@ -124,7 +142,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_WATCHLIST_REMOVE]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_WATCHLIST_REMOVE, m, log);
+      if (!p) return;
       const mid = str(p.market_id);
       if (!mid) return;
       store.apply("watchlist", (s) => {
@@ -133,7 +152,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_TRIGGERS_FIRED]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_TRIGGERS_FIRED, m, log);
+      if (!p) return;
       const tid = str(p.trigger_id ?? p.message_id);
       if (!tid) return;
       store.apply("triggers", (s) => {
@@ -158,7 +178,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_EXEC_SUBMITTED]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_EXEC_SUBMITTED, m, log);
+      if (!p) return;
       const tx = str(p.tx_hash);
       if (!tx) return;
       store.apply("exec_status", (s) => {
@@ -173,7 +194,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_EXEC_FILLED]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_EXEC_FILLED, m, log);
+      if (!p) return;
       const tx = str(p.tx_hash);
       if (!tx) return;
       store.apply("exec_status", (s) => {
@@ -196,7 +218,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_EXEC_REVERTED]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_EXEC_REVERTED, m, log);
+      if (!p) return;
       const tx = str(p.tx_hash);
       if (!tx) return;
       store.apply("exec_status", (s) => {
@@ -218,7 +241,8 @@ export async function startBridge(opts: {
     },
 
     [STREAM_CONTROL_KILL_ACK]: async (m) => {
-      const p = m.payload;
+      const p = await resolvePayload(STREAM_CONTROL_KILL_ACK, m, log);
+      if (!p) return;
       const cid = str(p.original_command_id);
       const status = (str(p.status).toUpperCase() ||
         "ACCEPTED") as NonNullable<GatewayState["kill"]["last_ack_status"]>;

@@ -1,6 +1,6 @@
 # Pythia v2 — Workstream и дорожная карта
 
-Дата актуализации: 2026-04-13 (Phase 2 UX improvements + WCAG 2.1 AA compliance deployed)
+Дата актуализации: 2026-04-28 (Dual-Loop foundation cleanup + Command Center preview merged)
 
 ## Роль этого документа
 
@@ -9,9 +9,9 @@
 Если между кодом, dashboard, старыми spec-docs и заметками есть расхождения, ориентироваться нужно в таком порядке:
 
 1. этот документ;
-2. [README.md](/Users/gerwer/Desktop/Pythia/README.md);
-3. [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md);
-4. [docs/DEPLOYMENT.md](/Users/gerwer/Desktop/Pythia/docs/DEPLOYMENT.md);
+2. [README.md](../README.md);
+3. [docs/ARCHITECTURE.md](./ARCHITECTURE.md);
+4. [docs/DEPLOYMENT.md](./DEPLOYMENT.md);
 5. исторические spec-docs в `docs/superpowers/specs/`.
 
 ## Что такое Pythia v2
@@ -41,21 +41,23 @@
 
 Стадия проекта на сегодня:
 
-- `Phase 0` завершена
-- `Phase 1` завершена
-- `Phase 2` реализована в baseline-варианте и уже в production
-- `Phase 3A` реализована как command-center foundation и уже в production
-- `Phase 4A` реализована как attention-engine foundation и уже в production
-- `Phase 5+` еще впереди
+- `Phase 0` завершена.
+- `Phase 1` завершена.
+- `Phase 2` работает в production как forecast + decision core + watchlist loop.
+- `Phase 3` реализована как dashboard command-center baseline.
+- `Phase 4` реализована как attention engine + Telegram operator loop.
+- `Phase 5` начата: quality pages и API уже в коде, но weekly discipline loop еще не закрыт.
+- Параллельно открыт отдельный **Dual-Loop** workstream: foundations и значимая часть backend Phase 2 уже в `main`, но paper execution еще не завершен.
 
 Коротко:
 
 - forecast работает;
 - decision core работает;
 - autonomous watchlist engine уже в production;
-- operator UX уже переведен в command-center baseline, но еще не доведен до финальной daily-desk формы;
-- attention engine foundation уже построен;
-- decision-quality layer еще не построен.
+- attention engine и inbound Telegram triage уже есть в коде;
+- quality layer больше не "пустое место": есть `/quality`, `shadow performance`, `operator vs shadow`;
+- Fast Loop уже вышел из чистого design: bus/contracts, gateway-api, Command Center preview, `sniper-ingest` и `sniper-risk` существуют в `main`;
+- `sniper-executor` все еще на foundation-skeleton стадии и остается главным незавершенным блоком текущего спринта.
 
 ## Уже доставлено в production
 
@@ -97,6 +99,8 @@
 ### Dashboard UX
 
 - [x] `Качество`
+- [x] `Shadow performance`
+- [x] `Operator vs shadow`
 - [x] `Главные сигналы дня`
 - [x] dossier-first `Разбор рынка`
 - [x] `Избранное` как triage-board по `watch dossier`
@@ -112,6 +116,21 @@
 - [x] статусы `urgent / today / later / in_progress / closed`
 - [x] dashboard triage transitions
 - [x] Telegram outbound inbox для `urgent/today`
+- [x] inbound Telegram triage / transitions (`/inbox`, `/done`, `/today`, `/snooze`, aliases)
+
+### Dual-Loop foundations in `main`
+
+- [x] protobuf contracts `schemas/dual_loop/v1/*`
+- [x] fixed-point wire format (`*_ppm`, `*_bps`, `*_unix_ms`; no financial `double`)
+- [x] canonical bus topics `dl.v1.*`
+- [x] `gateway-api` foundation
+- [x] inbound protobuf bridge в `gateway-api` (с JSON fallback для тестов/legacy)
+- [x] Command Center preview route `/command-center`
+- [x] `sniper-ingest` foundation + matcher + replay/test surface
+- [x] `sniper-risk` pre-trade checks foundation
+- [x] `sniper-executor` skeleton + `exec.status` heartbeats
+- [x] `sniper-executor` paper lifecycle foundation в коде: submit/fill/revert, nonce actor, stuck-timeout, `control.kill` consumer/ack
+- [x] decision: `phase1b-pg-listen-notify` не влит в `main`; канонический путь остается через Redis/NATS bus, а не через side-channel LISTEN/NOTIFY
 
 ## Что еще не закончено
 
@@ -129,16 +148,30 @@
 - [x] статусы `urgent / today / later / in_progress / closed`
 - [x] связка `attention item -> dashboard workspace`
 - [x] outbound Telegram inbox
-- [ ] inbound Telegram triage
+- [x] inbound Telegram triage
 - [ ] единый дневной digest по attention queue
 
 ### Quality / validation
 
-- [ ] метрики shadow performance
-- [ ] сравнение `operator mode` vs `shadow mode`
+- [x] quality API `/api/quality`
+- [x] shadow performance page
+- [x] operator vs shadow page
+- [x] decision-quality dashboard foundation
 - [ ] review discipline metrics
 - [ ] weekly decision review
-- [ ] decision-quality dashboard
+- [ ] automation поверх quality / review loop
+
+### Dual-Loop / Fast Loop
+
+- [x] bus/contracts foundation
+- [x] `gateway-api` foundation
+- [x] Command Center preview UI
+- [x] `sniper-ingest`
+- [x] `sniper-risk`
+- [ ] gateway state ↔ Command Center live-feed alignment
+- [ ] убрать transitional JSON publish-side в `gateway-api` (`signals.decisions`, `control.kill`) и довести весь control-plane до одного protobuf пути
+- [ ] `sniper-executor` paper execution
+- [ ] real WSS feed вместо mock Command Center feed
 
 ### Improvement loop
 
@@ -161,7 +194,7 @@
   - [x] `deep review mode`
 - [x] `Избранное` = активный контур сопровождения
 - [x] Telegram = inbox и alert-канал, а не основной экран чтения анализа
-- [x] live execution через Polymarket API сейчас не входит в scope
+- [x] live execution не входит в текущий production scope Pythia v2 и живет как отдельная цель Dual-Loop Phase 3
 
 ## Дорожная карта по фазам
 
@@ -212,13 +245,14 @@
 - [x] единый `attention_item`
 - [x] приоритизация alerts
 - [x] outbound Telegram inbox
-- [ ] inbound Telegram triage flow
+- [x] inbound Telegram triage flow
 - [ ] единый дневной digest
 
 ### Phase 5 — Decision Quality Layer
 
-- [ ] shadow performance dashboard
-- [ ] operator vs shadow comparison
+- [x] shadow performance dashboard
+- [x] operator vs shadow comparison
+- [x] quality API foundation
 - [ ] discipline metrics
 - [ ] post-mortem taxonomy
 - [ ] weekly decision review
@@ -232,8 +266,8 @@
 
 Если вы входите в проект прямо сейчас, лучший порядок такой:
 
-1. Прочитать [README.md](/Users/gerwer/Desktop/Pythia/README.md)
-2. Прочитать [docs/ARCHITECTURE.md](/Users/gerwer/Desktop/Pythia/docs/ARCHITECTURE.md)
+1. Прочитать [README.md](../README.md)
+2. Прочитать [docs/ARCHITECTURE.md](./ARCHITECTURE.md)
 3. Понять эти модули:
    - `src/main.ts`
    - `src/services/decision_core.ts`
@@ -241,20 +275,27 @@
    - `src/watchlist_refresh.ts`
    - `python/operator_core.py`
    - `python/watchlist_store.py`
-4. Потом уже смотреть dashboard pages и Telegram delivery
+4. Потом уже смотреть:
+   - `python/operator_actions.py`
+   - `python/dashboard_api.py`
+   - `dashboard/src/pages/*`
+   - `gateway-api/src/*`
+   - `services/sniper-ingest/*`
+   - `services/sniper-risk/*`
+   - `services/sniper-executor/*`
 
 ## Главный текущий фокус
 
 Самая важная следующая задача сейчас:
 
-- [ ] построить decision-quality слой поверх текущего command-center и attention engine
+- [ ] довести Dual-Loop foundation до честного paper execution без архитектурных дыр
 
 Практически это означает:
 
-- считать `operator vs shadow`;
-- считать review discipline;
-- делать weekly decision review;
-- использовать накопленный dataset для ranking/prompts/heuristics.
+- завершить `sniper-executor` в paper mode;
+- выровнять gateway/API/UI state model перед реальным WSS feed;
+- не допускать расхождения docs ↔ wire contracts ↔ runtime code;
+- параллельно не потерять weekly quality/review loop в Slow Loop.
 
 ## Критерии того, что мы движемся правильно
 

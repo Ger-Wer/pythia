@@ -11,12 +11,23 @@ use std::time::{Duration, Instant};
 use ahash::AHashMap;
 use alloy_primitives::Address;
 use dual_loop_common::abi::DecodedEvent;
+use dual_loop_common::proto::common::Money;
 use dual_loop_common::proto::new_uuid_v7;
 use dual_loop_common::proto::trigger::Trigger;
 use dual_loop_common::proto::watchlist::TriggerKind;
 use smallvec::SmallVec;
 
 use crate::watchlist::{MarketKey, WatchlistStore};
+
+#[inline]
+fn expected_price_money(p_fundamental_ppm: i64) -> Money {
+    // For Polymarket binary markets the fair YES/NO price is quoted in the
+    // same 0..1 range as probability, so ppm and USDC micros are numerically
+    // aligned on the wire (1_000_000 = 100% = $1.00).
+    Money {
+        amount_micros: p_fundamental_ppm,
+    }
+}
 
 /// Window for counting independent sources (2 seconds).
 const SOURCE_WINDOW: Duration = Duration::from_secs(2);
@@ -136,7 +147,7 @@ impl TriggerMatcher {
                 evidence_hash: evidence_hash.into(),
                 eta_block: 0,
                 observed_at_ns,
-                expected_price: entry.p_fundamental,
+                expected_price: Some(expected_price_money(entry.p_fundamental_ppm)),
                 slippage_bps: entry.max_slippage_bps,
                 source_count,
             })
@@ -156,7 +167,7 @@ impl TriggerMatcher {
                 evidence_hash: evidence_hash.into(),
                 eta_block: 0,
                 observed_at_ns,
-                expected_price: entry.p_fundamental,
+                expected_price: Some(expected_price_money(entry.p_fundamental_ppm)),
                 slippage_bps: entry.max_slippage_bps,
                 source_count: 1,
             })
@@ -198,7 +209,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
     use dual_loop_common::abi::addresses;
-    use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+    use dual_loop_common::proto::common::{MarketId, Money};
     use dual_loop_common::proto::watchlist::{TriggerPolicy, WatchlistUpsert};
 
     fn make_store_with_entry() -> (WatchlistStore, Address) {
@@ -213,19 +224,16 @@ mod tests {
                 ctf_address: ctf_str,
             }),
             version: 1,
-            edge: 0.15,
-            p_fundamental: 0.72,
-            confidence: 0.9,
+            edge_ppm: 150_000,
+            p_fundamental_ppm: 720_000,
+            confidence_ppm: 900_000,
             side_hint: 1,
             max_position_usd: Some(Money {
                 amount_micros: 10_000_000,
             }),
             max_slippage_bps: 50,
             ttl_ms: 3_600_000,
-            issued_at: Some(Timestamp {
-                wall_clock_unix_ms: dual_loop_common::time::StampedTime::now().wall_clock_unix_ms,
-                monotonic_ns: 0,
-            }),
+            issued_at_unix_ms: dual_loop_common::time::StampedTime::now().wall_clock_unix_ms,
             trigger_policy: Some(TriggerPolicy {
                 min_independent_sources: 1,
                 allowed_kinds: vec![
@@ -260,6 +268,10 @@ mod tests {
         let t = trigger.unwrap();
         assert_eq!(t.kind, TriggerKind::LargeFill as i32);
         assert!(t.source_count >= 1);
+        assert_eq!(
+            t.expected_price.as_ref().map(|money| money.amount_micros),
+            Some(720_000)
+        );
     }
 
     #[test]

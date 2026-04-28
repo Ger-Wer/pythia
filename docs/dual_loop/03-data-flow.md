@@ -7,10 +7,10 @@
  T+2s      ContextBuilder fetches Exa/news
  T+10s     LLM inference → P_fundamental = 0.72
  T+10.1s   SignalEngine: P_market=0.55, Edge=+0.17, EV=+4.2%
- T+10.2s   Signal published → signals.pending
+ T+10.2s   Signal published → dl.v1.signals.emitted
  T+10.3s   Operator sees card in Triage Queue
  T+12s     Operator hits [A] Accept (hotkey)
- T+12.01s  watchlist.upsert → Sniper loads market, subscribes to CTF contract
+ T+12.01s  dl.v1.watchlist.upsert → Sniper loads market, subscribes to CTF contract
  T+12.02s  Sniper streams OB depth to Command Center via WS
  ...
  T+Nms     Oracle tx appears in mempool (resolution pending)
@@ -32,7 +32,7 @@ Gamma API ──poll──▶ MarketPoller ──▶ ContextBuilder ──▶ Ll
                                                       SignalEngine
                                                             │
                                                             ▼
-                                                     signals.pending
+                                                     dl.v1.signals.emitted
 ```
 
 - Poll-интервал: 5 минут для новых рынков, 15 мин для существующих.
@@ -42,29 +42,29 @@ Gamma API ──poll──▶ MarketPoller ──▶ ContextBuilder ──▶ Ll
 ### Фаза 2: Operator Triage (Human-in-the-Loop, T+10s…T+60s)
 
 ```
-signals.pending ──▶ gateway-api ──WSS──▶ Command Center (Triage Queue)
+dl.v1.signals.emitted ──▶ gateway-api ──WSS──▶ Command Center (Triage Queue)
                                                 │
                                     [A] Accept / [R] Reject / [S] Snooze
                                                 │
                                                 ▼
-                                        signals.decision
+                                        dl.v1.signals.decisions
                                                 │
                                 ┌───────────────┴───────────────┐
                                 ▼                               ▼
                           pythia-core                      sniper-ingest
                           (записывает                      (если Accept:
                            decision в Postgres)             публикует в
-                                                            watchlist.upsert)
+                                                            dl.v1.watchlist.upsert)
 ```
 
-- Idempotency-key на `signals.decision` предотвращает double-accept.
+- Idempotency-key на `dl.v1.signals.decisions` предотвращает double-accept.
 - `Reject` пишет причину в decision journal для будущего retraining промптов.
 - `Snooze` возвращает карту в очередь через N минут (конфигурируемо, default 15m).
 
 ### Фаза 3: Armed & Watching (Fast Loop, T+12s…T+Nms)
 
 ```
-watchlist.upsert ──▶ sniper-ingest
+dl.v1.watchlist.upsert ──▶ sniper-ingest
                          │
                          ├──▶ OrderBookTracker (REST warm-up + WS incremental)
                          ├──▶ OracleDecoder.register(ctf_address)
@@ -74,7 +74,7 @@ watchlist.upsert ──▶ sniper-ingest
 
 - Watchlist entry имеет TTL (конфиг, default 24h).
 - Sniper держит до 150 одновременных рынков (hard cap по Phase 4 целям).
-- Stale entries auto-expire и публикуются `watchlist.remove`.
+- Stale entries auto-expire и публикуются `dl.v1.watchlist.remove`.
 
 ### Фаза 4: Trigger & Risk (Hot Path, T+N…T+N+3ms)
 
@@ -94,18 +94,17 @@ Polygon Node ──IPC──▶ MempoolSubscriber ──▶ OracleDecoder
                                        PASS          FAIL
                                          │              │
                                          ▼              ▼
-                                   triggers.fired  triggers.blocked
-                                                   (audit only)
+                                   dl.v1.triggers.fired
 ```
 
 - **Hot path budget: 3ms.** Zero-alloc, no-lock-contention.
 - Все checks в sniper-risk — O(1), pre-computed lookup tables.
-- `triggers.blocked` пишется в Redis Streams для post-mortem, но не в hot path.
+- blocked/rejected trigger paths остаются audit-only и не должны расширять hot path.
 
 ### Фаза 5: Execution (Hot Path, T+N+3ms…T+N+5ms)
 
 ```
-triggers.fired ──▶ sniper-executor
+dl.v1.triggers.fired ──▶ sniper-executor
                          │
                          ├──▶ NonceManager.reserve()
                          ├──▶ TxBuilder.finalize(template, nonce, gas, data)
