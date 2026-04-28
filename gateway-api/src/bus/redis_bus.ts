@@ -176,7 +176,7 @@ export class RedisBusClient implements BusClient {
                   stream,
                   ">",
                 )
-              : await this.redis.xreadgroup(
+              : await subscriptionRedis.xreadgroup(
                   "GROUP",
                   group,
                   consumerName,
