@@ -27,7 +27,9 @@ describe("redis bus subscription connections", () => {
     const subscriptionRedis = await openSubscriptionRedis(root as never);
 
     expect(root.duplicateCalls).toBe(1);
-    expect(root.lastDuplicate?.connectCalls).toBe(1);
-    expect(subscriptionRedis).toBe(root.lastDuplicate);
+    expect(root.lastDuplicate).not.toBeNull();
+    const duplicated = root.lastDuplicate as FakeSubscriptionRedis;
+    expect(duplicated.connectCalls).toBe(1);
+    expect(subscriptionRedis).toBe(duplicated);
   });
 });
