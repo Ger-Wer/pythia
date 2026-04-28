@@ -53,7 +53,10 @@ pub fn spawn_ws_subscriber(
                     error!(err = %e, "WS mempool subscriber error");
                 }
             }
-            warn!(backoff_ms = backoff.as_millis(), "reconnecting WS subscriber");
+            warn!(
+                backoff_ms = backoff.as_millis(),
+                "reconnecting WS subscriber"
+            );
             tokio::time::sleep(backoff).await;
             backoff = (backoff * 2).min(MAX_BACKOFF);
         }
@@ -78,27 +81,23 @@ pub fn spawn_ipc_subscriber(
                     error!(err = %e, "IPC mempool subscriber error");
                 }
             }
-            warn!(backoff_ms = backoff.as_millis(), "reconnecting IPC subscriber");
+            warn!(
+                backoff_ms = backoff.as_millis(),
+                "reconnecting IPC subscriber"
+            );
             tokio::time::sleep(backoff).await;
             backoff = (backoff * 2).min(MAX_BACKOFF);
         }
     })
 }
 
-async fn connect_and_stream_ws(
-    url: &str,
-    tx: &mpsc::Sender<PendingTx>,
-) -> anyhow::Result<()> {
+async fn connect_and_stream_ws(url: &str, tx: &mpsc::Sender<PendingTx>) -> anyhow::Result<()> {
     let ws = WsConnect::new(url);
-    let provider: RootProvider<PubSubFrontend, Ethereum> =
-        ProviderBuilder::new().on_ws(ws).await?;
+    let provider: RootProvider<PubSubFrontend, Ethereum> = ProviderBuilder::new().on_ws(ws).await?;
     stream_pending_txs(&provider, tx).await
 }
 
-async fn connect_and_stream_ipc(
-    path: &str,
-    tx: &mpsc::Sender<PendingTx>,
-) -> anyhow::Result<()> {
+async fn connect_and_stream_ipc(path: &str, tx: &mpsc::Sender<PendingTx>) -> anyhow::Result<()> {
     let ipc = IpcConnect::new(path.to_string());
     let provider: RootProvider<PubSubFrontend, Ethereum> =
         ProviderBuilder::new().on_ipc(ipc).await?;

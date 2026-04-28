@@ -17,7 +17,10 @@ use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
 use dual_loop_common::proto::watchlist::{TriggerKind, TriggerPolicy, WatchlistUpsert};
 
 fn setup_watchlist(store: &WatchlistStore) {
-    let ctf_str = format!("{:#x}", address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"));
+    let ctf_str = format!(
+        "{:#x}",
+        address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E")
+    );
     let upsert = WatchlistUpsert {
         message_id: None,
         market: Some(MarketId {
@@ -99,7 +102,10 @@ fn matcher_ignores_unknown_market() {
         address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"),
         monotonic_ns(),
     );
-    assert!(trigger.is_none(), "trigger should NOT fire for unknown market");
+    assert!(
+        trigger.is_none(),
+        "trigger should NOT fire for unknown market"
+    );
 }
 
 #[test]

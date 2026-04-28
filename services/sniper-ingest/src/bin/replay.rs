@@ -180,10 +180,7 @@ fn parse_log_data(log_val: &serde_json::Value) -> Result<alloy_primitives::LogDa
         })
         .unwrap_or_default();
 
-    let data_hex = log_val
-        .get("data")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0x");
+    let data_hex = log_val.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
     let data_bytes = hex_decode(data_hex)?;
 
     alloy_primitives::LogData::new(topics, data_bytes.into())

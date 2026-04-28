@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use ahash::AHashMap;
 use alloy_primitives::Address;
 use dual_loop_common::abi::DecodedEvent;
+use dual_loop_common::proto::new_uuid_v7;
 use dual_loop_common::proto::trigger::Trigger;
 use dual_loop_common::proto::watchlist::TriggerKind;
-use dual_loop_common::proto::new_uuid_v7;
 use smallvec::SmallVec;
 
 use crate::watchlist::{MarketKey, WatchlistStore};
@@ -198,8 +198,8 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
     use dual_loop_common::abi::addresses;
-    use dual_loop_common::proto::watchlist::{TriggerPolicy, WatchlistUpsert};
     use dual_loop_common::proto::common::{MarketId, Money, Timestamp};
+    use dual_loop_common::proto::watchlist::{TriggerPolicy, WatchlistUpsert};
 
     fn make_store_with_entry() -> (WatchlistStore, Address) {
         let store = WatchlistStore::new();
@@ -217,7 +217,9 @@ mod tests {
             p_fundamental: 0.72,
             confidence: 0.9,
             side_hint: 1,
-            max_position_usd: Some(Money { amount_micros: 10_000_000 }),
+            max_position_usd: Some(Money {
+                amount_micros: 10_000_000,
+            }),
             max_slippage_bps: 50,
             ttl_ms: 3_600_000,
             issued_at: Some(Timestamp {
@@ -226,7 +228,10 @@ mod tests {
             }),
             trigger_policy: Some(TriggerPolicy {
                 min_independent_sources: 1,
-                allowed_kinds: vec![TriggerKind::LargeFill as i32, TriggerKind::OracleResolution as i32],
+                allowed_kinds: vec![
+                    TriggerKind::LargeFill as i32,
+                    TriggerKind::OracleResolution as i32,
+                ],
                 max_price_impact_bps: 100,
             }),
         };

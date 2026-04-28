@@ -53,9 +53,7 @@ async fn main() -> Result<()> {
 
     // Bus consumers.
     let bus_tasks = match std::env::var("REDIS_URL") {
-        Ok(url) => Some(
-            spawn_bus_consumers(url, store.clone(), shutdown_rx.clone()).await?,
-        ),
+        Ok(url) => Some(spawn_bus_consumers(url, store.clone(), shutdown_rx.clone()).await?),
         Err(_) => {
             warn!("REDIS_URL not set; running without bus consumers");
             None
@@ -85,9 +83,7 @@ async fn main() -> Result<()> {
 
     // Redis publisher for triggers.
     let mut trigger_publisher = match std::env::var("REDIS_URL") {
-        Ok(url) => Some(
-            dual_loop_common::bus::StreamPublisher::connect(&url).await?,
-        ),
+        Ok(url) => Some(dual_loop_common::bus::StreamPublisher::connect(&url).await?),
         Err(_) => None,
     };
 
@@ -185,8 +181,7 @@ fn record_tx(pending: &PendingTx) {
         "{}/{}.jsonl",
         dir,
         now.format(
-            &time::format_description::parse("[year]-[month]-[day]-[hour]")
-                .expect("valid format")
+            &time::format_description::parse("[year]-[month]-[day]-[hour]").expect("valid format")
         )
         .expect("format ok")
     );
@@ -213,8 +208,7 @@ async fn spawn_bus_consumers(
     use dual_loop_common::bus::ConsumerGroup;
     use dual_loop_common::topics;
 
-    let consumer_id =
-        std::env::var("HOSTNAME").unwrap_or_else(|_| "sniper-ingest-1".to_string());
+    let consumer_id = std::env::var("HOSTNAME").unwrap_or_else(|_| "sniper-ingest-1".to_string());
     let group = topics::consumer_groups::SNIPER_INGEST;
 
     let mut upsert_cg =
