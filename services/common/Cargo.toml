@@ -31,6 +31,10 @@ prost-types.workspace = true
 redis.workspace = true
 async-nats.workspace = true
 
+# Alloy (EVM / ABI decoding)
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
+
 [build-dependencies]
 prost-build.workspace = true
 protoc-bin-vendored.workspace = true

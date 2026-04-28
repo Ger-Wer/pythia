@@ -8,6 +8,7 @@
 //! * [`bus`] — async-обёртки над Redis Streams и NATS JetStream.
 //! * [`observability`], [`time`] — helper'ы из Phase 0.
 
+pub mod abi;
 pub mod bus;
 pub mod observability;
 pub mod proto;

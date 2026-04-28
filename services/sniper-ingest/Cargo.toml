@@ -10,6 +10,10 @@ description = "Fast Loop: mempool subscriber, oracle decoder, trigger matcher."
 name = "sniper-ingest"
 path = "src/main.rs"
 
+[[bin]]
+name = "replay"
+path = "src/bin/replay.rs"
+
 [lib]
 name = "sniper_ingest"
 path = "src/lib.rs"
@@ -25,6 +29,33 @@ serde_json.workspace = true
 metrics.workspace = true
 dashmap.workspace = true
 prost.workspace = true
+time.workspace = true
+bytes.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+
+# Alloy (EVM provider + ABI)
+alloy.workspace = true
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
+
+# Hot-path data structures
+smallvec.workspace = true
+ahash.workspace = true
+arc-swap.workspace = true
+
+# CLI (for replay binary)
+clap.workspace = true
+hex.workspace = true
+
+# Logging
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tokio-test.workspace = true
+criterion.workspace = true
+alloy-node-bindings.workspace = true
+
+[[bench]]
+name = "matcher"
+harness = false

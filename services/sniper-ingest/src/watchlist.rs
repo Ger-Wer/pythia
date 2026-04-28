@@ -102,6 +102,12 @@ impl WatchlistStore {
         self.inner.get(key).map(|e| e.clone())
     }
 
+    /// Iterate over all entries (snapshot). Used by TriggerMatcher for
+    /// contract-address lookups.
+    pub fn iter(&self) -> Vec<WatchlistEntry> {
+        self.inner.iter().map(|kv| kv.value().clone()).collect()
+    }
+
     /// Apply an upsert. Ignores stale versions. Emits metrics.
     pub fn apply_upsert(&self, msg: &WatchlistUpsert) {
         let Some(entry) = WatchlistEntry::from_upsert(msg) else {
