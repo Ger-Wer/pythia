@@ -7,7 +7,7 @@
 
 services:
   redis:
-    ports: []
+    ports: !override []
 
   postgres:
-    ports: []
+    ports: !override []
