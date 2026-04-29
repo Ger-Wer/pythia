@@ -450,7 +450,9 @@ export async function runWatchlistRefresh(
       ) VALUES (?1, 'running', ?2)
     `,
   ).run(startedAt, marketsTotal);
-  const runId = Number(db.query('SELECT last_insert_rowid() AS id').get()?.id ?? 0);
+  const runId = Number(
+    (db.query('SELECT last_insert_rowid() AS id').get() as { id: number } | undefined)?.id ?? 0,
+  );
 
   const dossiers = collectRefreshTargets(db);
   let marketsChecked = 0;

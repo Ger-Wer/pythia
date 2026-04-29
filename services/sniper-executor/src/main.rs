@@ -61,6 +61,14 @@ struct Counters {
 
 type RedisPublisherHandle = Arc<Mutex<StreamPublisher>>;
 
+#[derive(Clone)]
+struct TriggerExecutionContext {
+    redis_publisher: Option<RedisPublisherHandle>,
+    nonce_manager: NonceManagerHandle,
+    paper_cfg: PaperExecutorConfig,
+    sink: BroadcastSink,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let service = "sniper_executor";
@@ -134,21 +142,14 @@ async fn main() -> Result<()> {
         let shutdown = shutdown.clone();
         let kill_state = kill_state.clone();
         let counters = counters.clone();
-        let redis_publisher = redis_publisher.clone();
-        let nonce_manager = nonce_manager.clone();
-        let paper_cfg = paper_cfg.clone();
+        let ctx = TriggerExecutionContext {
+            redis_publisher: redis_publisher.clone(),
+            nonce_manager: nonce_manager.clone(),
+            paper_cfg: paper_cfg.clone(),
+            sink,
+        };
         tokio::spawn(async move {
-            run_trigger_consumer(
-                js,
-                shutdown,
-                kill_state,
-                counters,
-                redis_publisher,
-                nonce_manager,
-                paper_cfg,
-                sink,
-            )
-            .await
+            run_trigger_consumer(js, shutdown, kill_state, counters, ctx).await
         })
     });
 
@@ -224,10 +225,7 @@ async fn run_trigger_consumer(
     shutdown: Arc<AtomicBool>,
     kill_state: SharedKillState,
     counters: Arc<Counters>,
-    redis_publisher: Option<RedisPublisherHandle>,
-    nonce_manager: NonceManagerHandle,
-    paper_cfg: PaperExecutorConfig,
-    sink: BroadcastSink,
+    ctx: TriggerExecutionContext,
 ) {
     let mut consumer = match js
         .pull_subscribe(
@@ -280,12 +278,12 @@ async fn run_trigger_consumer(
                         );
                     } else {
                         let now_ms = now_unix_ms();
-                        match nonce_manager.allocate().await {
+                        match ctx.nonce_manager.allocate().await {
                             Ok(nonce) => {
                                 let execution =
-                                    plan_paper_execution(&trigger, nonce, now_ms, &paper_cfg);
+                                    plan_paper_execution(&trigger, nonce, now_ms, &ctx.paper_cfg);
                                 if let Err(e) = publish_event(
-                                    &redis_publisher,
+                                    &ctx.redis_publisher,
                                     topics::EXEC_SUBMITTED,
                                     &execution.submitted,
                                 )
@@ -293,8 +291,8 @@ async fn run_trigger_consumer(
                                 {
                                     warn!(error = %e, nonce, "exec.submitted publish failed");
                                 }
-                                sink.submit(&execution);
-                                if let Err(e) = nonce_manager.track(execution.clone()).await {
+                                ctx.sink.submit(&execution);
+                                if let Err(e) = ctx.nonce_manager.track(execution.clone()).await {
                                     error!(error = %e, nonce, "failed to track in-flight execution");
                                 } else {
                                     counters.executed.fetch_add(1, Ordering::Relaxed);
@@ -353,6 +351,7 @@ async fn run_heartbeat(
                 NonceSnapshot::default()
             }
         };
+        metrics::gauge!("executor_next_nonce").set(snapshot.next_nonce as f64);
         metrics::gauge!("executor_in_flight_total").set(snapshot.in_flight as f64);
         metrics::gauge!("executor_oldest_in_flight_age_ms")
             .set(snapshot.oldest_in_flight_age_ms.unwrap_or(0) as f64);

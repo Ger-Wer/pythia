@@ -40,6 +40,7 @@ impl NonceManagerHandle {
                         let _ = reply.send(nonce);
                     }
                     Command::Track { execution } => {
+                        let execution = *execution;
                         in_flight.insert(execution.nonce, execution);
                     }
                     Command::PollDue { now_ms, reply } => {
@@ -113,7 +114,9 @@ impl NonceManagerHandle {
 
     pub async fn track(&self, execution: PlannedExecution) -> Result<()> {
         self.tx
-            .send(Command::Track { execution })
+            .send(Command::Track {
+                execution: Box::new(execution),
+            })
             .await
             .map_err(|_| anyhow!("nonce manager stopped"))?;
         Ok(())
@@ -150,7 +153,7 @@ impl NonceManagerHandle {
 
 enum Command {
     Allocate { reply: oneshot::Sender<u64> },
-    Track { execution: PlannedExecution },
+    Track { execution: Box<PlannedExecution> },
     PollDue {
         now_ms: i64,
         reply: oneshot::Sender<Vec<DueExecution>>,

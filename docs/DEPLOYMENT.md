@@ -155,6 +155,16 @@ bash scripts/manual_run.sh watch-alerts
 
 Эта проверка не заменяет production deploy Slow Loop, а дополняет его.
 
+`redis` и `postgres` в Dual-Loop dev stack доступны только внутри compose-сети и не публикуются на хост. Это сделано специально, чтобы shared-хосты вроде `amper` не конфликтовали с другими проектами.
+
+Для запуска Fast Loop достаточно обычной команды:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d redis nats postgres gateway-api sniper-ingest sniper-executor
+```
+
+Если нужен разовый доступ к этим сервисам с хоста, используйте `docker compose exec`, а не постоянную публикацию портов.
+
 ## Reverse proxy
 
 Наружу dashboard должен идти только так:

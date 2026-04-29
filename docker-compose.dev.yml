@@ -28,8 +28,6 @@ services:
       - "256mb"
       - --maxmemory-policy
       - "allkeys-lru"
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     networks:
@@ -71,8 +69,6 @@ services:
       POSTGRES_DB: pythia_dev
       POSTGRES_USER: pythia
       POSTGRES_PASSWORD: pythia_dev_password
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
@@ -192,6 +188,7 @@ services:
     restart: unless-stopped
     environment:
       METRICS_ADDR: "0.0.0.0:9102"
+      REDIS_URL: "redis://redis:6379"
       NATS_URL: "nats://nats:4222"
       PAPER_MODE: "true"
       RUST_LOG: "info"
@@ -200,6 +197,8 @@ services:
     networks:
       - dual-loop
     depends_on:
+      redis:
+        condition: service_healthy
       nats:
         condition: service_healthy
 
@@ -222,7 +221,7 @@ services:
       # DEV-ONLY defaults. Override in staging/prod via a real secrets store.
       #   GATEWAY_PASETO_KEY: openssl rand -base64 32
       #   OPERATOR_PASSWORD_HASH: `bun run -e "console.log(require('bcryptjs').hashSync(process.argv[1],10))" -- <password>`
-      GATEWAY_PASETO_KEY: "DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEV_DEVA="
+      GATEWAY_PASETO_KEY: "cHl0aGlhLWR1YWwtbG9vcC1kZXYta2V5LTMyYnl0ZXM="
       OPERATOR_ID: "admin"
       OPERATOR_PASSWORD_HASH: "$$2a$$10$$bR/.j3ziz5BC2vE4dETKLuX8AVPYFY0o5pRRnN.NXj29u9EcAkk1y"
       KILL_HMAC_SECRET: "dev-kill-hmac-secret-change-me"
