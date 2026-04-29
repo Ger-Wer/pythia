@@ -297,10 +297,11 @@ async fn run_trigger_consumer(
                                 } else {
                                     counters.executed.fetch_add(1, Ordering::Relaxed);
                                     metrics::counter!("exec_submitted_total").increment(1);
-                                    debug!(
+                                    info!(
                                         nonce,
                                         market = %execution.market_id(),
                                         auto_fill = execution.fill.is_some(),
+                                        tx_hash = %hex::encode(execution.submitted.tx_hash.as_ref()),
                                         "paper execution submitted"
                                     );
                                 }
@@ -420,7 +421,12 @@ async fn run_reconcile_loop(
                                     warn!(error = %e, nonce, "exec.filled publish failed");
                                 }
                                 metrics::counter!("exec_filled_total").increment(1);
-                                debug!(nonce, market = %execution.market_id(), "paper fill emitted");
+                                info!(
+                                    nonce,
+                                    market = %execution.market_id(),
+                                    tx_hash = %hex::encode(fill.tx_hash.as_ref()),
+                                    "paper fill emitted"
+                                );
                             }
                         }
                         DueExecution::Revert { nonce, execution } => {
@@ -435,7 +441,12 @@ async fn run_reconcile_loop(
                             }
                             metrics::counter!("exec_reverted_total", "reason" => "timeout")
                                 .increment(1);
-                            debug!(nonce, market = %execution.market_id(), "paper timeout emitted");
+                            info!(
+                                nonce,
+                                market = %execution.market_id(),
+                                tx_hash = %hex::encode(execution.timeout_revert.tx_hash.as_ref()),
+                                "paper timeout emitted"
+                            );
                         }
                     }
                 }

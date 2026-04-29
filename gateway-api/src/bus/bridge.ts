@@ -175,6 +175,11 @@ export async function startBridge(opts: {
           source_count: num(p.source_count),
         };
       });
+      log.info("bridge applied trigger", {
+        trigger_id: tid,
+        market_id: str(p.market_id),
+        kind: str(p.kind),
+      });
     },
 
     [STREAM_EXEC_SUBMITTED]: async (m) => {
@@ -190,6 +195,11 @@ export async function startBridge(opts: {
           submitted_at_unix_ms: num(p.submitted_at_unix_ms, Date.now()),
           paper_mode: Boolean(p.paper_mode),
         };
+      });
+      log.info("bridge applied exec status", {
+        tx_hash: tx,
+        market_id: str(p.market_id),
+        status: "SUBMITTED",
       });
     },
 
@@ -215,6 +225,11 @@ export async function startBridge(opts: {
           filled_at_unix_ms: num(p.filled_at_unix_ms, Date.now()),
         };
       });
+      log.info("bridge applied exec status", {
+        tx_hash: tx,
+        market_id: str(p.market_id),
+        status: "FILLED",
+      });
     },
 
     [STREAM_EXEC_REVERTED]: async (m) => {
@@ -237,6 +252,12 @@ export async function startBridge(opts: {
           block_number: num(p.block_number),
           reverted_at_unix_ms: num(p.reverted_at_unix_ms, Date.now()),
         };
+      });
+      log.info("bridge applied exec status", {
+        tx_hash: tx,
+        market_id: str(p.market_id),
+        status: "REVERTED",
+        reason: str(p.reason),
       });
     },
 
