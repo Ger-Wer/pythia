@@ -93,10 +93,10 @@ export function loadConfig(): Config {
 
     operatorId: process.env.OPERATOR_ID ?? "admin",
     // Default is bcrypt("changeme") — DEV ONLY. Must be overridden in staging/prod.
-    // $2a$10$bR/.j3ziz5BC2vE4dETKLuX8AVPYFY0o5pRRnN.NXj29u9EcAkk1y
+    // $2a$10$o8TxQnbbSnYLUQ8b97fj9e.FrX3uuKA9CS5Ftx4QbO9CxVGRbcFTq
     operatorPasswordHash:
       process.env.OPERATOR_PASSWORD_HASH ??
-      "$2a$10$bR/.j3ziz5BC2vE4dETKLuX8AVPYFY0o5pRRnN.NXj29u9EcAkk1y",
+      "$2a$10$o8TxQnbbSnYLUQ8b97fj9e.FrX3uuKA9CS5Ftx4QbO9CxVGRbcFTq",
 
     killHmacSecret:
       process.env.KILL_HMAC_SECRET ?? "dev-kill-hmac-secret-change-me",

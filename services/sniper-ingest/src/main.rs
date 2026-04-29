@@ -10,11 +10,11 @@
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use alloy_primitives::Address;
 use anyhow::Result;
 use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::{self, PendingTx, TX_CHANNEL_CAPACITY};
 use sniper_ingest::mock;
+use sniper_ingest::pending_decode;
 use sniper_ingest::watchlist::WatchlistStore;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
@@ -170,23 +170,31 @@ async fn run_matcher_loop(
             record_tx(&pending);
         }
 
-        // Extract the `to` address as the target contract.
-        use alloy::consensus::Transaction as TxTrait;
-        let contract_addr = pending.tx.to().unwrap_or(Address::ZERO);
+        let Some(target) = pending_decode::classify_pending_tx(&pending.tx) else {
+            continue;
+        };
 
-        // Try to decode logs from the tx receipt (if available in full tx body).
-        // For pending txs from mempool, we decode the input data against
-        // known function selectors. Phase 2 focuses on log-based decoding
-        // from confirmed txs via subscription; for pending txs we pass through
-        // with the contract address for watchlist matching.
+        metrics::counter!(
+            "mempool_target_tx_seen_total",
+            "contract" => target.contract.label()
+        )
+        .increment(1);
 
-        // For now, emit a decoded-total metric per contract.
-        let addr_label = format!("{contract_addr:#x}");
-        metrics::counter!("mempool_decoded_total", "contract" => addr_label).increment(1);
+        let selector = target
+            .selector_hex()
+            .unwrap_or_else(|| "none".to_string());
+        info!(
+            contract = target.contract.label(),
+            to = %format!("{:#x}", target.to),
+            selector = %selector,
+            input_len = target.input_len,
+            "target pending tx observed"
+        );
 
-        // The matcher currently requires DecodedEvent from logs. For full
-        // integration, the MempoolSubscriber will also process receipts.
-        // This loop is ready for when log subscription is added.
+        // Next step: map `selector` + calldata into typed calls and then into
+        // market-specific matching keys. We keep the selector extraction in the
+        // hot path now so the ANVIL_WS_URL subscriber is already shaped for the
+        // real mempool integration.
     }
 }
 

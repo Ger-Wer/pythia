@@ -16,6 +16,7 @@ interface RowProps {
 
 const WatchRow = memo(function WatchRow({ row }: RowProps) {
   const edgePct = (row.edge * 100).toFixed(1);
+  const execStatus = row.executionStatus?.toLowerCase();
   return (
     <tr>
       <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{row.question}</td>
@@ -31,6 +32,13 @@ const WatchRow = memo(function WatchRow({ row }: RowProps) {
       <td>{row.slippageBps}bps</td>
       <td>
         <span className={`cc-trigger-pill cc-trigger-pill--${row.trigger}`}>{row.trigger}</span>
+      </td>
+      <td>
+        {row.executionStatus ? (
+          <span className={`cc-exec-kind cc-exec-kind--${execStatus}`}>{row.executionStatus}</span>
+        ) : (
+          <span style={{ color: "var(--cc-text-faint)" }}>-</span>
+        )}
       </td>
     </tr>
   );
@@ -66,6 +74,7 @@ export const Watchlist = memo(function Watchlist() {
               <th>Depth</th>
               <th>Slip</th>
               <th>Trigger</th>
+              <th>Exec</th>
             </tr>
           </thead>
           <tbody

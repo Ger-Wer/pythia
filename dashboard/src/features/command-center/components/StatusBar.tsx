@@ -9,8 +9,18 @@ function pingClass(ms: number): string {
 }
 
 export const StatusBar = memo(function StatusBar() {
+  const hasRuntimeWs =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("cc_ws_url");
   const { health, feedMode } = useCommandCenterStore(
-    useShallow((s) => ({ health: s.health, feedMode: (import.meta.env.VITE_COMMAND_CENTER_WS_URL as string | undefined)?.trim() ? "WS" : "MOCK" })),
+    useShallow((s) => ({
+      health: s.health,
+      feedMode:
+        hasRuntimeWs ||
+        (import.meta.env.VITE_COMMAND_CENTER_WS_URL as string | undefined)?.trim()
+          ? "WS"
+          : "MOCK",
+    })),
   );
   return (
     <div className="cc-banner" role="region" aria-label="System status banner">

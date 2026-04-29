@@ -224,7 +224,7 @@ services:
       #   OPERATOR_PASSWORD_HASH: `bun run -e "console.log(require('bcryptjs').hashSync(process.argv[1],10))" -- <password>`
       GATEWAY_PASETO_KEY: "cHl0aGlhLWR1YWwtbG9vcC1kZXYta2V5LTMyYnl0ZXM="
       OPERATOR_ID: "admin"
-      OPERATOR_PASSWORD_HASH: "$$2a$$10$$bR/.j3ziz5BC2vE4dETKLuX8AVPYFY0o5pRRnN.NXj29u9EcAkk1y"
+      OPERATOR_PASSWORD_HASH: "$$2a$$10$$o8TxQnbbSnYLUQ8b97fj9e.FrX3uuKA9CS5Ftx4QbO9CxVGRbcFTq"
       KILL_HMAC_SECRET: "dev-kill-hmac-secret-change-me"
     ports:
       - "127.0.0.1:9103:9103"

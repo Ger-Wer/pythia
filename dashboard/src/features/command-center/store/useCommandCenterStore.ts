@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { applyPatch, type Operation } from "fast-json-patch";
 import type {
+  CommandCenterSnapshot,
   CommandCenterState,
   LocalDecision,
   Signal,
@@ -11,7 +12,7 @@ import { makeInitialState } from "./initialState";
 
 interface CommandCenterActions {
   /** Replace entire state from a snapshot (from WS on connect). */
-  applySnapshot: (next: Partial<CommandCenterState>) => void;
+  applySnapshot: (next: CommandCenterSnapshot) => void;
   /** Apply an RFC6902 JSON Patch delta. */
   applyDelta: (ops: Operation[]) => void;
   /** Local helpers for mock feed. */
@@ -43,7 +44,14 @@ const LATENCY_WINDOW = 60;
 export const useCommandCenterStore = create<CommandCenterStore>()((set) => ({
   ...makeInitialState(),
 
-  applySnapshot: (next) => set((s) => ({ ...s, ...next })),
+  applySnapshot: (next) =>
+    set((s) => ({
+      ...s,
+      ...next,
+      health: next.health ? { ...s.health, ...next.health } : s.health,
+      latency: next.latency ? { ...s.latency, ...next.latency } : s.latency,
+      cursor: next.cursor ? { ...s.cursor, ...next.cursor } : s.cursor,
+    })),
 
   applyDelta: (ops) =>
     set((s) => {

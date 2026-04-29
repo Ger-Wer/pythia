@@ -29,6 +29,7 @@ export interface WatchlistRow {
   slippageBps: number;
   trigger: TriggerState;
   priceSeries: number[];
+  executionStatus?: "SUBMITTED" | "FILLED" | "REVERTED";
 }
 
 export type TriggerEventKind = "fired" | "blocked" | "submitted" | "filled" | "reverted";
@@ -75,3 +76,12 @@ export interface CommandCenterState {
   perfHudOpen: boolean;
   now: number;
 }
+
+export type CommandCenterSnapshot = Omit<
+  Partial<CommandCenterState>,
+  "health" | "latency" | "cursor"
+> & {
+  health?: Partial<SystemHealth>;
+  latency?: Partial<LatencyBuckets>;
+  cursor?: Partial<CommandCenterState["cursor"]>;
+};

@@ -14,8 +14,15 @@ only touch UI state.
   fully. When unset/`false`, the page shows an "Command Center disabled"
   placeholder unless the URL has `?preview=1`.
 - `VITE_COMMAND_CENTER_WS_URL` — optional. When set, the client opens a
-  real WebSocket and applies `snapshot` + `delta` (JSON Patch) frames. When
+  real WebSocket and applies `snapshot` + `patch` (JSON Patch) frames. When
   unset, the mock feed runs instead.
+- `VITE_COMMAND_CENTER_WS_TOKEN` — optional build-time token for dev/demo
+  sessions. Safer alternative: open `/command-center?...&token=<paseto>`.
+- `VITE_COMMAND_CENTER_WS_DEBUG=true` or page query `cc_debug=1` — logs WS
+  connect / snapshot / patch application in the browser console.
+- Page query `cc_ws_url=ws://.../ws/v1` — runtime override for the gateway
+  WebSocket URL, useful on shared servers where we do not want to rebuild the
+  dashboard for every demo/proof run.
 
 See `dashboard/.env.example`.
 

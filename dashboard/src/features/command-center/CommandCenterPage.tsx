@@ -38,6 +38,16 @@ export const CommandCenterPage = memo(function CommandCenterPage({ disableFeed }
   const { toasts, push } = useToasts();
   const feedRef = useRef<CommandCenterFeedHandle | null>(null);
   const reset = useCommandCenterStore((s) => s.reset);
+  const setNow = useCommandCenterStore((s) => s.setNow);
+
+  useEffect(() => {
+    if (!accessible) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [accessible, setNow]);
 
   useEffect(() => {
     if (!accessible) return;

@@ -4,4 +4,5 @@ pub mod matcher;
 pub mod mempool;
 pub mod metrics;
 pub mod mock;
+pub mod pending_decode;
 pub mod watchlist;
