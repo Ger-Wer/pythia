@@ -23,6 +23,7 @@ fn main() -> std::io::Result<()> {
         "dual_loop/v1/watchlist.proto",
         "dual_loop/v1/signal.proto",
         "dual_loop/v1/trigger.proto",
+        "dual_loop/v1/mock.proto",
         "dual_loop/v1/execution.proto",
         "dual_loop/v1/control.proto",
     ];

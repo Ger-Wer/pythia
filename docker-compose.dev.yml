@@ -165,6 +165,7 @@ services:
     restart: unless-stopped
     environment:
       METRICS_ADDR: "0.0.0.0:9101"
+      MOCK_MEMPOOL_ENABLED: "true"
       REDIS_URL: "redis://redis:6379"
       NATS_URL: "nats://nats:4222"
       RUST_LOG: "info"

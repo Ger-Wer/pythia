@@ -110,6 +110,34 @@ fn matcher_ignores_unknown_market() {
 }
 
 #[test]
+fn matcher_fires_on_mock_mempool_tx() {
+    let store = WatchlistStore::new();
+    setup_watchlist(&store);
+    let mut matcher = TriggerMatcher::new(store);
+
+    let ctf_addr = address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E");
+    let tx_hash = vec![0x42; 32];
+    let trigger = matcher.try_match_mock(
+        ctf_addr,
+        TriggerKind::LargeFill,
+        monotonic_ns(),
+        tx_hash.clone(),
+    );
+
+    assert!(trigger.is_some(), "mock mempool tx should fire");
+    let trigger = trigger.unwrap();
+    assert_eq!(trigger.kind, TriggerKind::LargeFill as i32);
+    assert_eq!(trigger.evidence_hash.as_ref(), tx_hash.as_slice());
+    assert_eq!(
+        trigger
+            .market
+            .as_ref()
+            .map(|market| market.polymarket_id.as_str()),
+        Some("test-market-1")
+    );
+}
+
+#[test]
 fn abi_decoder_round_trip_all_events() {
     // CTF OrderFilled
     let ctf_event = CtfExchange::OrderFilled {

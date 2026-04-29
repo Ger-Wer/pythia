@@ -6,6 +6,7 @@
 use dual_loop_common::proto::common::{MarketId, Money, Side, Uuid};
 use dual_loop_common::proto::control::{Heartbeat, KillAck, KillAckStatus, KillCommand, KillScope};
 use dual_loop_common::proto::execution::{ExecStatus, ExecSubmitted, ExecutorState};
+use dual_loop_common::proto::mock::MockMempoolTx;
 use dual_loop_common::proto::signal::{DecisionAction, Signal, SignalDecision, SignalPriority};
 use dual_loop_common::proto::trigger::Trigger;
 use dual_loop_common::proto::watchlist::{
@@ -133,6 +134,21 @@ fn trigger_roundtrip() {
         source_count: 2,
     };
     assert_roundtrip(trigger);
+}
+
+#[test]
+fn mock_mempool_tx_roundtrip() {
+    let msg = MockMempoolTx {
+        message_id: None,
+        market: Some(MarketId {
+            polymarket_id: "mock-market".into(),
+            ctf_address: "0xfeed".into(),
+        }),
+        kind: TriggerKind::LargeFill as i32,
+        tx_hash: prost::bytes::Bytes::from_static(&[0x42; 32]),
+        observed_at_ns: 4242,
+    };
+    assert_roundtrip(msg);
 }
 
 #[test]

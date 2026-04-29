@@ -14,6 +14,10 @@ path = "src/main.rs"
 name = "replay"
 path = "src/bin/replay.rs"
 
+[[bin]]
+name = "sniper-mock-injector"
+path = "src/bin/sniper-mock-injector.rs"
+
 [lib]
 name = "sniper_ingest"
 path = "src/lib.rs"

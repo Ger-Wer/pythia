@@ -105,10 +105,33 @@ impl TriggerMatcher {
         observed_at_ns: u64,
     ) -> Option<Trigger> {
         let market_key = self.resolve_market_key(event, contract_address)?;
-
-        let entry = self.store.get(&market_key)?;
-
         let kind = trigger_kind_from_event(event);
+        let evidence_hash = compute_evidence_hash(event);
+        self.try_match_for_market_key(market_key, kind, observed_at_ns, evidence_hash)
+    }
+
+    /// Dev-only helper used by the mock mempool injector path. It skips ABI
+    /// decoding and feeds a synthetic transaction directly into the normal
+    /// watchlist/policy/source-count matching logic.
+    pub fn try_match_mock(
+        &mut self,
+        contract_address: Address,
+        kind: TriggerKind,
+        observed_at_ns: u64,
+        evidence_hash: Vec<u8>,
+    ) -> Option<Trigger> {
+        let market_key = self.resolve_market_key_from_address(contract_address)?;
+        self.try_match_for_market_key(market_key, kind, observed_at_ns, evidence_hash)
+    }
+
+    fn try_match_for_market_key(
+        &mut self,
+        market_key: MarketKey,
+        kind: TriggerKind,
+        observed_at_ns: u64,
+        evidence_hash: Vec<u8>,
+    ) -> Option<Trigger> {
+        let entry = self.store.get(&market_key)?;
 
         // Check allowed_kinds.
         if let Some(ref policy) = entry.trigger_policy {
@@ -135,8 +158,6 @@ impl TriggerMatcher {
 
             metrics::counter!("trigger_fired_total", "market" => market_key.0.clone(), "kind" => format!("{kind:?}")).increment(1);
 
-            let evidence_hash = compute_evidence_hash(event);
-
             Some(Trigger {
                 message_id: Some(new_uuid_v7()),
                 market: Some(dual_loop_common::proto::common::MarketId {
@@ -154,8 +175,6 @@ impl TriggerMatcher {
         } else {
             // No policy → fire unconditionally.
             metrics::counter!("trigger_fired_total", "market" => market_key.0.clone(), "kind" => format!("{kind:?}")).increment(1);
-
-            let evidence_hash = compute_evidence_hash(event);
 
             Some(Trigger {
                 message_id: Some(new_uuid_v7()),
@@ -180,6 +199,10 @@ impl TriggerMatcher {
         _event: &DecodedEvent,
         contract_address: Address,
     ) -> Option<MarketKey> {
+        self.resolve_market_key_from_address(contract_address)
+    }
+
+    fn resolve_market_key_from_address(&self, contract_address: Address) -> Option<MarketKey> {
         let addr_str = format!("{contract_address:#x}");
 
         // Walk the watchlist to find an entry matching this contract address.

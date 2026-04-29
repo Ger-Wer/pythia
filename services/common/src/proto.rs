@@ -42,6 +42,11 @@ pub mod trigger {
     pub use super::v1::{Trigger, TriggerBlocked};
 }
 
+/// Message types originally declared in `mock.proto`.
+pub mod mock {
+    pub use super::v1::MockMempoolTx;
+}
+
 /// Message types originally declared in `execution.proto`.
 pub mod execution {
     pub use super::v1::{ExecFilled, ExecReverted, ExecStatus, ExecSubmitted, ExecutorState};

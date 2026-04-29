@@ -14,6 +14,7 @@ use alloy_primitives::Address;
 use anyhow::Result;
 use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::{self, PendingTx, TX_CHANNEL_CAPACITY};
+use sniper_ingest::mock;
 use sniper_ingest::watchlist::WatchlistStore;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
@@ -58,6 +59,21 @@ async fn main() -> Result<()> {
             warn!("REDIS_URL not set; running without bus consumers");
             None
         }
+    };
+
+    let mock_handle = if mock::enabled_from_env() {
+        match (std::env::var("REDIS_URL"), std::env::var("NATS_URL")) {
+            (Ok(redis_url), Ok(nats_url)) => Some(
+                mock::spawn_mock_consumer(redis_url, nats_url, store.clone(), shutdown_rx.clone())
+                    .await?,
+            ),
+            _ => {
+                warn!("MOCK_MEMPOOL_ENABLED=true but REDIS_URL or NATS_URL missing; mock path disabled");
+                None
+            }
+        }
+    } else {
+        None
     };
 
     // Mempool channel.
@@ -129,6 +145,9 @@ async fn main() -> Result<()> {
         h.abort();
     }
     if let Some(h) = ipc_handle {
+        h.abort();
+    }
+    if let Some(h) = mock_handle {
         h.abort();
     }
     matcher_handle.abort();
