@@ -209,8 +209,8 @@ services:
 
   gateway-api:
     build:
-      context: ./gateway-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: gateway-api/Dockerfile
     container_name: dual-loop-gateway-api
     restart: unless-stopped
     environment:
