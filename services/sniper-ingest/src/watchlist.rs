@@ -32,6 +32,7 @@ pub type MarketKey = (String, String);
 #[derive(Debug, Clone)]
 pub struct WatchlistEntry {
     pub market_key: MarketKey,
+    pub market_specific_key: Option<String>,
     pub version: u64,
     /// Signed probability difference in ppm (1_000_000 = 100%).
     pub edge_ppm: i64,
@@ -64,6 +65,11 @@ impl WatchlistEntry {
             .unwrap_or(0);
         Some(Self {
             market_key: (market.polymarket_id.clone(), market.ctf_address.clone()),
+            market_specific_key: if market.market_specific_key.is_empty() {
+                None
+            } else {
+                Some(market.market_specific_key.clone())
+            },
             version: msg.version,
             edge_ppm: msg.edge_ppm,
             p_fundamental_ppm: msg.p_fundamental_ppm,
@@ -121,6 +127,16 @@ impl WatchlistStore {
 
     pub fn get(&self, key: &MarketKey) -> Option<WatchlistEntry> {
         self.inner.get(key).map(|e| e.clone())
+    }
+
+    pub fn find_by_market_specific_key(&self, key: &str) -> Option<WatchlistEntry> {
+        self.inner.iter().find_map(|entry| {
+            let value = entry.value();
+            match value.market_specific_key.as_deref() {
+                Some(candidate) if candidate.eq_ignore_ascii_case(key) => Some(value.clone()),
+                _ => None,
+            }
+        })
     }
 
     /// Iterate over all entries (snapshot). Used by TriggerMatcher for
@@ -254,6 +270,8 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "abc123".into(),
                 ctf_address: "0xdead".into(),
+                market_specific_key:
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             }),
             version,
             edge_ppm: 30_000,
@@ -283,6 +301,8 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "abc123".into(),
                 ctf_address: "0xdead".into(),
+                market_specific_key:
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             }),
             version: 1,
             reason: 0,
@@ -298,6 +318,22 @@ mod tests {
         s.apply_upsert(&sample_upsert(3, 60_000, 1)); // stale
         let entry = s.get(&("abc123".into(), "0xdead".into())).unwrap();
         assert_eq!(entry.version, 5);
+    }
+
+    #[test]
+    fn lookup_by_market_specific_key() {
+        let s = WatchlistStore::new();
+        s.apply_upsert(&sample_upsert(1, 60_000, 1));
+        let entry = s
+            .find_by_market_specific_key(
+                "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("entry by market_specific_key");
+        assert_eq!(entry.market_key.0, "abc123");
+        assert_eq!(
+            entry.market_specific_key.as_deref(),
+            Some("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
     }
 
     #[test]

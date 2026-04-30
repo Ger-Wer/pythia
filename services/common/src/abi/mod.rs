@@ -74,10 +74,38 @@ pub mod addresses {
     use alloy_primitives::address;
     use alloy_primitives::Address;
 
-    pub const POLYMARKET_CTF_EXCHANGE: Address =
+    // Current Polymarket trading contract (official docs, checked 2026-04-29).
+    pub const POLYMARKET_CTF_EXCHANGE_V2: Address =
+        address!("E111180000d2663C0091e4f400237545B87B996B");
+    // Legacy exchange still used in older test fixtures and historical notes.
+    pub const LEGACY_POLYMARKET_CTF_EXCHANGE_V1: Address =
         address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E");
+    pub const POLYMARKET_CTF_EXCHANGE: Address = POLYMARKET_CTF_EXCHANGE_V2;
+
+    // Polymarket UMA adapter deployments (official docs, checked 2026-04-29).
+    pub const POLYMARKET_UMA_ADAPTER_V1: Address =
+        address!("CB1822859cEF82Cd2Eb4E6276C7916e692995130");
+    pub const POLYMARKET_UMA_ADAPTER_V2: Address =
+        address!("6A9D222616C90FcA5754cd1333cFD9b7fb6a4F74");
+    pub const POLYMARKET_UMA_ADAPTER_V3: Address =
+        address!("157Ce2d672854c848c9b79C49a8Cc6cc89176a49");
+
+    // Legacy experimental decoder target kept for backwards-compatible tests.
     pub const UMA_OPTIMISTIC_ORACLE_V3: Address =
         address!("fb55F43fB9F48F63f9269DB7Dde3BbBe1ebDC0dE");
+
+    #[inline]
+    pub fn is_polymarket_ctf_exchange(address: Address) -> bool {
+        address == POLYMARKET_CTF_EXCHANGE_V2 || address == LEGACY_POLYMARKET_CTF_EXCHANGE_V1
+    }
+
+    #[inline]
+    pub fn is_polymarket_uma_adapter(address: Address) -> bool {
+        matches!(
+            address,
+            POLYMARKET_UMA_ADAPTER_V1 | POLYMARKET_UMA_ADAPTER_V2 | POLYMARKET_UMA_ADAPTER_V3
+        )
+    }
 }
 
 /// Attempt to decode a raw log emitted by `address` into a [`DecodedEvent`].
@@ -87,7 +115,7 @@ pub fn try_decode_log(address: Address, log: &alloy_primitives::LogData) -> Opti
     let topic0 = log.topics().first()?;
 
     // Polymarket CTF Exchange
-    if address == addresses::POLYMARKET_CTF_EXCHANGE {
+    if addresses::is_polymarket_ctf_exchange(address) {
         if *topic0 == polymarket_ctf::CtfExchange::OrderFilled::SIGNATURE_HASH {
             return polymarket_ctf::try_decode_order_filled(log);
         }

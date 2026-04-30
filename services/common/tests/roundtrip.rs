@@ -33,6 +33,8 @@ fn watchlist_upsert_roundtrip() {
         market: Some(MarketId {
             polymarket_id: "mkt-01".into(),
             ctf_address: "0xabc".into(),
+            market_specific_key:
+                "0x1111111111111111111111111111111111111111111111111111111111111111".into(),
         }),
         version: 42,
         edge_ppm: 50_000,
@@ -64,6 +66,8 @@ fn watchlist_remove_roundtrip() {
         market: Some(MarketId {
             polymarket_id: "mkt-02".into(),
             ctf_address: "0xdef".into(),
+            market_specific_key:
+                "0x2222222222222222222222222222222222222222222222222222222222222222".into(),
         }),
         version: 7,
         reason: 1,
@@ -81,6 +85,8 @@ fn signal_and_decision_roundtrip() {
         market: Some(MarketId {
             polymarket_id: "m".into(),
             ctf_address: "a".into(),
+            market_specific_key:
+                "0x3333333333333333333333333333333333333333333333333333333333333333".into(),
         }),
         market_question: "Will X happen?".into(),
         edge_ppm: 40_000,
@@ -122,6 +128,8 @@ fn trigger_roundtrip() {
         market: Some(MarketId {
             polymarket_id: "m".into(),
             ctf_address: "a".into(),
+            market_specific_key:
+                "0x4444444444444444444444444444444444444444444444444444444444444444".into(),
         }),
         kind: TriggerKind::LargeFill as i32,
         evidence_hash: prost::bytes::Bytes::from_static(&[0xAB; 32]),
@@ -143,6 +151,8 @@ fn mock_mempool_tx_roundtrip() {
         market: Some(MarketId {
             polymarket_id: "mock-market".into(),
             ctf_address: "0xfeed".into(),
+            market_specific_key:
+                "0x5555555555555555555555555555555555555555555555555555555555555555".into(),
         }),
         kind: TriggerKind::LargeFill as i32,
         tx_hash: prost::bytes::Bytes::from_static(&[0x42; 32]),

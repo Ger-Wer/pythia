@@ -162,7 +162,7 @@ Current behaviour on `main`:
 - inbound streams may arrive either as raw protobuf bytes in `payload` or as legacy JSON envelopes;
 - the bridge prefers protobuf decode for `signals/watchlist/triggers/exec/kill_ack`;
 - tests and local mocks still use JSON payload objects;
-- gateway publish-side for `dl.v1.signals.decisions` and `dl.v1.control.kill` is still a JSON compatibility envelope.
+- gateway publish-side for `dl.v1.signals.decisions` and `dl.v1.control.kill` now prefers protobuf bytes when codecs are available, but still keeps JSON fallback for compatibility / missing-codegen cases.
 
 Consumer group: **`gateway`** on every subscribed stream:
 

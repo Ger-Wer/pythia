@@ -1,4 +1,4 @@
-import { memo, useRef } from "react";
+import { memo, useRef, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCommandCenterStore } from "../store/useCommandCenterStore";
@@ -12,13 +12,14 @@ function edgeClass(edge: number): string {
 
 interface RowProps {
   row: WatchlistRow;
+  style?: CSSProperties;
 }
 
-const WatchRow = memo(function WatchRow({ row }: RowProps) {
+const WatchRow = memo(function WatchRow({ row, style }: RowProps) {
   const edgePct = (row.edge * 100).toFixed(1);
   const execStatus = row.executionStatus?.toLowerCase();
   return (
-    <tr>
+    <tr style={style}>
       <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{row.question}</td>
       <td>{row.side}</td>
       <td className={edgeClass(row.edge)}>{row.edge >= 0 ? "+" : ""}{edgePct}%</td>
@@ -88,8 +89,9 @@ export const Watchlist = memo(function Watchlist() {
               const id = order[vrow.index]!;
               const row = rows[id]!;
               return (
-                <tr
+                <WatchRow
                   key={id}
+                  row={row}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -99,9 +101,7 @@ export const Watchlist = memo(function Watchlist() {
                     display: "table",
                     tableLayout: "fixed",
                   }}
-                >
-                  <WatchRow row={row} />
-                </tr>
+                />
               );
             })}
           </tbody>

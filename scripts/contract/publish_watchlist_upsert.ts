@@ -22,7 +22,12 @@ async function main() {
 
   const msg: WatchlistUpsert = {
     messageId: { value: Buffer.alloc(16, 0x11) },
-    market: { polymarketId: 'cross-lang-001', ctfAddress: '0xfeed' },
+    market: {
+      polymarketId: 'cross-lang-001',
+      ctfAddress: '0xfeed',
+      marketSpecificKey:
+        '0xcrosslang000000000000000000000000000000000000000000000000000000',
+    },
     version: 7n,
     edgePpm: 42_000n,
     pFundamentalPpm: 700_000n,

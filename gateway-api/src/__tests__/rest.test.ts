@@ -2,9 +2,12 @@
 // conflict, 404, auth. Uses Fastify's inject() for zero-network calls.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { STREAM_SIGNALS_DECISIONS } from "../bus/topics.ts";
+import { createHmac } from "node:crypto";
+import { STREAM_CONTROL_KILL, STREAM_CONTROL_KILL_ACK, STREAM_SIGNALS_DECISIONS } from "../bus/topics.ts";
 import type { Signal } from "../types.ts";
 import { makeTestContext, type TestContext } from "./helpers.ts";
+
+const EXPECT_PROTO_PUBLISH = process.env.EXPECT_PROTO_PUBLISH === "1";
 
 function sampleSignal(overrides: Partial<Signal> = {}): Signal {
   return {
@@ -95,10 +98,14 @@ describe("REST", () => {
 
   test("accept signal publishes decision and updates state", async () => {
     let lastPublished: unknown = null;
+    let lastPayloadBytes: Uint8Array | undefined;
     const originalPublish = ctx.bus.publish.bind(ctx.bus);
-    ctx.bus.publish = async (stream, payload) => {
-      if (stream === STREAM_SIGNALS_DECISIONS) lastPublished = payload;
-      return originalPublish(stream, payload);
+    ctx.bus.publish = async (stream, payload, payloadBytes) => {
+      if (stream === STREAM_SIGNALS_DECISIONS) {
+        lastPublished = payload;
+        lastPayloadBytes = payloadBytes;
+      }
+      return originalPublish(stream, payload, payloadBytes);
     };
 
     const res = await ctx.handle.app.inject({
@@ -120,9 +127,79 @@ describe("REST", () => {
       action: "ACCEPT",
       operator_id: ctx.operatorId,
     });
+    if (EXPECT_PROTO_PUBLISH) {
+      expect(lastPayloadBytes).toBeInstanceOf(Uint8Array);
+      expect(lastPayloadBytes?.length).toBeGreaterThan(0);
+    }
 
     const snap = ctx.handle.store.getState();
     expect(snap.signals["SIG-1"]?.decision?.action).toBe("ACCEPT");
+  });
+
+  test("kill command publishes proto bytes and returns executor ack", async () => {
+    let lastPublished: unknown = null;
+    let lastPayloadBytes: Uint8Array | undefined;
+    const originalPublish = ctx.bus.publish.bind(ctx.bus);
+    ctx.bus.publish = async (stream, payload, payloadBytes) => {
+      if (stream === STREAM_CONTROL_KILL) {
+        lastPublished = payload;
+        lastPayloadBytes = payloadBytes;
+        await originalPublish(stream, payload, payloadBytes);
+        const commandId = String((payload as Record<string, unknown>).message_id ?? "");
+        setTimeout(() => {
+          void originalPublish(STREAM_CONTROL_KILL_ACK, {
+            original_command_id: commandId,
+            status: "COMPLETE",
+            detail: "ok",
+            active_triggers_cancelled: 0,
+            pending_tx_cancelled: 0,
+            ack_at_unix_ms: Date.now(),
+          });
+        }, 10);
+        return "kill-stream-id";
+      }
+      return originalPublish(stream, payload, payloadBytes);
+    };
+
+    const issuedAt = Date.now();
+    const signature = createHmac("sha256", ctx.config.killHmacSecret)
+      .update(
+        [
+          ctx.operatorId,
+          "NEW_TRIGGERS",
+          "",
+          String(77),
+          String(issuedAt),
+        ].join("|"),
+      )
+      .digest("hex");
+
+    const res = await ctx.handle.app.inject({
+      method: "POST",
+      url: "/api/v1/control/kill",
+      headers: { authorization: `Bearer ${ctx.token}` },
+      payload: {
+        operator_id: ctx.operatorId,
+        idempotency_key: "idem-kill-1",
+        scope: "NEW_TRIGGERS",
+        nonce: 77,
+        issued_at_unix_ms: issuedAt,
+        signature,
+      },
+    });
+
+    expect(res.statusCode).toBe(202);
+    const body = res.json() as { command_id: string; ack_status: string };
+    expect(body.ack_status).toBe("COMPLETE");
+    expect(lastPublished).toMatchObject({
+      operator_id: ctx.operatorId,
+      scope: "NEW_TRIGGERS",
+      nonce: 77,
+    });
+    if (EXPECT_PROTO_PUBLISH) {
+      expect(lastPayloadBytes).toBeInstanceOf(Uint8Array);
+      expect(lastPayloadBytes?.length).toBeGreaterThan(0);
+    }
   });
 
   test("reject requires reason", async () => {

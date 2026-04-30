@@ -153,6 +153,7 @@ pub fn decode_kill_command(message: &ConsumerMessage) -> Result<KillCommand> {
         Some(market_id) if !market_id.trim().is_empty() => Some(MarketId {
             polymarket_id: market_id,
             ctf_address: String::new(),
+            market_specific_key: String::new(),
         }),
         _ => None,
     };

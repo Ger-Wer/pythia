@@ -189,6 +189,8 @@ jobs:
     name: gateway-api (Bun — lint + test + build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      EXPECT_PROTO_PUBLISH: "1"
     defaults:
       run:
         working-directory: gateway-api
@@ -199,6 +201,19 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.13"
+
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: root bun install
+        working-directory: .
+        run: bun install --frozen-lockfile
+
+      - name: Generate TS proto clients
+        working-directory: .
+        run: bun run proto:gen
 
       - name: bun install
         run: bun install --frozen-lockfile || bun install

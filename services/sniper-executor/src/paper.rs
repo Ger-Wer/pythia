@@ -166,9 +166,7 @@ pub fn plan_paper_execution(
         message_id: Some(new_uuid_v7()),
         tx_hash: tx_hash.clone(),
         market: trigger.market.clone(),
-        realized_price: trigger.expected_price.or(Some(Money {
-            amount_micros: 0,
-        })),
+        realized_price: trigger.expected_price.or(Some(Money { amount_micros: 0 })),
         filled_size: Some(size),
         gas_spent_usd: Some(Money { amount_micros: 0 }),
         block_number: 0,
@@ -211,6 +209,7 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "market-1".to_string(),
                 ctf_address: "0xfeed".to_string(),
+                market_specific_key: String::new(),
             }),
             kind: 1,
             evidence_hash: Bytes::from_static(&[0x11; 32]),

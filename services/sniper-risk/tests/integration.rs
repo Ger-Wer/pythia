@@ -38,6 +38,7 @@ fn make_fill(market: &str, size: i64, price: i64, gas: i64) -> ExecFilled {
         market: Some(MarketId {
             polymarket_id: market.to_string(),
             ctf_address: String::new(),
+            market_specific_key: String::new(),
         }),
         realized_price: Some(Money {
             amount_micros: price,
@@ -61,6 +62,7 @@ fn make_revert(market: &str, gas: i64, reason: &str) -> ExecReverted {
         market: Some(MarketId {
             polymarket_id: market.to_string(),
             ctf_address: String::new(),
+            market_specific_key: String::new(),
         }),
         reason: reason.to_string(),
         gas_spent_usd: Some(Money { amount_micros: gas }),

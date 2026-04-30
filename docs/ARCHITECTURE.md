@@ -1,6 +1,6 @@
 # Архитектура Pythia
 
-Дата актуализации: 2026-04-28
+Дата актуализации: 2026-04-29
 
 ## Роль документа
 
@@ -162,9 +162,10 @@ resolved market -> update prediction outcome -> close paper positions
 
 - weekly discipline/review loop поверх quality layer;
 - еще более короткий operator workflow;
-- real-time live Command Center feed для Dual-Loop preview route.
+- protobuf-first operator write-path без compatibility JSON publish-side;
+- soak/latency hardening для paper execution перед первым релизом.
 
-Текущее важное transitional замечание по Dual-Loop: inbound bus-события (`watchlist/signals/triggers/exec/kill_ack`) уже сведены к protobuf-first projection в `gateway-api`, но outbound operator-mutation path из `gateway-api` (`signals.decisions`, `control.kill`) пока еще живет как compatibility JSON envelope. Это не целевая архитектура, а промежуточная стадия миграции.
+Текущее важное transitional замечание по Dual-Loop: Command Center уже читает живой state из `gateway-api` по WebSocket, inbound bus-события (`watchlist/signals/triggers/exec/kill_ack`) уже сведены к protobuf-first projection в `gateway-api`, а outbound operator-mutation path из `gateway-api` (`signals.decisions`, `control.kill`) теперь предпочитает protobuf publish при доступных codecs, но все еще сохраняет JSON fallback. Это не целевая архитектура, а промежуточная стадия миграции.
 
 ## Deployment topology
 
@@ -182,6 +183,18 @@ Production живет на `amper`.
 - dashboard публикуется только на `127.0.0.1:8787`;
 - наружу он отдается через reverse proxy;
 - данные и логи лежат в bind-mounted `data/` и `logs/`.
+
+## Fast Loop dev/proving topology
+
+Dual-Loop пока не является отдельным production-runtime, но уже имеет рабочий proving-contour:
+
+- `gateway-api` как REST/WS surface для Command Center;
+- `sniper-ingest` как mempool subscriber и decoder;
+- `sniper-risk` как pre-trade policy layer;
+- `sniper-executor` как paper executor с nonce actor и kill-switch;
+- `anvil` как dev-fork для real pending-tx tests.
+
+На этой стадии уже доказан реальный paper E2E путь: `pendingTransactions` из Anvil WS -> calldata decode (`resolve` / `resolveManually`) -> `market_specific_key` match -> trigger publish -> paper submit/fill -> gateway state update.
 
 ## Расписание
 

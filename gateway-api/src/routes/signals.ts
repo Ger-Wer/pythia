@@ -18,7 +18,9 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { AuditLog } from "../audit.ts";
 import type { Config } from "../config.ts";
+import { makeLogger } from "../logger.ts";
 import type { BusClient } from "../bus/types.ts";
+import { encodeProtoPublishPayload } from "../bus/proto.ts";
 import { STREAM_SIGNALS_DECISIONS } from "../bus/topics.ts";
 import type { IdempotencyStore } from "../middleware/idempotency.ts";
 import { decisionsPublishedTotal } from "../metrics.ts";
@@ -56,6 +58,7 @@ export function registerSignalsRoutes(
   },
 ): void {
   const { config, store, bus, audit, idempotency } = deps;
+  const protoLog = makeLogger("warn", { component: "signals-proto-publish" });
 
   async function decide(
     req: import("fastify").FastifyRequest<{
@@ -145,7 +148,12 @@ export function registerSignalsRoutes(
       payload.snooze_until_unix_ms = req.body.snooze_until_unix_ms ?? 0;
 
     if (bus) {
-      await bus.publish(STREAM_SIGNALS_DECISIONS, payload);
+      const payloadBytes = await encodeProtoPublishPayload(
+        STREAM_SIGNALS_DECISIONS,
+        payload,
+        protoLog,
+      );
+      await bus.publish(STREAM_SIGNALS_DECISIONS, payload, payloadBytes ?? undefined);
     }
     decisionsPublishedTotal.inc({ action });
 

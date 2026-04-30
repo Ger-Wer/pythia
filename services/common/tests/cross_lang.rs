@@ -97,6 +97,10 @@ async fn ts_publishes_rust_consumes_watchlist_upsert() {
     let market = upsert.market.as_ref().expect("market");
     assert_eq!(market.polymarket_id, "cross-lang-001");
     assert_eq!(market.ctf_address, "0xfeed");
+    assert_eq!(
+        market.market_specific_key,
+        "0xcrosslang000000000000000000000000000000000000000000000000000000"
+    );
     assert_eq!(upsert.version, 7);
     assert_eq!(upsert.edge_ppm, 42_000);
     assert_eq!(upsert.p_fundamental_ppm, 700_000);

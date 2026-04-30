@@ -148,9 +148,9 @@ async fn main() -> Result<()> {
             paper_cfg: paper_cfg.clone(),
             sink,
         };
-        tokio::spawn(async move {
-            run_trigger_consumer(js, shutdown, kill_state, counters, ctx).await
-        })
+        tokio::spawn(
+            async move { run_trigger_consumer(js, shutdown, kill_state, counters, ctx).await },
+        )
     });
 
     let heartbeat_task = js.clone().map(|js| {
@@ -159,7 +159,15 @@ async fn main() -> Result<()> {
         let counters = counters.clone();
         let nonce_manager = nonce_manager.clone();
         tokio::spawn(async move {
-            run_heartbeat(js, shutdown, kill_state, counters, nonce_manager, paper_mode).await
+            run_heartbeat(
+                js,
+                shutdown,
+                kill_state,
+                counters,
+                nonce_manager,
+                paper_mode,
+            )
+            .await
         })
     });
 
@@ -170,7 +178,14 @@ async fn main() -> Result<()> {
         let redis_publisher = redis_publisher.clone();
         let nonce_manager = nonce_manager.clone();
         tokio::spawn(async move {
-            run_reconcile_loop(shutdown, kill_state, counters, nonce_manager, redis_publisher).await
+            run_reconcile_loop(
+                shutdown,
+                kill_state,
+                counters,
+                nonce_manager,
+                redis_publisher,
+            )
+            .await
         })
     };
 
@@ -262,7 +277,11 @@ async fn run_trigger_consumer(
             Ok(trigger) => {
                 counters.seen.fetch_add(1, Ordering::Relaxed);
                 metrics::counter!("exec_triggers_seen_total").increment(1);
-                debug!(kind = trigger.kind, eta_block = trigger.eta_block, "trigger received");
+                debug!(
+                    kind = trigger.kind,
+                    eta_block = trigger.eta_block,
+                    "trigger received"
+                );
 
                 if !shutdown.load(Ordering::Relaxed) {
                     if kill_blocks_market(&kill_state, trigger.market.as_ref()).await {

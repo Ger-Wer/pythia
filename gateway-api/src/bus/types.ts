@@ -21,7 +21,11 @@ export interface BusSubscription {
 }
 
 export interface BusClient {
-  publish(stream: string, payload: Record<string, unknown>): Promise<string>;
+  publish(
+    stream: string,
+    payload: Record<string, unknown>,
+    payloadBytes?: Uint8Array,
+  ): Promise<string>;
 
   subscribeStream(
     stream: string,

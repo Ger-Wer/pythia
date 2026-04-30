@@ -1,10 +1,12 @@
-import { stringify as uuidStringify } from "uuid";
+import { parse as uuidParse, stringify as uuidStringify } from "uuid";
 import type { Logger } from "../logger.ts";
 import {
+  STREAM_CONTROL_KILL,
   STREAM_CONTROL_KILL_ACK,
   STREAM_EXEC_FILLED,
   STREAM_EXEC_REVERTED,
   STREAM_EXEC_SUBMITTED,
+  STREAM_SIGNALS_DECISIONS,
   STREAM_SIGNALS_EMITTED,
   STREAM_TRIGGERS_FIRED,
   STREAM_WATCHLIST_REMOVE,
@@ -12,11 +14,15 @@ import {
 } from "./topics.ts";
 
 type ProtoCodec<T> = {
+  encode?(input: T): { finish(): Uint8Array };
   decode(input: Uint8Array): T;
 };
 
 interface ProtoBundle {
-  signal?: { Signal: ProtoCodec<Record<string, unknown>> };
+  signal?: {
+    Signal: ProtoCodec<Record<string, unknown>>;
+    SignalDecision: ProtoCodec<Record<string, unknown>>;
+  };
   watchlist?: {
     WatchlistUpsert: ProtoCodec<Record<string, unknown>>;
     WatchlistRemove: ProtoCodec<Record<string, unknown>>;
@@ -27,7 +33,10 @@ interface ProtoBundle {
     ExecFilled: ProtoCodec<Record<string, unknown>>;
     ExecReverted: ProtoCodec<Record<string, unknown>>;
   };
-  control?: { KillAck: ProtoCodec<Record<string, unknown>> };
+  control?: {
+    KillAck: ProtoCodec<Record<string, unknown>>;
+    KillCommand: ProtoCodec<Record<string, unknown>>;
+  };
 }
 
 const PPM_SCALE = 1_000_000;
@@ -149,6 +158,15 @@ function uuidToString(value: unknown): string {
   return bytesToHex(raw);
 }
 
+function uuidFromString(value: string): { value: Uint8Array } | undefined {
+  if (!value) return undefined;
+  try {
+    return { value: uuidParse(value) };
+  } catch {
+    return undefined;
+  }
+}
+
 function marketId(value: unknown): string {
   if (!value || typeof value !== "object") return "";
   return String((value as { polymarketId?: unknown }).polymarketId ?? "");
@@ -216,6 +234,43 @@ function killAckStatusName(value: unknown): string {
       return "REJECTED_REPLAY";
     default:
       return "ACCEPTED";
+  }
+}
+
+function decisionActionValue(value: unknown): number {
+  switch (String(value ?? "").toUpperCase()) {
+    case "ACCEPT":
+      return 1;
+    case "REJECT":
+      return 2;
+    case "SNOOZE":
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+function killScopeValue(value: unknown): number {
+  switch (String(value ?? "").toUpperCase()) {
+    case "GLOBAL":
+      return 1;
+    case "MARKET":
+      return 2;
+    case "NEW_TRIGGERS":
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+function hexToBytes(value: unknown): Uint8Array {
+  if (typeof value !== "string") return new Uint8Array();
+  const trimmed = value.trim().replace(/^0x/i, "");
+  if (trimmed.length === 0 || trimmed.length % 2 !== 0) return new Uint8Array();
+  try {
+    return Uint8Array.from(Buffer.from(trimmed, "hex"));
+  } catch {
+    return new Uint8Array();
   }
 }
 
@@ -364,6 +419,69 @@ export async function decodeProtoPayload(
     }
   } catch (error) {
     warnOnce(log, `proto-decode-failed:${stream}`, "protobuf decode failed; keeping JSON fallback only", {
+      stream,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+export async function encodeProtoPublishPayload(
+  stream: string,
+  payload: Record<string, unknown>,
+  log: Logger,
+): Promise<Uint8Array | null> {
+  const bundle = await loadProtoBundle(log);
+  if (!bundle) return null;
+
+  try {
+    switch (stream) {
+      case STREAM_SIGNALS_DECISIONS: {
+        const codec = bundle.signal?.SignalDecision;
+        if (!codec?.encode) return null;
+        return codec
+          .encode({
+            messageId: uuidFromString(String(payload.message_id ?? "")),
+            signalId: String(payload.signal_id ?? ""),
+            expectedVersion: BigInt(asNumber(payload.expected_version)),
+            idempotencyKey: String(payload.idempotency_key ?? ""),
+            action: decisionActionValue(payload.action),
+            operatorId: String(payload.operator_id ?? ""),
+            rejectionReason: String(payload.rejection_reason ?? ""),
+            snoozeUntilUnixMs: BigInt(asNumber(payload.snooze_until_unix_ms)),
+            decidedAtUnixMs: BigInt(asNumber(payload.decided_at_unix_ms)),
+          })
+          .finish();
+      }
+
+      case STREAM_CONTROL_KILL: {
+        const codec = bundle.control?.KillCommand;
+        if (!codec?.encode) return null;
+        const marketId = String(payload.market_id ?? "");
+        return codec
+          .encode({
+            messageId: uuidFromString(String(payload.message_id ?? "")),
+            operatorId: String(payload.operator_id ?? ""),
+            scope: killScopeValue(payload.scope),
+            market: marketId
+              ? {
+                  polymarketId: marketId,
+                  ctfAddress: "",
+                  marketSpecificKey: "",
+                }
+              : undefined,
+            nonce: BigInt(asNumber(payload.nonce)),
+            issuedAtUnixMs: BigInt(asNumber(payload.issued_at_unix_ms)),
+            signature: hexToBytes(payload.signature),
+          })
+          .finish();
+      }
+
+      default:
+        return null;
+    }
+  } catch (error) {
+    warnOnce(log, `proto-encode-failed:${stream}`, "protobuf encode failed; keeping JSON publish fallback", {
       stream,
       error: error instanceof Error ? error.message : String(error),
     });

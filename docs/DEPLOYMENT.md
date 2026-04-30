@@ -1,6 +1,6 @@
 # Развертывание Pythia на `amper`
 
-Дата актуализации: 2026-04-28
+Дата актуализации: 2026-04-29
 
 ## Роль документа
 
@@ -48,6 +48,8 @@
 - Dual-Loop Fast Loop как отдельный постоянно работающий production stack.
 
 Fast Loop код уже в репозитории, но его verification/deployment нужно считать отдельным workstream поверх основного Pythia runtime.
+
+На сегодня Fast Loop уже не только "лежит в репозитории": dev-контур доказан до paper execution и real mempool dev proof через Anvil. Но это все еще не отдельный постоянный production-runtime и не live-capital stack.
 
 ## `.env` и секреты
 
@@ -160,10 +162,12 @@ bash scripts/manual_run.sh watch-alerts
 Для запуска Fast Loop достаточно обычной команды:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d redis nats postgres gateway-api sniper-ingest sniper-executor
+docker compose -f docker-compose.dev.yml up -d redis nats postgres anvil gateway-api sniper-ingest sniper-executor
 ```
 
 Если нужен разовый доступ к этим сервисам с хоста, используйте `docker compose exec`, а не постоянную публикацию портов.
+
+Если нужен именно real mempool dev proof, проверьте что в окружении задан `ANVIL_WS_URL=ws://anvil:8545` для `sniper-ingest`, а сам `anvil` поднят с fork RPC, который реально отвечает с сервера.
 
 ## Reverse proxy
 

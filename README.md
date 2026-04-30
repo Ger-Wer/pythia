@@ -1,6 +1,6 @@
 # Pythia
 
-Дата актуализации: 2026-04-28
+Дата актуализации: 2026-04-29
 
 Pythia - это приватный `decision desk` для Polymarket. В репозитории сейчас живут два связанных контура:
 
@@ -23,9 +23,11 @@ Pythia - это приватный `decision desk` для Polymarket. В реп�
 
 - `Slow Loop` уже работает как production runtime на `amper`.
 - `Phase 0` Dual-Loop завершена.
-- `Phase 1` Dual-Loop по сути собрана: contracts, bus topics, `gateway-api`, Command Center preview, shadow PostgreSQL.
-- `Phase 2` Dual-Loop частично реализована: `sniper-ingest`, `sniper-risk` и paper/control foundation в `sniper-executor` уже в коде.
+- `Phase 1` Dual-Loop по сути собрана: contracts, bus topics, `gateway-api`, live WebSocket feed в Command Center, shadow PostgreSQL.
+- `Phase 2` Dual-Loop уже дошла до честного paper contour: `sniper-ingest`, `sniper-risk`, paper-mode `sniper-executor`, real mempool decode/match path через Anvil dev-fork.
 - Live trading в production нет. Реальные trading-ключи не используются.
+
+Первая честная release-цель проекта сейчас не `live trading`, а `Pythia v1.0 Paper Operator Release`: операторский релиз с реальным потоком событий, Command Center, auth, paper execution, kill-switch и устойчивым audit trail.
 
 Практический вывод для нового разработчика:
 
@@ -77,17 +79,19 @@ archive/             Historical reports, design docs and session artifacts
 - protobuf contracts с fixed-point wire format;
 - canonical topics `dl.v1.*`;
 - `gateway-api` + inbound protobuf bridge;
-- Command Center preview;
-- `sniper-ingest`;
+- `market_specific_key` в wire contract для per-market matching;
+- Command Center с реальным gateway WebSocket feed;
+- `sniper-ingest` с Anvil/WS mempool subscriber и calldata decode для UMA adapter;
 - `sniper-risk`;
-- paper/control foundation в `sniper-executor`.
+- `sniper-executor` в paper mode: submit/fill/revert, nonce actor, stuck detection, kill consumer/ack;
+- E2E dev proof: pending tx -> decode -> `market_specific_key` match -> trigger -> paper fill -> gateway state.
 
 ## Что ещё не закончено
 
-- end-to-end verification Fast Loop на реальном toolchain;
-- live feed alignment между `gateway-api` и Command Center;
+- green CI и воспроизводимая Git history для Fast Loop без server-only drift;
 - полный protobuf control-plane без transitional JSON publish-side;
-- long-running paper execution verification;
+- long-running paper execution verification (`72h` soak, latency SLO, replay determinism);
+- continuous shadow/audit persistence в Postgres и release runbooks;
 - любой live execution на Polymarket.
 
 ## Source of truth

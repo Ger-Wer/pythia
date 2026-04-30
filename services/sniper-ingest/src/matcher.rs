@@ -124,6 +124,21 @@ impl TriggerMatcher {
         self.try_match_for_market_key(market_key, kind, observed_at_ns, evidence_hash)
     }
 
+    /// Match a pending tx that was decoded down to a canonical per-market
+    /// key (for Polymarket: lowercase `conditionId`).
+    pub fn try_match_market_specific_key(
+        &mut self,
+        market_specific_key: &str,
+        kind: TriggerKind,
+        observed_at_ns: u64,
+        evidence_hash: Vec<u8>,
+    ) -> Option<Trigger> {
+        let entry = self
+            .store
+            .find_by_market_specific_key(market_specific_key)?;
+        self.try_match_for_market_key(entry.market_key, kind, observed_at_ns, evidence_hash)
+    }
+
     fn try_match_for_market_key(
         &mut self,
         market_key: MarketKey,
@@ -163,6 +178,7 @@ impl TriggerMatcher {
                 market: Some(dual_loop_common::proto::common::MarketId {
                     polymarket_id: market_key.0,
                     ctf_address: market_key.1,
+                    market_specific_key: entry.market_specific_key.clone().unwrap_or_default(),
                 }),
                 kind: kind as i32,
                 evidence_hash: evidence_hash.into(),
@@ -181,6 +197,7 @@ impl TriggerMatcher {
                 market: Some(dual_loop_common::proto::common::MarketId {
                     polymarket_id: market_key.0,
                     ctf_address: market_key.1,
+                    market_specific_key: entry.market_specific_key.clone().unwrap_or_default(),
                 }),
                 kind: kind as i32,
                 evidence_hash: evidence_hash.into(),
@@ -245,6 +262,8 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "test-market-1".to_string(),
                 ctf_address: ctf_str,
+                market_specific_key:
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             }),
             version: 1,
             edge_ppm: 150_000,
@@ -331,5 +350,69 @@ mod tests {
         // Same kind again — still 2 distinct.
         let c3 = tracker.record_and_count(TriggerKind::LargeFill, now);
         assert_eq!(c3, 2);
+    }
+
+    #[test]
+    fn resolves_market_by_market_specific_key() {
+        let store = WatchlistStore::new();
+        let shared_ctf = format!("{:#x}", addresses::POLYMARKET_CTF_EXCHANGE);
+
+        for (market_id, key) in [
+            (
+                "test-market-1",
+                "0x1111111111111111111111111111111111111111111111111111111111111111",
+            ),
+            (
+                "test-market-2",
+                "0x2222222222222222222222222222222222222222222222222222222222222222",
+            ),
+        ] {
+            store.apply_upsert(&WatchlistUpsert {
+                message_id: None,
+                market: Some(MarketId {
+                    polymarket_id: market_id.to_string(),
+                    ctf_address: shared_ctf.clone(),
+                    market_specific_key: key.to_string(),
+                }),
+                version: 1,
+                edge_ppm: 150_000,
+                p_fundamental_ppm: 720_000,
+                confidence_ppm: 900_000,
+                side_hint: 1,
+                max_position_usd: Some(Money {
+                    amount_micros: 10_000_000,
+                }),
+                max_slippage_bps: 50,
+                ttl_ms: 3_600_000,
+                issued_at_unix_ms: dual_loop_common::time::StampedTime::now().wall_clock_unix_ms,
+                trigger_policy: Some(TriggerPolicy {
+                    min_independent_sources: 1,
+                    allowed_kinds: vec![TriggerKind::OracleResolution as i32],
+                    max_price_impact_bps: 100,
+                }),
+            });
+        }
+
+        let mut matcher = TriggerMatcher::new(store);
+        let trigger = matcher.try_match_market_specific_key(
+            "0x2222222222222222222222222222222222222222222222222222222222222222",
+            TriggerKind::OracleResolution,
+            12345,
+            vec![0x22; 32],
+        );
+        let resolved = matcher
+            .store
+            .find_by_market_specific_key(
+                "0x2222222222222222222222222222222222222222222222222222222222222222",
+            )
+            .expect("entry");
+        assert_eq!(resolved.market_key.0, "test-market-2");
+        assert_eq!(
+            trigger
+                .as_ref()
+                .and_then(|value| value.market.as_ref())
+                .map(|market| market.polymarket_id.as_str()),
+            Some("test-market-2")
+        );
     }
 }
