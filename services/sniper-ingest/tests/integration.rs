@@ -11,7 +11,9 @@ use dual_loop_common::abi::polymarket_ctf::CtfExchange;
 use dual_loop_common::abi::{self, DecodedEvent};
 use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::monotonic_ns;
-use sniper_ingest::pending_decode::{classify_pending_call, condition_id_from_question_id, UmaCtfAdapter};
+use sniper_ingest::pending_decode::{
+    classify_pending_call, condition_id_from_question_id, UmaCtfAdapter,
+};
 use sniper_ingest::watchlist::WatchlistStore;
 
 use dual_loop_common::proto::common::{MarketId, Money};
@@ -77,7 +79,10 @@ fn matcher_fires_on_ctf_order_filled() {
     let trigger = trigger.unwrap();
     assert_eq!(trigger.kind, TriggerKind::LargeFill as i32);
     assert_eq!(
-        trigger.expected_price.as_ref().map(|money| money.amount_micros),
+        trigger
+            .expected_price
+            .as_ref()
+            .map(|money| money.amount_micros),
         Some(720_000)
     );
     // Matcher latency should be well under 10ms.
@@ -148,13 +153,19 @@ fn pending_call_decode_produces_condition_key_for_uma_adapter() {
     }
     .abi_encode();
 
-    let observation = classify_pending_call(dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3, &input)
-        .expect("observation");
+    let observation = classify_pending_call(
+        dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3,
+        &input,
+    )
+    .expect("observation");
     let resolution = observation.resolution.expect("resolution decode");
     assert_eq!(resolution.selector_name, "resolve");
     assert_eq!(
         resolution.market_specific_key,
-        condition_id_from_question_id(dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3, question_id)
+        condition_id_from_question_id(
+            dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3,
+            question_id
+        )
     );
 }
 

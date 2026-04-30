@@ -80,8 +80,7 @@ pub mod addresses {
     // Legacy exchange still used in older test fixtures and historical notes.
     pub const LEGACY_POLYMARKET_CTF_EXCHANGE_V1: Address =
         address!("4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E");
-    pub const POLYMARKET_CTF_EXCHANGE: Address =
-        POLYMARKET_CTF_EXCHANGE_V2;
+    pub const POLYMARKET_CTF_EXCHANGE: Address = POLYMARKET_CTF_EXCHANGE_V2;
 
     // Polymarket UMA adapter deployments (official docs, checked 2026-04-29).
     pub const POLYMARKET_UMA_ADAPTER_V1: Address =

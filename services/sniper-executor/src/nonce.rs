@@ -8,8 +8,14 @@ use crate::paper::PlannedExecution;
 
 #[derive(Debug, Clone)]
 pub enum DueExecution {
-    Fill { nonce: u64, execution: PlannedExecution },
-    Revert { nonce: u64, execution: PlannedExecution },
+    Fill {
+        nonce: u64,
+        execution: PlannedExecution,
+    },
+    Revert {
+        nonce: u64,
+        execution: PlannedExecution,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -152,8 +158,12 @@ impl NonceManagerHandle {
 }
 
 enum Command {
-    Allocate { reply: oneshot::Sender<u64> },
-    Track { execution: Box<PlannedExecution> },
+    Allocate {
+        reply: oneshot::Sender<u64>,
+    },
+    Track {
+        execution: Box<PlannedExecution>,
+    },
     PollDue {
         now_ms: i64,
         reply: oneshot::Sender<Vec<DueExecution>>,
@@ -223,7 +233,10 @@ mod tests {
 
         let due = actor.poll_due(1_150).await.expect("poll_due");
 
-        assert!(matches!(due.as_slice(), [DueExecution::Fill { nonce: 0, .. }]));
+        assert!(matches!(
+            due.as_slice(),
+            [DueExecution::Fill { nonce: 0, .. }]
+        ));
     }
 
     #[tokio::test]

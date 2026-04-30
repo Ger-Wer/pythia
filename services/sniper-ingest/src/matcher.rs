@@ -133,7 +133,9 @@ impl TriggerMatcher {
         observed_at_ns: u64,
         evidence_hash: Vec<u8>,
     ) -> Option<Trigger> {
-        let entry = self.store.find_by_market_specific_key(market_specific_key)?;
+        let entry = self
+            .store
+            .find_by_market_specific_key(market_specific_key)?;
         self.try_match_for_market_key(entry.market_key, kind, observed_at_ns, evidence_hash)
     }
 
@@ -261,8 +263,7 @@ mod tests {
                 polymarket_id: "test-market-1".to_string(),
                 ctf_address: ctf_str,
                 market_specific_key:
-                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                        .to_string(),
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             }),
             version: 1,
             edge_ppm: 150_000,

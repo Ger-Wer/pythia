@@ -61,7 +61,10 @@ struct Cli {
     #[arg(long, default_value = "paper-e2e-001")]
     market_id: String,
 
-    #[arg(long, default_value = "Will the Paper Mode mock execution complete end-to-end?")]
+    #[arg(
+        long,
+        default_value = "Will the Paper Mode mock execution complete end-to-end?"
+    )]
     market_question: String,
 
     #[arg(long)]
@@ -187,9 +190,9 @@ async fn main() -> anyhow::Result<()> {
         .uma_adapter_address
         .unwrap_or_else(|| format!("{:#x}", addresses::POLYMARKET_UMA_ADAPTER_V3));
     let uma_adapter = Address::from_str(&uma_adapter_address)?;
-    let market_specific_key = cli.market_specific_key.unwrap_or_else(|| {
-        condition_id_from_question_id(uma_adapter, question_id)
-    });
+    let market_specific_key = cli
+        .market_specific_key
+        .unwrap_or_else(|| condition_id_from_question_id(uma_adapter, question_id));
     let market = MarketId {
         polymarket_id: cli.market_id.clone(),
         ctf_address: ctf_address.clone(),

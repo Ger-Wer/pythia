@@ -173,8 +173,7 @@ mod tests {
 
     #[test]
     fn decodes_uma_adapter_resolve_to_market_specific_key() {
-        let question_id =
-            b256!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let question_id = b256!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         let input = UmaCtfAdapter::resolveCall {
             questionID: question_id,
         }

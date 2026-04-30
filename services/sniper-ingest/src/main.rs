@@ -10,8 +10,8 @@
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use anyhow::Result;
 use alloy::network::TransactionResponse;
+use anyhow::Result;
 use dual_loop_common::bus::JetStreamClient;
 use dual_loop_common::proto::watchlist::TriggerKind;
 use dual_loop_common::topics;
@@ -110,12 +110,18 @@ async fn main() -> Result<()> {
                     .ensure_stream(TRIGGERS_STREAM, vec![topics::TRIGGERS_FIRED.into()])
                     .await
                 {
-                    warn!(?error, "could not ensure trigger stream for real mempool path");
+                    warn!(
+                        ?error,
+                        "could not ensure trigger stream for real mempool path"
+                    );
                 }
                 Some(js)
             }
             Err(error) => {
-                warn!(?error, "NATS connect failed; real mempool trigger publish disabled");
+                warn!(
+                    ?error,
+                    "NATS connect failed; real mempool trigger publish disabled"
+                );
                 None
             }
         },
@@ -196,9 +202,7 @@ async fn run_matcher_loop(
         )
         .increment(1);
 
-        let selector = target
-            .selector_hex()
-            .unwrap_or_else(|| "none".to_string());
+        let selector = target.selector_hex().unwrap_or_else(|| "none".to_string());
         info!(
             contract = target.contract.label(),
             to = %format!("{:#x}", target.to),
