@@ -196,6 +196,10 @@ services:
       NATS_URL: "nats://nats:4222"
       PAPER_MODE: "true"
       RUST_LOG: "info"
+      # Must match gateway-api's KILL_HMAC_SECRET; both sides verify the kill
+      # envelope HMAC. Defaults to the dev value so a fresh `make dev-up` works
+      # without a .env, but staging/prod must override via .env (Track A3).
+      KILL_HMAC_SECRET: "${KILL_HMAC_SECRET:-dev-kill-hmac-secret-change-me}"
     ports:
       - "127.0.0.1:9102:9102"
     networks:
@@ -222,13 +226,16 @@ services:
       LOG_LEVEL: "info"
       REDIS_URL: "redis://redis:6379"
       NATS_URL: "nats://nats:4222"
-      # DEV-ONLY defaults. Override in staging/prod via a real secrets store.
-      #   GATEWAY_PASETO_KEY: openssl rand -base64 32
-      #   OPERATOR_PASSWORD_HASH: `bun run -e "console.log(require('bcryptjs').hashSync(process.argv[1],10))" -- <password>`
-      GATEWAY_PASETO_KEY: "cHl0aGlhLWR1YWwtbG9vcC1kZXYta2V5LTMyYnl0ZXM="
-      OPERATOR_ID: "admin"
-      OPERATOR_PASSWORD_HASH: "$$2a$$10$$o8TxQnbbSnYLUQ8b97fj9e.FrX3uuKA9CS5Ftx4QbO9CxVGRbcFTq"
-      KILL_HMAC_SECRET: "dev-kill-hmac-secret-change-me"
+      # DEV-ONLY defaults. Override in staging/prod via .env / a real secrets
+      # store. Generation recipes:
+      #   GATEWAY_PASETO_KEY:    openssl rand -base64 32
+      #   KILL_HMAC_SECRET:      openssl rand -hex 32
+      #   OPERATOR_PASSWORD_HASH: bun run -e "console.log(require('bcryptjs').hashSync(process.argv[1],10))" -- <password>
+      # Track A3: rotation is required before live trading.
+      GATEWAY_PASETO_KEY: "${GATEWAY_PASETO_KEY:-cHl0aGlhLWR1YWwtbG9vcC1kZXYta2V5LTMyYnl0ZXM=}"
+      OPERATOR_ID: "${OPERATOR_ID:-admin}"
+      OPERATOR_PASSWORD_HASH: "${OPERATOR_PASSWORD_HASH:-$$2a$$10$$o8TxQnbbSnYLUQ8b97fj9e.FrX3uuKA9CS5Ftx4QbO9CxVGRbcFTq}"
+      KILL_HMAC_SECRET: "${KILL_HMAC_SECRET:-dev-kill-hmac-secret-change-me}"
     ports:
       - "127.0.0.1:9103:9103"
     networks:
