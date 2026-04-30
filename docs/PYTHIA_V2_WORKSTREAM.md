@@ -1,6 +1,6 @@
 # Pythia v2 — Workstream и дорожная карта
 
-Дата актуализации: 2026-04-28 (Dual-Loop foundation cleanup + Command Center preview merged)
+Дата актуализации: 2026-04-29 (Paper execution + live Command Center feed + real mempool dev proof)
 
 ## Роль этого документа
 
@@ -47,7 +47,7 @@
 - `Phase 3` реализована как dashboard command-center baseline.
 - `Phase 4` реализована как attention engine + Telegram operator loop.
 - `Phase 5` начата: quality pages и API уже в коде, но weekly discipline loop еще не закрыт.
-- Параллельно открыт отдельный **Dual-Loop** workstream: foundations и значимая часть backend Phase 2 уже в `main`, но paper execution еще не завершен.
+- Параллельно открыт отдельный **Dual-Loop** workstream: foundations уже пройдены, paper execution в dev-контуре доказан, и проект вошел в release-hardening стадию.
 
 Коротко:
 
@@ -56,8 +56,9 @@
 - autonomous watchlist engine уже в production;
 - attention engine и inbound Telegram triage уже есть в коде;
 - quality layer больше не "пустое место": есть `/quality`, `shadow performance`, `operator vs shadow`;
-- Fast Loop уже вышел из чистого design: bus/contracts, gateway-api, Command Center preview, `sniper-ingest` и `sniper-risk` существуют в `main`;
-- `sniper-executor` все еще на foundation-skeleton стадии и остается главным незавершенным блоком текущего спринта.
+- Fast Loop уже вышел из чистого design: bus/contracts, `gateway-api`, живой Command Center, `sniper-ingest`, `sniper-risk` и paper-mode `sniper-executor` существуют в `main`;
+- реальный mempool path в dev уже доказан через `Anvil WS -> calldata decode -> market_specific_key match -> trigger -> paper fill -> gateway state`;
+- первый релиз проекта нужно понимать как `Paper Operator Release`, а не как запуск live-capital execution.
 
 ## Уже доставлено в production
 
@@ -125,11 +126,13 @@
 - [x] canonical bus topics `dl.v1.*`
 - [x] `gateway-api` foundation
 - [x] inbound protobuf bridge в `gateway-api` (с JSON fallback для тестов/legacy)
-- [x] Command Center preview route `/command-center`
+- [x] outbound protobuf-first publish path в `gateway-api` для `signals.decisions` и `control.kill` (с JSON fallback при отсутствии codecs)
+- [x] Command Center route `/command-center`
 - [x] `sniper-ingest` foundation + matcher + replay/test surface
 - [x] `sniper-risk` pre-trade checks foundation
-- [x] `sniper-executor` skeleton + `exec.status` heartbeats
+- [x] live gateway WebSocket feed в Command Center
 - [x] `sniper-executor` paper lifecycle foundation в коде: submit/fill/revert, nonce actor, stuck-timeout, `control.kill` consumer/ack
+- [x] real mempool dev proof через Anvil + UMA adapter decode + `market_specific_key`
 - [x] decision: `phase1b-pg-listen-notify` не влит в `main`; канонический путь остается через Redis/NATS bus, а не через side-channel LISTEN/NOTIFY
 
 ## Что еще не закончено
@@ -165,13 +168,13 @@
 
 - [x] bus/contracts foundation
 - [x] `gateway-api` foundation
-- [x] Command Center preview UI
+- [x] Command Center UI с live gateway feed
 - [x] `sniper-ingest`
 - [x] `sniper-risk`
-- [ ] gateway state ↔ Command Center live-feed alignment
-- [ ] убрать transitional JSON publish-side в `gateway-api` (`signals.decisions`, `control.kill`) и довести весь control-plane до одного protobuf пути
-- [ ] `sniper-executor` paper execution
-- [ ] real WSS feed вместо mock Command Center feed
+- [ ] убрать residual JSON fallback в `gateway-api` publish-side (`signals.decisions`, `control.kill`) и довести весь control-plane до одного protobuf пути без compatibility режима
+- [ ] автоматическая прокидка `market_specific_key` из Slow Loop producer path во все watchlist publish flows
+- [ ] `services/market-data` / order book tracker для реального edge-quality контура
+- [ ] release-hardening: secret rotation, stable shadow/audit persistence, 72h paper soak
 
 ### Improvement loop
 
@@ -288,13 +291,13 @@
 
 Самая важная следующая задача сейчас:
 
-- [ ] довести Dual-Loop foundation до честного paper execution без архитектурных дыр
+- [ ] превратить доказанный paper contour в воспроизводимый release-контур без server-only drift и без слабых operational defaults
 
 Практически это означает:
 
-- завершить `sniper-executor` в paper mode;
-- выровнять gateway/API/UI state model перед реальным WSS feed;
-- не допускать расхождения docs ↔ wire contracts ↔ runtime code;
+- зафиксировать текущий real-mempool progress в чистой Git history и канонических docs;
+- закрыть protobuf-first control plane и producer-path для `market_specific_key`;
+- прогнать soak/latency/replay gates для первого paper release;
 - параллельно не потерять weekly quality/review loop в Slow Loop.
 
 ## Критерии того, что мы движемся правильно

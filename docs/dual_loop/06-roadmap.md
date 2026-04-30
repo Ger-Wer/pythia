@@ -1,16 +1,19 @@
 # 06 — Roadmap & Phases
 
-Дата актуализации: 2026-04-28
+Дата актуализации: 2026-04-29
 
 ## Текущий статус
 
 - `Phase 0` завершена.
-- `Phase 1` в основном уже влита в `main`: bus/contracts, gateway-api foundation, Command Center preview, shadow PG.
+- `Phase 1` в основном уже влита в `main`: bus/contracts, gateway-api foundation, live Command Center feed, shadow PG.
 - `gateway-api` больше не purely JSON-only на receive-side: inbound bridge уже умеет проецировать protobuf Redis payloads в UI state, сохраняя JSON fallback для тестов и legacy-path.
-- `Phase 2` частично в коде: `sniper-ingest` и `sniper-risk` уже реализованы, а в `sniper-executor` уже влиты paper submit/fill/revert lifecycle, nonce actor, stuck-timeout loop и `control.kill` consumer/ack path. End-to-end DoD и build verification в этой среде пока не закрыты.
+- `gateway-api` на publish-side тоже сдвинут в proto-first сторону: `signals.decisions` и `control.kill` теперь кодируются в protobuf при доступных codecs, но compatibility fallback на JSON еще не убран полностью.
+- `Phase 2` уже доказана в dev/paper-контуре: `sniper-ingest` и `sniper-risk` реализованы, `sniper-executor` уже вмещает paper submit/fill/revert lifecycle, nonce actor, stuck-timeout loop и `control.kill` consumer/ack path, а real mempool path через Anvil WS + UMA adapter decode + `market_specific_key` matching прошел E2E. End-to-end release DoD и CI discipline пока не закрыты.
 - `origin/devin/phase1-foundation-corrections` по сути интегрирована: wire contracts переведены на fixed-point (`*_ppm`, `*_bps`, `*_unix_ms`; без финансовых `double`).
-- `origin/devin/phase1-track-c-command-center-ui` интегрирована как read-only / mock-fed preview.
+- `origin/devin/phase1-track-c-command-center-ui` интегрирована и уже читает живой gateway state по WebSocket; preview-mode остается только dev/smoke fallback.
 - `origin/devin/phase1b-pg-listen-notify` **не** считается каноническим путем и не должна вливаться в `main`: LISTEN/NOTIFY остается best-effort side-channel, а source of truth для межсервисного uplink остается Redis/NATS bus.
+
+Релизная цель ближайшего цикла: не live trading, а `Paper Operator Release` с реальным mempool signal path, стабильным Command Center и жесткими operational gates.
 
 ## Phase 0 — Foundations (2 недели) — **завершена**
 
@@ -43,19 +46,19 @@
 - [x] Переписать Pythia watchlist publisher (`src/services/watchlist_publisher.ts`) в новый формат.
 - [x] `gateway-api` foundation: REST, auth, Redis bridge, JSON Patch state.
 - [x] Inbound protobuf → gateway state bridge (с JSON fallback на тестовом/legacy пути).
-- [x] Базовая версия Command Center (read-only preview): Triage Queue + Status Bar + Heatmap + Execution panel.
+- [x] Базовая версия Command Center: Triage Queue + Status Bar + Heatmap + Execution panel.
 - [x] SQLite → PostgreSQL shadow-write foundation.
 - [x] Feature flags/toggles через env.
 - [x] Dev setup с Anvil / local stack для Fast Loop foundation.
-- [ ] Реальный gateway ↔ Command Center live feed вместо preview/mock path.
+- [x] Реальный gateway ↔ Command Center live feed вместо preview/mock path.
 
 **DoD:**
 - [x] Contract/codegen foundation и canonical topic registry есть в `main`.
 - [x] Gateway routes и state bridge существуют в коде.
 - [ ] Сигналы из Pythia появляются в **реальном** Command Center < 500ms.
-- [ ] Оператор может Accept/Reject из самого Command Center UI (backend routes есть, UI feed еще preview/mock).
+- [ ] Оператор может Accept/Reject из самого Command Center UI (backend routes есть, UI write-path еще не закончен).
 - [ ] Synthetic load test: 1k signals/min без drop.
-- [ ] Убрать legacy JSON publish-side для `signals.decisions` / `control.kill` и довести `gateway-api` до чистого protobuf control-plane.
+- [ ] Убрать residual JSON fallback для `signals.decisions` / `control.kill` и довести `gateway-api` до чистого protobuf control-plane.
 - [ ] Shadow PG live 7 дней без дельт с SQLite на критических запросах.
 
 ## Phase 2 — Sniper MVP: Ingest & Paper Execution (3–4 недели) — **частично реализована**
@@ -65,17 +68,19 @@
 **Задачи:**
 - [x] `sniper-ingest`: mempool firehose / reconnect foundation в коде.
 - [x] ABI-декодер для CTF-контрактов и ключевых оракулов.
+- [x] `market_specific_key` matching для resolution path вместо coarse address-only match.
 - [ ] `OrderBookTracker` с REST warm-up + WS incremental.
 - [x] `TriggerMatcher` + risk pre-checks (`sniper-risk`) в коде.
 - [x] `sniper-executor` paper-mode foundation в коде: submit/fill/revert lifecycle, `BroadcastSink::Noop`, nonce actor, stuck detection, `control.kill` consumer + `KillAck`.
-- [x] Active Watchlist / Execution Panel preview в UI.
+- [x] Active Watchlist / Execution Panel в UI с live gateway feed.
+- [x] Real mempool E2E через Anvil: pending tx -> decode -> `market_specific_key` match -> trigger -> paper fill -> gateway state.
 - [x] Replay harness и matcher/perf test surface.
 
 **DoD:**
 - [ ] End-to-end latency измерен: `mempool_seen → trigger_emitted` p95 < 8ms на staging-hardware.
 - [ ] 72 часа непрерывного paper-run без memory leak (RSS drift < 5%).
 - [ ] Backtest-harness: replay mempool-дампа даёт детерминированные triggers (byte-for-byte).
-- [ ] Build/test verification для обновлённого `sniper-executor` и protobuf bridge подтверждена реальным toolchain/CI, а не только code inspection.
+- [ ] Build/test verification для обновлённого `sniper-executor`, real mempool decode path и protobuf bridge подтверждена чистым CI/main, а не только server-side proof.
 - [ ] Shadow-comparison: paper-fills vs реальное движение цены — статистика расхождений в weekly report.
 
 ## Phase 3 — Live Execution (Hardened) (3–4 недели)
@@ -128,7 +133,7 @@ Phase 0 ─┬─▶ Phase 1 ─┬─▶ Phase 2 ─▶ Phase 3 ─▶ Phase 4
 
 Параллелизуемые треки внутри Phase 1:
 - **Backend:** gateway-api + bus bridge.
-- **Frontend:** Command Center readonly skeleton.
+- **Frontend:** Command Center live-read surface.
 - **Data:** SQL→PG shadow write.
 - **Schemas:** lock контракты.
 

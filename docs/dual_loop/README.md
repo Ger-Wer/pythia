@@ -1,7 +1,7 @@
 # Dual-Loop Architecture
 
-Дата актуализации: 2026-04-28
-Статус: Design v1.1, Phase 0 completed, Phase 1 mostly merged, Phase 2 partially implemented
+Дата актуализации: 2026-04-29
+Статус: Design v1.1, Phase 0 completed, Phase 1 merged enough for operator flow, Phase 2 proven in paper/dev and entering hardening
 
 ## Роль документа
 
@@ -32,13 +32,13 @@ Dual-Loop — это следующая фаза развития. Пока су
 - [x] Design v1.0/v1.1 написан.
 - [x] **Phase 0 (Foundations)** завершена.
 - [~] **Phase 1 — Bus & Contracts** в основном уже в `main`.
-- [~] **Phase 2 — Sniper MVP** частично уже в `main`: `sniper-ingest` и `sniper-risk` реализованы, в `sniper-executor` уже есть paper lifecycle/control foundation, но end-to-end paper verification еще впереди.
+- [~] **Phase 2 — Sniper MVP** уже доказана в dev/paper-контуре: `sniper-ingest` ловит real pending tx через Anvil WS, декодирует UMA adapter calldata, матчится по `market_specific_key`, а `sniper-executor` делает paper submit/fill через живой `gateway-api` state bridge. Теперь главный фокус — release hardening, soak и CI discipline.
 - [ ] Phase 3 — Live Execution (hardened).
 - [ ] Phase 4 — Scale & Optimization.
 
 Важное архитектурное решение на текущий момент: `phase1b-pg-listen-notify` не считается каноническим transport-path. Межсервисный source of truth остается Redis/NATS bus; LISTEN/NOTIFY допускается только как best-effort side-channel.
 
-Текущее transitional состояние шины: `gateway-api` уже умеет ingest'ить protobuf Redis payloads на receive-side, но его outbound operator mutations (`signals.decisions`, `control.kill`) пока еще публикуются как JSON compatibility envelope.
+Текущее transitional состояние шины: `gateway-api` уже умеет ingest'ить protobuf Redis payloads на receive-side и кормит живой Command Center по WebSocket, а для outbound operator mutations (`signals.decisions`, `control.kill`) теперь предпочитает protobuf publish, но пока сохраняет JSON fallback.
 
 См. [`06-roadmap.md`](./06-roadmap.md) для деталей.
 
