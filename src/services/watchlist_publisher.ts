@@ -14,6 +14,8 @@ import { randomUUID } from 'node:crypto';
 
 import { StreamPublisher } from './bus/redis_streams';
 import { WATCHLIST_UPSERT, WATCHLIST_REMOVE } from './bus/topics';
+import { fetchMarket } from '../tools/polymarket';
+import type { PolymarketMarket } from '../tools/polymarket';
 // NOTE: proto types are imported *lazily* below so that any file which
 // transitively imports this module (via `decision_core` → `db.ts`) can still
 // load when the ts-proto output in `src/generated/` has not yet been built.
@@ -58,6 +60,8 @@ export interface WatchlistDecisionInput {
   marketId: string;
   /** CTF contract address (may be missing in SQLite; pass empty string). */
   ctfAddress?: string;
+  /** Canonical per-market key (Polymarket: lowercase `conditionId`). */
+  marketSpecificKey?: string;
   /** One of the decision-core actions. */
   recommendedAction: 'watch' | 'review' | 'enter_yes' | 'enter_no';
   /** Internal probability estimate, 0..1. */
@@ -85,6 +89,8 @@ export interface WatchlistPublisherConfig {
   redisUrl?: string;
   /** Optional preconstructed publisher (for tests). */
   publisher?: StreamPublisher;
+  /** Optional market metadata lookup override (tests / custom enrichers). */
+  lookupMarket?: (marketId: string) => Promise<PolymarketMarket | null>;
   /** Optional structured logger. */
   log?: (event: Record<string, unknown>) => void;
 }
@@ -176,6 +182,28 @@ export class WatchlistPublisher {
     return this.publisher !== null;
   }
 
+  private async resolveMarketSpecificKey(
+    input: WatchlistDecisionInput,
+  ): Promise<string> {
+    if (input.marketSpecificKey?.trim()) {
+      return input.marketSpecificKey.trim().toLowerCase();
+    }
+
+    const lookupMarket = this.cfg.lookupMarket ?? fetchMarket;
+    try {
+      const market = await lookupMarket(input.marketId);
+      return market?.conditionId?.trim().toLowerCase() ?? '';
+    } catch (err) {
+      this.log({
+        msg: 'watchlist_upsert market lookup failed',
+        level: 'warn',
+        market_id: input.marketId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return '';
+    }
+  }
+
   /**
    * Convert a decision-core input → `WatchlistUpsert` proto. Exposed for
    * testing without a live Redis. Async because proto types are lazy-loaded.
@@ -183,11 +211,13 @@ export class WatchlistPublisher {
   async buildUpsert(input: WatchlistDecisionInput): Promise<WatchlistUpsertType> {
     const { Side } = await loadProto();
     const edge = input.pMarket === null ? 0 : input.pFundamental - input.pMarket;
+    const marketSpecificKey = await this.resolveMarketSpecificKey(input);
     const upsert: WatchlistUpsertType = {
       messageId: { value: uuidBytes() },
       market: {
         polymarketId: input.marketId,
         ctfAddress: input.ctfAddress ?? '',
+        marketSpecificKey,
       },
       version: BigInt(Math.max(0, input.version)),
       edgePpm: probToPpm(edge),

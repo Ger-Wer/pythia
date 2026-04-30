@@ -53,7 +53,12 @@ describe('proto roundtrip', () => {
   it('WatchlistUpsert', () => {
     const msg: WatchlistUpsert = {
       messageId: { value: Buffer.alloc(16, 1) },
-      market: { polymarketId: 'mkt-01', ctfAddress: '0xabc' },
+      market: {
+        polymarketId: 'mkt-01',
+        ctfAddress: '0xabc',
+        marketSpecificKey:
+          '0x1111111111111111111111111111111111111111111111111111111111111111',
+      },
       version: 42n,
       edgePpm: 50_000n,
       pFundamentalPpm: 670_000n,
@@ -71,6 +76,9 @@ describe('proto roundtrip', () => {
     };
     const back = roundtrip(WatchlistUpsert, msg);
     expect(back.market?.polymarketId).toBe('mkt-01');
+    expect(back.market?.marketSpecificKey).toBe(
+      '0x1111111111111111111111111111111111111111111111111111111111111111',
+    );
     expect(back.edgePpm).toBe(50_000n);
     expect(back.version).toBe(42n);
     expect(back.maxPositionUsd?.amountMicros).toBe(10_000_000n);
@@ -81,7 +89,12 @@ describe('proto roundtrip', () => {
   it('WatchlistRemove', () => {
     const msg: WatchlistRemove = {
       messageId: undefined,
-      market: { polymarketId: 'mkt-02', ctfAddress: '0xdef' },
+      market: {
+        polymarketId: 'mkt-02',
+        ctfAddress: '0xdef',
+        marketSpecificKey:
+          '0x2222222222222222222222222222222222222222222222222222222222222222',
+      },
       version: 7n,
       reason: 1,
       issuedAtUnixMs: 1_700_000_001_000n,
@@ -97,7 +110,12 @@ describe('proto roundtrip', () => {
       messageId: undefined,
       signalId: 'sig-42',
       serverVersion: 3n,
-      market: { polymarketId: 'm', ctfAddress: 'a' },
+      market: {
+        polymarketId: 'm',
+        ctfAddress: 'a',
+        marketSpecificKey:
+          '0x3333333333333333333333333333333333333333333333333333333333333333',
+      },
       marketQuestion: 'Will X happen?',
       edgePpm: 40_000n,
       pFundamentalPpm: 600_000n,
@@ -138,7 +156,12 @@ describe('proto roundtrip', () => {
   it('Trigger', () => {
     const msg: Trigger = {
       messageId: undefined,
-      market: { polymarketId: 'm', ctfAddress: 'a' },
+      market: {
+        polymarketId: 'm',
+        ctfAddress: 'a',
+        marketSpecificKey:
+          '0x4444444444444444444444444444444444444444444444444444444444444444',
+      },
       kind: TriggerKind.TRIGGER_KIND_LARGE_FILL,
       evidenceHash: Buffer.alloc(32, 0xab),
       etaBlock: 123456n,
