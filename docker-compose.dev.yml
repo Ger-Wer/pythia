@@ -168,6 +168,7 @@ services:
       MOCK_MEMPOOL_ENABLED: "true"
       REDIS_URL: "redis://redis:6379"
       NATS_URL: "nats://nats:4222"
+      ANVIL_WS_URL: "ws://anvil:8545"
       RUST_LOG: "info"
     ports:
       - "127.0.0.1:9101:9101"
@@ -178,6 +179,8 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+      anvil:
+        condition: service_started
 
   sniper-executor:
     build:
@@ -253,6 +256,8 @@ services:
       - "0.0.0.0"
       - "--chain-id"
       - "137"
+      - "--block-time"
+      - "2"
       - "--fork-url"
       - "${POLYGON_RPC_URL:-https://polygon-rpc.com}"
     ports:
