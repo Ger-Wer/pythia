@@ -11,6 +11,10 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
+use alloy::network::TransactionResponse;
+use dual_loop_common::bus::JetStreamClient;
+use dual_loop_common::proto::watchlist::TriggerKind;
+use dual_loop_common::topics;
 use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::{self, PendingTx, TX_CHANNEL_CAPACITY};
 use sniper_ingest::mock;
@@ -21,6 +25,7 @@ use tokio::time::{interval, Duration};
 use tracing::{info, warn};
 
 static RECORDER_ENABLED: AtomicBool = AtomicBool::new(false);
+const TRIGGERS_STREAM: &str = "DL_TRIGGERS";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -97,10 +102,27 @@ async fn main() -> Result<()> {
     // Drop the extra sender so the channel closes when both actors drop.
     drop(mempool_tx);
 
-    // Redis publisher for triggers.
-    let mut trigger_publisher = match std::env::var("REDIS_URL") {
-        Ok(url) => Some(dual_loop_common::bus::StreamPublisher::connect(&url).await?),
-        Err(_) => None,
+    // JetStream publisher for real mempool triggers.
+    let trigger_js = match std::env::var("NATS_URL") {
+        Ok(url) => match JetStreamClient::connect(&url).await {
+            Ok(js) => {
+                if let Err(error) = js
+                    .ensure_stream(TRIGGERS_STREAM, vec![topics::TRIGGERS_FIRED.into()])
+                    .await
+                {
+                    warn!(?error, "could not ensure trigger stream for real mempool path");
+                }
+                Some(js)
+            }
+            Err(error) => {
+                warn!(?error, "NATS connect failed; real mempool trigger publish disabled");
+                None
+            }
+        },
+        Err(_) => {
+            warn!("NATS_URL not set; real mempool trigger publish disabled");
+            None
+        }
     };
 
     // Matcher + processing loop.
@@ -108,13 +130,7 @@ async fn main() -> Result<()> {
         let store = store.clone();
         let shutdown_rx_inner = shutdown_rx.clone();
         tokio::spawn(async move {
-            run_matcher_loop(
-                mempool_rx,
-                store,
-                trigger_publisher.as_mut(),
-                shutdown_rx_inner,
-            )
-            .await;
+            run_matcher_loop(mempool_rx, store, trigger_js, shutdown_rx_inner).await;
         })
     };
 
@@ -159,10 +175,10 @@ async fn main() -> Result<()> {
 async fn run_matcher_loop(
     mut rx: mpsc::Receiver<PendingTx>,
     store: WatchlistStore,
-    _trigger_publisher: Option<&mut dual_loop_common::bus::StreamPublisher>,
+    trigger_js: Option<JetStreamClient>,
     _shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) {
-    let _matcher = TriggerMatcher::new(store);
+    let mut matcher = TriggerMatcher::new(store);
 
     while let Some(pending) = rx.recv().await {
         // Record raw tx if recorder mode is on.
@@ -191,10 +207,73 @@ async fn run_matcher_loop(
             "target pending tx observed"
         );
 
-        // Next step: map `selector` + calldata into typed calls and then into
-        // market-specific matching keys. We keep the selector extraction in the
-        // hot path now so the ANVIL_WS_URL subscriber is already shaped for the
-        // real mempool integration.
+        let Some(resolution) = target.resolution.as_ref() else {
+            continue;
+        };
+
+        let question_id = format!("{:#x}", resolution.question_id);
+        info!(
+            contract = target.contract.label(),
+            to = %format!("{:#x}", target.to),
+            selector = %selector,
+            selector_name = resolution.selector_name,
+            question_id = %question_id,
+            market_specific_key = %resolution.market_specific_key,
+            "pending resolution calldata decoded"
+        );
+
+        let tx_hash = pending.tx.tx_hash();
+        let Some(trigger) = matcher.try_match_market_specific_key(
+            &resolution.market_specific_key,
+            TriggerKind::OracleResolution,
+            pending.observed_at_ns,
+            tx_hash.as_slice().to_vec(),
+        ) else {
+            info!(
+                tx_hash = %format!("{:#x}", tx_hash),
+                question_id = %question_id,
+                market_specific_key = %resolution.market_specific_key,
+                "pending resolution decoded but no watchlist match found"
+            );
+            continue;
+        };
+
+        let Some(js) = trigger_js.as_ref() else {
+            warn!(
+                tx_hash = %format!("{:#x}", tx_hash),
+                question_id = %question_id,
+                market_specific_key = %resolution.market_specific_key,
+                "trigger matched but NATS publisher unavailable"
+            );
+            continue;
+        };
+
+        let market_id = trigger
+            .market
+            .as_ref()
+            .map(|market| market.polymarket_id.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+        match js.publish(topics::TRIGGERS_FIRED, &trigger).await {
+            Ok(()) => {
+                info!(
+                    tx_hash = %format!("{:#x}", tx_hash),
+                    question_id = %question_id,
+                    market_specific_key = %resolution.market_specific_key,
+                    market_id = %market_id,
+                    "pending tx matched by market_specific_key and trigger published"
+                );
+            }
+            Err(error) => {
+                warn!(
+                    ?error,
+                    tx_hash = %format!("{:#x}", tx_hash),
+                    question_id = %question_id,
+                    market_specific_key = %resolution.market_specific_key,
+                    market_id = %market_id,
+                    "trigger publish failed for decoded pending tx"
+                );
+            }
+        }
     }
 }
 

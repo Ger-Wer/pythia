@@ -1,5 +1,10 @@
+use std::str::FromStr;
 use std::time::Duration;
 
+use alloy::network::TransactionBuilder;
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::types::TransactionRequest;
+use alloy_primitives::{Address, B256};
 use clap::{Parser, ValueEnum};
 use dual_loop_common::abi::addresses;
 use dual_loop_common::bus::StreamPublisher;
@@ -13,6 +18,7 @@ use prost::bytes::Bytes;
 use serde::Serialize;
 use sniper_ingest::mempool::monotonic_ns;
 use sniper_ingest::mock::MOCK_MEMPOOL_TOPIC;
+use sniper_ingest::pending_decode::{condition_id_from_question_id, UmaCtfAdapter};
 
 #[derive(Clone, Debug, ValueEnum)]
 enum MockKind {
@@ -20,6 +26,12 @@ enum MockKind {
     OracleResolution,
     AdminAction,
     NewsConfirmed,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum InjectMode {
+    Mock,
+    Anvil,
 }
 
 impl MockKind {
@@ -40,6 +52,12 @@ struct Cli {
     #[arg(long)]
     redis_url: Option<String>,
 
+    #[arg(long, value_enum, default_value_t = InjectMode::Mock)]
+    mode: InjectMode,
+
+    #[arg(long)]
+    anvil_rpc_url: Option<String>,
+
     #[arg(long, default_value = "paper-e2e-001")]
     market_id: String,
 
@@ -48,6 +66,18 @@ struct Cli {
 
     #[arg(long)]
     ctf_address: Option<String>,
+
+    #[arg(
+        long,
+        default_value = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )]
+    question_id: String,
+
+    #[arg(long)]
+    uma_adapter_address: Option<String>,
+
+    #[arg(long)]
+    market_specific_key: Option<String>,
 
     #[arg(long, default_value_t = 1)]
     version: u64,
@@ -91,15 +121,19 @@ struct Cli {
 
 #[derive(Serialize)]
 struct InjectorSummary {
+    mode: String,
     market_id: String,
     ctf_address: String,
+    market_specific_key: String,
+    question_id: String,
+    uma_adapter_address: String,
     signal_topic: &'static str,
     watchlist_topic: &'static str,
-    mock_topic: &'static str,
+    mock_topic: Option<&'static str>,
     tx_hash_hex: String,
     signal_stream_id: String,
     watchlist_stream_id: String,
-    mock_stream_id: String,
+    mock_stream_id: Option<String>,
 }
 
 fn synthetic_tx_hash(seed: &Bytes) -> Bytes {
@@ -108,6 +142,29 @@ fn synthetic_tx_hash(seed: &Bytes) -> Bytes {
     raw[..copy_len].copy_from_slice(&seed[..copy_len]);
     raw[16..(16 + copy_len)].copy_from_slice(&seed[..copy_len]);
     Bytes::copy_from_slice(&raw)
+}
+
+async fn send_anvil_resolve_tx(
+    rpc_url: &str,
+    to: Address,
+    question_id: B256,
+) -> anyhow::Result<B256> {
+    let provider = ProviderBuilder::new().on_http(rpc_url.parse()?);
+    let from = provider
+        .get_accounts()
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("anvil returned no unlocked accounts"))?;
+
+    let tx = TransactionRequest::default()
+        .with_from(from)
+        .with_to(to)
+        .with_call(&UmaCtfAdapter::resolveCall {
+            questionID: question_id,
+        });
+    let pending = provider.send_transaction(tx).await?;
+    Ok(*pending.tx_hash())
 }
 
 #[tokio::main]
@@ -125,9 +182,18 @@ async fn main() -> anyhow::Result<()> {
     let ctf_address = cli
         .ctf_address
         .unwrap_or_else(|| format!("{:#x}", addresses::POLYMARKET_CTF_EXCHANGE));
+    let question_id = B256::from_str(&format!("0x{}", cli.question_id.trim_start_matches("0x")))?;
+    let uma_adapter_address = cli
+        .uma_adapter_address
+        .unwrap_or_else(|| format!("{:#x}", addresses::POLYMARKET_UMA_ADAPTER_V3));
+    let uma_adapter = Address::from_str(&uma_adapter_address)?;
+    let market_specific_key = cli.market_specific_key.unwrap_or_else(|| {
+        condition_id_from_question_id(uma_adapter, question_id)
+    });
     let market = MarketId {
         polymarket_id: cli.market_id.clone(),
         ctf_address: ctf_address.clone(),
+        market_specific_key: market_specific_key.clone(),
     };
     let message_id = new_uuid_v7();
     let tx_hash = synthetic_tx_hash(&message_id.value);
@@ -184,22 +250,46 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::time::sleep(Duration::from_millis(cli.settle_delay_ms)).await;
 
-    let mock_tx = MockMempoolTx {
-        message_id: Some(message_id),
-        market: Some(market),
-        kind: trigger_kind as i32,
-        tx_hash: tx_hash.clone(),
-        observed_at_ns: monotonic_ns(),
+    let (tx_hash_hex, mock_stream_id) = match cli.mode {
+        InjectMode::Mock => {
+            let mock_tx = MockMempoolTx {
+                message_id: Some(message_id),
+                market: Some(market),
+                kind: trigger_kind as i32,
+                tx_hash: tx_hash.clone(),
+                observed_at_ns: monotonic_ns(),
+            };
+            let mock_stream_id = publisher.publish(MOCK_MEMPOOL_TOPIC, &mock_tx).await?;
+            (hex::encode(tx_hash.as_ref()), Some(mock_stream_id))
+        }
+        InjectMode::Anvil => {
+            let rpc_url = cli
+                .anvil_rpc_url
+                .clone()
+                .or_else(|| std::env::var("ANVIL_RPC_URL").ok())
+                .unwrap_or_else(|| "http://127.0.0.1:8545".to_string());
+            let tx_hash = send_anvil_resolve_tx(&rpc_url, uma_adapter, question_id).await?;
+            (format!("{:#x}", tx_hash), None)
+        }
     };
-    let mock_stream_id = publisher.publish(MOCK_MEMPOOL_TOPIC, &mock_tx).await?;
 
     let summary = InjectorSummary {
+        mode: match cli.mode {
+            InjectMode::Mock => "mock".to_string(),
+            InjectMode::Anvil => "anvil".to_string(),
+        },
         market_id: cli.market_id,
         ctf_address,
+        market_specific_key,
+        question_id: format!("{:#x}", question_id),
+        uma_adapter_address,
         signal_topic: topics::SIGNALS_EMITTED,
         watchlist_topic: topics::WATCHLIST_UPSERT,
-        mock_topic: MOCK_MEMPOOL_TOPIC,
-        tx_hash_hex: hex::encode(tx_hash.as_ref()),
+        mock_topic: match cli.mode {
+            InjectMode::Mock => Some(MOCK_MEMPOOL_TOPIC),
+            InjectMode::Anvil => None,
+        },
+        tx_hash_hex,
         signal_stream_id,
         watchlist_stream_id,
         mock_stream_id,
