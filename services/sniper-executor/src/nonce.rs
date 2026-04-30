@@ -181,6 +181,7 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "market-actor".to_string(),
                 ctf_address: "0xactor".to_string(),
+                market_specific_key: String::new(),
             }),
             kind: 1,
             evidence_hash: Bytes::from_static(&[0x44; 32]),

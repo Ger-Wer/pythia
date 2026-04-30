@@ -26,6 +26,12 @@ message Uuid {
 message MarketId {
   string polymarket_id = 1;
   string ctf_address = 2;
+  // Canonical per-market key used by Fast Loop matching.
+  // For Polymarket markets this should normally be the `conditionId`
+  // from the Markets/Gamma API, serialized as a lowercase 0x-prefixed hex.
+  // Some decoders may derive it from other identifiers (for example
+  // `questionId` + oracle adapter address + outcomeSlotCount=2).
+  string market_specific_key = 3;
 }
 
 // Цена/деньги в fixed-point (6 decimals, как USDC). 1_000_000 = $1.00.

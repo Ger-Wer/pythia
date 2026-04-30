@@ -211,6 +211,7 @@ mod tests {
             market: Some(MarketId {
                 polymarket_id: "market-1".to_string(),
                 ctf_address: "0xfeed".to_string(),
+                market_specific_key: String::new(),
             }),
             kind: 1,
             evidence_hash: Bytes::from_static(&[0x11; 32]),

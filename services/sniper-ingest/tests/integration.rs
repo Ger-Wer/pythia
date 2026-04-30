@@ -6,11 +6,12 @@
 use alloy::providers::{Provider, ProviderBuilder, WsConnect};
 use alloy_node_bindings::Anvil;
 use alloy_primitives::{address, b256, Address, U256};
-use alloy_sol_types::SolEvent;
+use alloy_sol_types::{SolCall, SolEvent};
 use dual_loop_common::abi::polymarket_ctf::CtfExchange;
 use dual_loop_common::abi::{self, DecodedEvent};
 use sniper_ingest::matcher::TriggerMatcher;
 use sniper_ingest::mempool::monotonic_ns;
+use sniper_ingest::pending_decode::{classify_pending_call, condition_id_from_question_id, UmaCtfAdapter};
 use sniper_ingest::watchlist::WatchlistStore;
 
 use dual_loop_common::proto::common::{MarketId, Money};
@@ -26,6 +27,8 @@ fn setup_watchlist(store: &WatchlistStore) {
         market: Some(MarketId {
             polymarket_id: "test-market-1".to_string(),
             ctf_address: ctf_str,
+            market_specific_key:
+                "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
         }),
         version: 1,
         edge_ppm: 150_000,
@@ -134,6 +137,24 @@ fn matcher_fires_on_mock_mempool_tx() {
             .as_ref()
             .map(|market| market.polymarket_id.as_str()),
         Some("test-market-1")
+    );
+}
+
+#[test]
+fn pending_call_decode_produces_condition_key_for_uma_adapter() {
+    let question_id = b256!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    let input = UmaCtfAdapter::resolveCall {
+        questionID: question_id,
+    }
+    .abi_encode();
+
+    let observation = classify_pending_call(dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3, &input)
+        .expect("observation");
+    let resolution = observation.resolution.expect("resolution decode");
+    assert_eq!(resolution.selector_name, "resolve");
+    assert_eq!(
+        resolution.market_specific_key,
+        condition_id_from_question_id(dual_loop_common::abi::addresses::POLYMARKET_UMA_ADAPTER_V3, question_id)
     );
 }
 

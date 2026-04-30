@@ -23,6 +23,9 @@ fn make_store() -> (WatchlistStore, Address) {
         market: Some(MarketId {
             polymarket_id: "bench-market".to_string(),
             ctf_address: ctf_str,
+            market_specific_key:
+                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .to_string(),
         }),
         version: 1,
         edge_ppm: 150_000,
