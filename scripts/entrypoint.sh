@@ -2,6 +2,10 @@
 set -euo pipefail
 
 export PATH="/root/.bun/bin:$PATH"
+# Ensure `from python.*` imports resolve. Cron jobs invoke scripts as
+# `python python/foo.py`, which puts /app/python on sys.path but not /app
+# itself, so any `from python.bar import …` fails with ModuleNotFoundError.
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/app"
 export DB_PATH="${DB_PATH:-/app/data/pythia.db}"
 export LOG_DIR="${LOG_DIR:-/app/logs}"
 
