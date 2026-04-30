@@ -263,12 +263,17 @@ services:
     # is sufficient for paper-mode E2E and for hermetic CI runs (the public
     # https://polygon-rpc.com endpoint started returning 401 "tenant disabled"
     # for unauthenticated traffic, so it is no longer a usable default).
+    # Both the if-condition and the --fork-url argument are expanded by
+    # docker-compose at YAML-parse time (single '$'), so the wrapper sees
+    # the host-side value of POLYGON_RPC_URL. POLYGON_RPC_URL is not
+    # forwarded into the container's environment — it is baked into the
+    # generated entrypoint script directly.
     entrypoint:
       - /bin/sh
       - -c
       - |
         if [ -n "${POLYGON_RPC_URL:-}" ]; then
-          exec anvil --host 0.0.0.0 --chain-id 137 --block-time 2 --fork-url "$$POLYGON_RPC_URL"
+          exec anvil --host 0.0.0.0 --chain-id 137 --block-time 2 --fork-url "${POLYGON_RPC_URL}"
         else
           exec anvil --host 0.0.0.0 --chain-id 137 --block-time 2
         fi
