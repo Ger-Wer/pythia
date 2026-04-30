@@ -19,10 +19,11 @@ export class MemoryBusClient implements BusClient {
   async publish(
     stream: string,
     payload: Record<string, unknown>,
+    payloadBytes?: Uint8Array,
   ): Promise<string> {
     this.nextId += 1;
     const id = `${Date.now()}-${this.nextId}`;
-    const msg: BusMessage = { id, payload };
+    const msg: BusMessage = { id, payload, payloadBytes };
     const handlers = this.handlers.get(stream) ?? [];
     for (const h of handlers) {
       // Fire-and-forget like a real subscriber loop.

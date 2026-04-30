@@ -11,6 +11,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { AuditLog } from "../audit.ts";
+import { encodeProtoPublishPayload } from "../bus/proto.ts";
 import type { BusClient } from "../bus/types.ts";
 import { STREAM_CONTROL_KILL } from "../bus/topics.ts";
 import type { BridgeHandle } from "../bus/bridge.ts";
@@ -20,6 +21,7 @@ import { killCommandsTotal } from "../metrics.ts";
 import type { EventStore } from "../state/store.ts";
 import type { KillScope } from "../types.ts";
 import { requireAuth } from "./auth.ts";
+import { makeLogger } from "../logger.ts";
 
 interface KillBody {
   operator_id: string;
@@ -76,6 +78,7 @@ export function registerControlRoutes(
   },
 ): void {
   const { config, store, bus, bridge, audit, idempotency } = deps;
+  const protoLog = makeLogger("warn", { component: "control-proto-publish" });
 
   app.post<{ Body: KillBody }>(
     "/api/v1/control/kill",
@@ -187,7 +190,12 @@ export function registerControlRoutes(
       };
 
       if (bus) {
-        await bus.publish(STREAM_CONTROL_KILL, envelope);
+        const payloadBytes = await encodeProtoPublishPayload(
+          STREAM_CONTROL_KILL,
+          envelope,
+          protoLog,
+        );
+        await bus.publish(STREAM_CONTROL_KILL, envelope, payloadBytes ?? undefined);
       }
 
       store.apply("exec_status", (s) => {

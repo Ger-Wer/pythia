@@ -117,12 +117,13 @@ export class RedisBusClient implements BusClient {
   async publish(
     stream: string,
     payload: Record<string, unknown>,
+    payloadBytes?: Uint8Array,
   ): Promise<string> {
     const id = await this.redis.xadd(
       stream,
       "*",
       "payload",
-      JSON.stringify(payload),
+      payloadBytes ? Buffer.from(payloadBytes) : JSON.stringify(payload),
     );
     return id ?? "";
   }
