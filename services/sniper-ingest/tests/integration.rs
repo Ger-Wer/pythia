@@ -85,6 +85,8 @@ fn matcher_fires_on_ctf_order_filled() {
             .map(|money| money.amount_micros),
         Some(720_000)
     );
+    assert!(trigger.issued_at_unix_ms > 0);
+    assert!(trigger.watchlist_valid_until_unix_ms > trigger.issued_at_unix_ms);
     // Matcher latency should be well under 10ms.
     assert!(latency < 10_000_000, "latency_ns={latency} > 10ms");
 }
@@ -143,6 +145,8 @@ fn matcher_fires_on_mock_mempool_tx() {
             .map(|market| market.polymarket_id.as_str()),
         Some("test-market-1")
     );
+    assert!(trigger.issued_at_unix_ms > 0);
+    assert!(trigger.watchlist_valid_until_unix_ms > trigger.issued_at_unix_ms);
 }
 
 #[test]

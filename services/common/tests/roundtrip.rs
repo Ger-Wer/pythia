@@ -140,6 +140,8 @@ fn trigger_roundtrip() {
         }),
         slippage_bps: 10,
         source_count: 2,
+        issued_at_unix_ms: 1_700_000_020_000,
+        watchlist_valid_until_unix_ms: 1_700_000_080_000,
     };
     assert_roundtrip(trigger);
 }

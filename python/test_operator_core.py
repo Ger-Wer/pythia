@@ -72,7 +72,7 @@ class OperatorCoreTests(unittest.TestCase):
             )
             core = OperatorCore(db_path=db_path, log_dir=Path(db_path).parent / "logs")
 
-            core.add_to_watchlist("watch-1", "Следить внимательно")
+            core.add_to_watchlist("watch-1", "Следить внимательно", now_iso="2026-04-08T12:00:00Z")
 
             with sqlite3.connect(db_path) as conn:
                 row = conn.execute(

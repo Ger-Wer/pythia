@@ -28,7 +28,7 @@ class WatchlistStoreTests(unittest.TestCase):
 
             with sqlite3.connect(db_path) as conn:
                 ensure_watchlist_engine_schema(conn)
-                bootstrap_watch_dossier(conn, "watch-1", "Следить внимательно")
+                bootstrap_watch_dossier(conn, "watch-1", "Следить внимательно", now_iso="2026-04-07T12:00:00Z")
                 row = conn.execute(
                     """
                     SELECT market_id, freshness_policy, initial_snapshot_state, thesis_state,
@@ -153,7 +153,7 @@ class WatchlistStoreTests(unittest.TestCase):
 
             with sqlite3.connect(db_path) as conn:
                 ensure_watchlist_engine_schema(conn)
-                bootstrap_watch_dossier(conn, "watch-2", "Сильный сигнал")
+                bootstrap_watch_dossier(conn, "watch-2", "Сильный сигнал", now_iso="2026-04-07T12:00:00Z")
                 conn.execute(
                     """
                     INSERT INTO watch_refresh_runs (

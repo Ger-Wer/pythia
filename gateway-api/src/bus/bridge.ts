@@ -173,6 +173,8 @@ export async function startBridge(opts: {
           expected_price: num(p.expected_price),
           slippage_bps: num(p.slippage_bps),
           source_count: num(p.source_count),
+          issued_at_unix_ms: num(p.issued_at_unix_ms, num(p.observed_at_unix_ms, Date.now())),
+          watchlist_valid_until_unix_ms: num(p.watchlist_valid_until_unix_ms),
         };
       });
       log.info("bridge applied trigger", {

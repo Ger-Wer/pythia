@@ -43,6 +43,11 @@
 
 Timestamp-wrapper из Phase 0 **удалён** — унифицированы плоские `int64 *_unix_ms` (распаковка `Timestamp.monotonic_ns` на hot-path'е съедала такты).
 
+`Trigger` carries both monotonic and wall-clock time:
+- `observed_at_ns` stays monotonic and is only for same-process latency math.
+- `issued_at_unix_ms` is the wall-clock emission time from `sniper-ingest`.
+- `watchlist_valid_until_unix_ms` is copied from the matched watchlist entry; `sniper-executor` passes it into `RiskGuard` and rejects expired/stale intents before nonce allocation.
+
 Генерация клиентов:
 - **Rust:** `prost-build` → `services/common/src/proto.rs` (через `build.rs`).
 - **TypeScript:** `ts-proto` → `src/generated/dual_loop/v1/*.ts` (обязателен для live protobuf bridge; генерируется из корня репозитория через `bun run proto:gen`).

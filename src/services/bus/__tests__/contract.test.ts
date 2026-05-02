@@ -169,11 +169,15 @@ describe('proto roundtrip', () => {
       expectedPrice: { amountMicros: 550_000n },
       slippageBps: 10,
       sourceCount: 2,
+      issuedAtUnixMs: 1_700_000_020_000n,
+      watchlistValidUntilUnixMs: 1_700_000_080_000n,
     };
     const back = roundtrip(Trigger, msg);
     expect(back.etaBlock).toBe(123456n);
     expect(back.expectedPrice?.amountMicros).toBe(550_000n);
     expect(back.evidenceHash.length).toBe(32);
+    expect(back.issuedAtUnixMs).toBe(1_700_000_020_000n);
+    expect(back.watchlistValidUntilUnixMs).toBe(1_700_000_080_000n);
   });
 
   it('ExecStatus', () => {

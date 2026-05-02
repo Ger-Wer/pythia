@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 dual_loop_common = { path = "../common" }
+sniper-risk = { path = "../sniper-risk" }
 tokio.workspace = true
 tracing.workspace = true
 anyhow.workspace = true

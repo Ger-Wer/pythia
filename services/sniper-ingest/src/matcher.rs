@@ -187,9 +187,12 @@ impl TriggerMatcher {
                 expected_price: Some(expected_price_money(entry.p_fundamental_ppm)),
                 slippage_bps: entry.max_slippage_bps,
                 source_count,
+                issued_at_unix_ms: now_ms,
+                watchlist_valid_until_unix_ms: entry.expires_at_unix_ms,
             })
         } else {
             // No policy → fire unconditionally.
+            let now_ms = dual_loop_common::time::StampedTime::now().wall_clock_unix_ms;
             metrics::counter!("trigger_fired_total", "market" => market_key.0.clone(), "kind" => format!("{kind:?}")).increment(1);
 
             Some(Trigger {
@@ -206,6 +209,8 @@ impl TriggerMatcher {
                 expected_price: Some(expected_price_money(entry.p_fundamental_ppm)),
                 slippage_bps: entry.max_slippage_bps,
                 source_count: 1,
+                issued_at_unix_ms: now_ms,
+                watchlist_valid_until_unix_ms: entry.expires_at_unix_ms,
             })
         }
     }
@@ -314,6 +319,8 @@ mod tests {
             t.expected_price.as_ref().map(|money| money.amount_micros),
             Some(720_000)
         );
+        assert!(t.issued_at_unix_ms > 0);
+        assert!(t.watchlist_valid_until_unix_ms > t.issued_at_unix_ms);
     }
 
     #[test]
@@ -414,5 +421,9 @@ mod tests {
                 .map(|market| market.polymarket_id.as_str()),
             Some("test-market-2")
         );
+        assert!(trigger
+            .as_ref()
+            .map(|value| value.watchlist_valid_until_unix_ms > value.issued_at_unix_ms)
+            .unwrap_or(false));
     }
 }

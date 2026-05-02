@@ -1021,12 +1021,18 @@ class OperatorCore:
             for row in rows
         ]
 
-    def add_to_watchlist(self, market_id: str, note: str = "") -> None:
+    def add_to_watchlist(
+        self,
+        market_id: str,
+        note: str = "",
+        *,
+        now_iso: str | None = None,
+    ) -> None:
         market_id = str(market_id).strip()
         if not market_id:
             raise ValueError("market_id is required")
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso or datetime.now(timezone.utc).isoformat()
         with self._connect_rw() as conn:
             self._ensure_watchlist_table(conn)
             ensure_watchlist_engine_schema(conn)

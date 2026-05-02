@@ -8,7 +8,7 @@
 - `Phase 1` в основном уже влита в `main`: bus/contracts, gateway-api foundation, live Command Center feed, shadow PG.
 - `gateway-api` больше не purely JSON-only на receive-side: inbound bridge уже умеет проецировать protobuf Redis payloads в UI state, сохраняя JSON fallback для тестов и legacy-path.
 - `gateway-api` на publish-side тоже сдвинут в proto-first сторону: `signals.decisions` и `control.kill` теперь кодируются в protobuf при доступных codecs, но compatibility fallback на JSON еще не убран полностью.
-- `Phase 2` уже доказана в dev/paper-контуре: `sniper-ingest` и `sniper-risk` реализованы, `sniper-executor` уже вмещает paper submit/fill/revert lifecycle, nonce actor, stuck-timeout loop и `control.kill` consumer/ack path, а real mempool path через Anvil WS + UMA adapter decode + `market_specific_key` matching прошел E2E. End-to-end release DoD и CI discipline пока не закрыты.
+- `Phase 2` уже доказана в dev/paper-контуре: `sniper-ingest` и `sniper-risk` реализованы, `sniper-executor` уже вмещает paper submit/fill/revert lifecycle, nonce actor, stuck-timeout loop, `control.kill` consumer/ack path и встроенный `RiskGuard` pre-trade gate перед nonce allocation, а real mempool path через Anvil WS + UMA adapter decode + `market_specific_key` matching прошел E2E. End-to-end release DoD и CI discipline пока не закрыты.
 - `origin/devin/phase1-foundation-corrections` по сути интегрирована: wire contracts переведены на fixed-point (`*_ppm`, `*_bps`, `*_unix_ms`; без финансовых `double`).
 - `origin/devin/phase1-track-c-command-center-ui` интегрирована и уже читает живой gateway state по WebSocket; preview-mode остается только dev/smoke fallback.
 - `origin/devin/phase1b-pg-listen-notify` **не** считается каноническим путем и не должна вливаться в `main`: LISTEN/NOTIFY остается best-effort side-channel, а source of truth для межсервисного uplink остается Redis/NATS bus.
@@ -70,8 +70,8 @@
 - [x] ABI-декодер для CTF-контрактов и ключевых оракулов.
 - [x] `market_specific_key` matching для resolution path вместо coarse address-only match.
 - [ ] `OrderBookTracker` с REST warm-up + WS incremental.
-- [x] `TriggerMatcher` + risk pre-checks (`sniper-risk`) в коде.
-- [x] `sniper-executor` paper-mode foundation в коде: submit/fill/revert lifecycle, `BroadcastSink::Noop`, nonce actor, stuck detection, `control.kill` consumer + `KillAck`.
+- [x] `TriggerMatcher` + risk pre-checks (`sniper-risk`) в коде; `Trigger` несёт wall-clock `issued_at_unix_ms` и `watchlist_valid_until_unix_ms` для executor-side checks.
+- [x] `sniper-executor` paper-mode foundation в коде: submit/fill/revert lifecycle, `BroadcastSink::Noop`, nonce actor, stuck detection, `control.kill` consumer + `KillAck`, `RiskGuard` pre-trade reject before nonce allocation, fill/revert feedback into risk state.
 - [x] Active Watchlist / Execution Panel в UI с live gateway feed.
 - [x] Real mempool E2E через Anvil: pending tx -> decode -> `market_specific_key` match -> trigger -> paper fill -> gateway state.
 - [x] Replay harness и matcher/perf test surface.
@@ -80,7 +80,7 @@
 - [ ] End-to-end latency измерен: `mempool_seen → trigger_emitted` p95 < 8ms на staging-hardware.
 - [ ] 72 часа непрерывного paper-run без memory leak (RSS drift < 5%).
 - [ ] Backtest-harness: replay mempool-дампа даёт детерминированные triggers (byte-for-byte).
-- [ ] Build/test verification для обновлённого `sniper-executor`, real mempool decode path и protobuf bridge подтверждена чистым CI/main, а не только server-side proof.
+- [ ] Build/test verification для обновлённого `sniper-executor`, real mempool decode path и protobuf bridge подтверждена чистым CI/main, а не только server-side proof. Локальная/изолированная проверка 2026-05-02: `cargo fmt --check` и `cargo test -p sniper-executor -p sniper-ingest -p dual_loop_common` прошли в Docker Rust image на `amper`, но CI/main еще не подтверждены.
 - [ ] Shadow-comparison: paper-fills vs реальное движение цены — статистика расхождений в weekly report.
 
 ## Phase 3 — Live Execution (Hardened) (3–4 недели)

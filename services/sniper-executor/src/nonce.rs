@@ -202,6 +202,8 @@ mod tests {
             }),
             slippage_bps: 15,
             source_count: 1,
+            issued_at_unix_ms: 1_000_000,
+            watchlist_valid_until_unix_ms: 1_060_000,
         }
     }
 

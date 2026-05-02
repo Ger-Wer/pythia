@@ -79,6 +79,8 @@ export interface Trigger {
   expected_price: number;
   slippage_bps: number;
   source_count: number;
+  issued_at_unix_ms: number;
+  watchlist_valid_until_unix_ms: number;
 }
 
 export interface ExecStatus {

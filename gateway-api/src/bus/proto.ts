@@ -349,11 +349,13 @@ export async function decodeProtoPayload(
           market_id: marketId(msg.market),
           kind: triggerKindName(msg.kind),
           eta_block: asNumber(msg.etaBlock),
-          // Trigger carries a monotonic timestamp, not wall-clock time.
-          observed_at_unix_ms: Date.now(),
+          // `observed_at_ns` is monotonic; use the wall-clock trigger issue time for UI projection.
+          observed_at_unix_ms: asNumber(msg.issuedAtUnixMs) || Date.now(),
           expected_price: moneyMicros(msg.expectedPrice) / PPM_SCALE,
           slippage_bps: asNumber(msg.slippageBps),
           source_count: asNumber(msg.sourceCount),
+          issued_at_unix_ms: asNumber(msg.issuedAtUnixMs),
+          watchlist_valid_until_unix_ms: asNumber(msg.watchlistValidUntilUnixMs),
         };
       }
 

@@ -34,6 +34,13 @@ message Trigger {
 
   // Число независимых источников, подтвердивших событие (>= policy.min).
   uint32 source_count = 9;
+
+  // Wall-clock time when sniper-ingest emitted this trigger.
+  int64 issued_at_unix_ms = 10;
+
+  // Wall-clock deadline copied from the matched watchlist entry.
+  // sniper-executor/sniper-risk reject if this is already expired.
+  int64 watchlist_valid_until_unix_ms = 11;
 }
 
 // sniper-risk → audit: триггер заблокирован pre-trade checks.

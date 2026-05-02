@@ -36,6 +36,7 @@ use control::{
     SharedKillState,
 };
 use dual_loop_common::bus::{ConsumerGroup, JetStreamClient, StreamPublisher};
+use dual_loop_common::proto::control::Heartbeat;
 use dual_loop_common::proto::execution::{ExecStatus, ExecutorState};
 use dual_loop_common::proto::now_unix_ms;
 use dual_loop_common::proto::trigger::Trigger;
@@ -43,6 +44,7 @@ use dual_loop_common::{topics, WIRE_VERSION};
 use nonce::{DueExecution, NonceManagerHandle, NonceSnapshot};
 use paper::{plan_paper_execution, BroadcastSink, PaperExecutorConfig};
 use prost::Message;
+use sniper_risk::{record_risk_outcome, RiskGuard, RiskLimits, TradeIntent};
 use tokio::sync::Mutex;
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};
@@ -67,6 +69,7 @@ struct TriggerExecutionContext {
     nonce_manager: NonceManagerHandle,
     paper_cfg: PaperExecutorConfig,
     sink: BroadcastSink,
+    risk_guard: Arc<RiskGuard>,
 }
 
 #[tokio::main]
@@ -84,12 +87,14 @@ async fn main() -> Result<()> {
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
     let paper_cfg = PaperExecutorConfig::from_env();
     let control_cfg = ControlConfig::from_env();
+    let heartbeat_consumer_name = format!("{}-risk-heartbeat", control_cfg.consumer_name);
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let kill_state = new_shared_state();
     let counters = Arc::new(Counters::default());
     let nonce_manager = NonceManagerHandle::spawn(paper_cfg.base_nonce);
     let sink = BroadcastSink::Noop;
+    let risk_guard = Arc::new(RiskGuard::new(RiskLimits::from_env(), now_unix_ms()));
 
     let redis_publisher = match StreamPublisher::connect(&redis_url).await {
         Ok(publisher) => Some(Arc::new(Mutex::new(publisher))),
@@ -108,6 +113,7 @@ async fn main() -> Result<()> {
         auto_fill = paper_cfg.auto_fill,
         base_nonce = paper_cfg.base_nonce,
         control_consumer = %control_cfg.consumer_name,
+        heartbeat_consumer = %heartbeat_consumer_name,
         "sniper-executor starting (Phase 2-B paper foundation)"
     );
 
@@ -147,6 +153,7 @@ async fn main() -> Result<()> {
             nonce_manager: nonce_manager.clone(),
             paper_cfg: paper_cfg.clone(),
             sink,
+            risk_guard: risk_guard.clone(),
         };
         tokio::spawn(
             async move { run_trigger_consumer(js, shutdown, kill_state, counters, ctx).await },
@@ -158,6 +165,7 @@ async fn main() -> Result<()> {
         let kill_state = kill_state.clone();
         let counters = counters.clone();
         let nonce_manager = nonce_manager.clone();
+        let risk_guard = risk_guard.clone();
         tokio::spawn(async move {
             run_heartbeat(
                 js,
@@ -165,6 +173,7 @@ async fn main() -> Result<()> {
                 kill_state,
                 counters,
                 nonce_manager,
+                risk_guard,
                 paper_mode,
             )
             .await
@@ -177,6 +186,7 @@ async fn main() -> Result<()> {
         let counters = counters.clone();
         let redis_publisher = redis_publisher.clone();
         let nonce_manager = nonce_manager.clone();
+        let risk_guard = risk_guard.clone();
         tokio::spawn(async move {
             run_reconcile_loop(
                 shutdown,
@@ -184,6 +194,7 @@ async fn main() -> Result<()> {
                 counters,
                 nonce_manager,
                 redis_publisher,
+                risk_guard,
             )
             .await
         })
@@ -208,6 +219,16 @@ async fn main() -> Result<()> {
         })
     };
 
+    let risk_heartbeat_task = {
+        let shutdown = shutdown.clone();
+        let redis_url = redis_url.clone();
+        let risk_guard = risk_guard.clone();
+        tokio::spawn(async move {
+            run_risk_heartbeat_consumer(redis_url, shutdown, risk_guard, heartbeat_consumer_name)
+                .await
+        })
+    };
+
     // Drive shutdown via SIGINT/SIGTERM → flip kill switch → children exit.
     shutdown_signal().await;
     info!("shutdown signal received; engaging kill switch and draining");
@@ -223,6 +244,7 @@ async fn main() -> Result<()> {
         }
         let _ = reconcile_task.await;
         let _ = control_task.await;
+        let _ = risk_heartbeat_task.await;
     })
     .await
     .ok();
@@ -297,36 +319,7 @@ async fn run_trigger_consumer(
                         );
                     } else {
                         let now_ms = now_unix_ms();
-                        match ctx.nonce_manager.allocate().await {
-                            Ok(nonce) => {
-                                let execution =
-                                    plan_paper_execution(&trigger, nonce, now_ms, &ctx.paper_cfg);
-                                if let Err(e) = publish_event(
-                                    &ctx.redis_publisher,
-                                    topics::EXEC_SUBMITTED,
-                                    &execution.submitted,
-                                )
-                                .await
-                                {
-                                    warn!(error = %e, nonce, "exec.submitted publish failed");
-                                }
-                                ctx.sink.submit(&execution);
-                                if let Err(e) = ctx.nonce_manager.track(execution.clone()).await {
-                                    error!(error = %e, nonce, "failed to track in-flight execution");
-                                } else {
-                                    counters.executed.fetch_add(1, Ordering::Relaxed);
-                                    metrics::counter!("exec_submitted_total").increment(1);
-                                    info!(
-                                        nonce,
-                                        market = %execution.market_id(),
-                                        auto_fill = execution.fill.is_some(),
-                                        tx_hash = %hex::encode(execution.submitted.tx_hash.as_ref()),
-                                        "paper execution submitted"
-                                    );
-                                }
-                            }
-                            Err(e) => error!(error = %e, "nonce allocation failed"),
-                        }
+                        submit_paper_execution(&trigger, now_ms, &counters, &ctx).await;
                     }
                 }
 
@@ -346,6 +339,83 @@ async fn run_trigger_consumer(
     info!("trigger consumer shutting down");
 }
 
+fn trade_intent_from_trigger(
+    trigger: &Trigger,
+    now_ms: i64,
+    cfg: &PaperExecutorConfig,
+) -> TradeIntent {
+    TradeIntent {
+        market_id: trigger
+            .market
+            .as_ref()
+            .map(|market| market.polymarket_id.clone())
+            .unwrap_or_default(),
+        size_usd: cfg.default_size_usd_micros,
+        slippage_bps: trigger.slippage_bps,
+        watchlist_valid_until_unix_ms: trigger.watchlist_valid_until_unix_ms,
+        issued_at_unix_ms: trigger.issued_at_unix_ms,
+        now_unix_ms: now_ms,
+    }
+}
+
+async fn submit_paper_execution(
+    trigger: &Trigger,
+    now_ms: i64,
+    counters: &Counters,
+    ctx: &TriggerExecutionContext,
+) -> bool {
+    let intent = trade_intent_from_trigger(trigger, now_ms, &ctx.paper_cfg);
+    let risk_result = ctx.risk_guard.evaluate(&intent);
+    record_risk_outcome(&risk_result);
+    if let Err(e) = risk_result {
+        metrics::counter!("exec_triggers_blocked_total", "reason" => "risk").increment(1);
+        warn!(
+            error = %e,
+            market = %intent.market_id,
+            slippage_bps = intent.slippage_bps,
+            issued_at_unix_ms = intent.issued_at_unix_ms,
+            watchlist_valid_until_unix_ms = intent.watchlist_valid_until_unix_ms,
+            "trigger blocked by risk guard"
+        );
+        return false;
+    }
+
+    match ctx.nonce_manager.allocate().await {
+        Ok(nonce) => {
+            let execution = plan_paper_execution(trigger, nonce, now_ms, &ctx.paper_cfg);
+            if let Err(e) = publish_event(
+                &ctx.redis_publisher,
+                topics::EXEC_SUBMITTED,
+                &execution.submitted,
+            )
+            .await
+            {
+                warn!(error = %e, nonce, "exec.submitted publish failed");
+            }
+            ctx.sink.submit(&execution);
+            if let Err(e) = ctx.nonce_manager.track(execution.clone()).await {
+                error!(error = %e, nonce, "failed to track in-flight execution");
+                false
+            } else {
+                counters.executed.fetch_add(1, Ordering::Relaxed);
+                metrics::counter!("exec_submitted_total").increment(1);
+                info!(
+                    nonce,
+                    market = %execution.market_id(),
+                    auto_fill = execution.fill.is_some(),
+                    tx_hash = %hex::encode(execution.submitted.tx_hash.as_ref()),
+                    "paper execution submitted"
+                );
+                true
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "nonce allocation failed");
+            false
+        }
+    }
+}
+
 /// Periodic `ExecStatus` publisher for the Command Center.
 async fn run_heartbeat(
     js: JetStreamClient,
@@ -353,6 +423,7 @@ async fn run_heartbeat(
     kill_state: SharedKillState,
     counters: Arc<Counters>,
     nonce_manager: NonceManagerHandle,
+    risk_guard: Arc<RiskGuard>,
     paper_mode: bool,
 ) {
     let mut tick = interval(HEARTBEAT_INTERVAL);
@@ -375,6 +446,7 @@ async fn run_heartbeat(
         metrics::gauge!("executor_in_flight_total").set(snapshot.in_flight as f64);
         metrics::gauge!("executor_oldest_in_flight_age_ms")
             .set(snapshot.oldest_in_flight_age_ms.unwrap_or(0) as f64);
+        risk_guard.emit_metrics(now_unix_ms());
 
         let status = ExecStatus {
             heartbeat_seq: seq,
@@ -421,6 +493,7 @@ async fn run_reconcile_loop(
     counters: Arc<Counters>,
     nonce_manager: NonceManagerHandle,
     redis_publisher: Option<RedisPublisherHandle>,
+    risk_guard: Arc<RiskGuard>,
 ) {
     let mut tick = interval(RECONCILE_INTERVAL);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -440,6 +513,8 @@ async fn run_reconcile_loop(
                                     warn!(error = %e, nonce, "exec.filled publish failed");
                                 }
                                 metrics::counter!("exec_filled_total").increment(1);
+                                risk_guard.record_fill(fill);
+                                risk_guard.emit_metrics(now_ms);
                                 info!(
                                     nonce,
                                     market = %execution.market_id(),
@@ -460,6 +535,8 @@ async fn run_reconcile_loop(
                             }
                             metrics::counter!("exec_reverted_total", "reason" => "timeout")
                                 .increment(1);
+                            risk_guard.record_revert(&execution.timeout_revert);
+                            risk_guard.emit_metrics(now_ms);
                             info!(
                                 nonce,
                                 market = %execution.market_id(),
@@ -599,6 +676,65 @@ async fn run_control_consumer(
     info!("control consumer shutting down");
 }
 
+async fn run_risk_heartbeat_consumer(
+    redis_url: String,
+    shutdown: Arc<AtomicBool>,
+    risk_guard: Arc<RiskGuard>,
+    consumer_name: String,
+) {
+    let mut consumer = match ConsumerGroup::connect(
+        &redis_url,
+        topics::CONTROL_HEARTBEAT,
+        topics::consumer_groups::SNIPER_RISK,
+        &consumer_name,
+    )
+    .await
+    {
+        Ok(consumer) => consumer,
+        Err(e) => {
+            error!(error = %e, "heartbeat consumer failed to connect; dead-man heartbeats disabled");
+            return;
+        }
+    };
+
+    info!(
+        topic = topics::CONTROL_HEARTBEAT,
+        "risk heartbeat consumer up"
+    );
+
+    while !shutdown.load(Ordering::Relaxed) {
+        let messages = match consumer.read_next().await {
+            Ok(messages) => messages,
+            Err(e) => {
+                warn!(error = %e, "heartbeat consumer read failed; backing off");
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                continue;
+            }
+        };
+
+        for message in messages {
+            match message.decode::<Heartbeat>() {
+                Ok(heartbeat) => {
+                    risk_guard.record_heartbeat(heartbeat.heartbeat_at_unix_ms);
+                    risk_guard.emit_metrics(now_unix_ms());
+                    debug!(
+                        operator_id = %heartbeat.operator_id,
+                        heartbeat_at_unix_ms = heartbeat.heartbeat_at_unix_ms,
+                        "operator heartbeat recorded"
+                    );
+                }
+                Err(e) => warn!(error = %e, "heartbeat decode failed"),
+            }
+
+            if let Err(e) = consumer.ack(&message.id).await {
+                warn!(error = %e, id = %message.id, "heartbeat ack failed");
+            }
+        }
+    }
+
+    info!("risk heartbeat consumer shutting down");
+}
+
 async fn publish_event<M: Message>(
     redis_publisher: &Option<RedisPublisherHandle>,
     topic: &str,
@@ -632,5 +768,117 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {}
         _ = terminate => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use dual_loop_common::proto::common::{MarketId, Money, Uuid};
+
+    fn risk_limits(max_slippage_bps: u32) -> RiskLimits {
+        RiskLimits {
+            per_market_cap_usd: 10_000_000,
+            global_cap_usd: 100_000_000,
+            max_slippage_bps,
+            daily_budget_usd: 1_000_000_000,
+            stale_signal_threshold_ms: 60_000,
+            dead_man_timeout_ms: 300_000,
+            cb_consecutive_fails: 3,
+            cb_failure_rate: 0.5,
+            cb_window_secs: 60,
+        }
+    }
+
+    fn sample_trigger(now_ms: i64, slippage_bps: u32) -> Trigger {
+        Trigger {
+            message_id: Some(Uuid {
+                value: Bytes::from_static(&[0xEF; 16]),
+            }),
+            market: Some(MarketId {
+                polymarket_id: "risk-market-1".to_string(),
+                ctf_address: "0xrisk".to_string(),
+                market_specific_key: "0xabc".to_string(),
+            }),
+            kind: 1,
+            evidence_hash: Bytes::from_static(&[0x55; 32]),
+            eta_block: 7,
+            observed_at_ns: 100,
+            expected_price: Some(Money {
+                amount_micros: 650_000,
+            }),
+            slippage_bps,
+            source_count: 1,
+            issued_at_unix_ms: now_ms - 1_000,
+            watchlist_valid_until_unix_ms: now_ms + 60_000,
+        }
+    }
+
+    fn execution_context(max_slippage_bps: u32, now_ms: i64) -> TriggerExecutionContext {
+        TriggerExecutionContext {
+            redis_publisher: None,
+            nonce_manager: NonceManagerHandle::spawn(0),
+            paper_cfg: PaperExecutorConfig::default(),
+            sink: BroadcastSink::Noop,
+            risk_guard: Arc::new(RiskGuard::new(risk_limits(max_slippage_bps), now_ms)),
+        }
+    }
+
+    #[test]
+    fn trade_intent_uses_trigger_risk_fields() {
+        let now_ms = 1_000_000;
+        let trigger = sample_trigger(now_ms, 25);
+
+        let intent = trade_intent_from_trigger(&trigger, now_ms, &PaperExecutorConfig::default());
+
+        assert_eq!(intent.market_id, "risk-market-1");
+        assert_eq!(
+            intent.size_usd,
+            PaperExecutorConfig::default().default_size_usd_micros
+        );
+        assert_eq!(intent.slippage_bps, 25);
+        assert_eq!(intent.issued_at_unix_ms, now_ms - 1_000);
+        assert_eq!(intent.watchlist_valid_until_unix_ms, now_ms + 60_000);
+    }
+
+    #[tokio::test]
+    async fn risk_reject_prevents_nonce_allocation_and_tracking() {
+        let now_ms = 1_000_000;
+        let ctx = execution_context(10, now_ms);
+        let counters = Counters::default();
+        let trigger = sample_trigger(now_ms, 25);
+
+        let submitted = submit_paper_execution(&trigger, now_ms, &counters, &ctx).await;
+        let snapshot = ctx
+            .nonce_manager
+            .snapshot(now_ms)
+            .await
+            .expect("nonce snapshot");
+
+        assert!(!submitted);
+        assert_eq!(counters.executed.load(Ordering::Relaxed), 0);
+        assert_eq!(snapshot.next_nonce, 0);
+        assert_eq!(snapshot.in_flight, 0);
+    }
+
+    #[tokio::test]
+    async fn risk_accept_allows_paper_submission_and_tracking() {
+        let now_ms = 1_000_000;
+        let ctx = execution_context(50, now_ms);
+        let counters = Counters::default();
+        let trigger = sample_trigger(now_ms, 25);
+
+        let submitted = submit_paper_execution(&trigger, now_ms, &counters, &ctx).await;
+        let snapshot = ctx
+            .nonce_manager
+            .snapshot(now_ms)
+            .await
+            .expect("nonce snapshot");
+
+        assert!(submitted);
+        assert_eq!(counters.executed.load(Ordering::Relaxed), 1);
+        assert_eq!(snapshot.next_nonce, 1);
+        assert_eq!(snapshot.in_flight, 1);
     }
 }

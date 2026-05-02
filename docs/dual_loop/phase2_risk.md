@@ -102,6 +102,12 @@ All metrics are exported via Prometheus scrape endpoint.
 
 ## Integration with sniper-executor (P2-B)
 
+Current implementation status:
+- `sniper-ingest` copies `issued_at_unix_ms` and `watchlist_valid_until_unix_ms` into every `Trigger`.
+- `sniper-executor` builds a `TradeIntent` from the trigger, evaluates `RiskGuard` before nonce allocation, and blocks rejected triggers before paper submit/fill tracking.
+- `sniper-executor` consumes `dl.v1.control.heartbeat` and records it into the embedded `RiskGuard` dead-man switch.
+- Paper fills/reverts are recorded back into `RiskGuard` so position caps, daily budget, and circuit breaker state evolve with the paper lifecycle.
+
 ```rust
 use sniper_risk::{RiskGuard, RiskLimits, TradeIntent};
 
