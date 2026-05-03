@@ -162,6 +162,7 @@ export function initDb(): Database {
   });
   db.run('PRAGMA foreign_keys = ON;');
   db.run('PRAGMA journal_mode = WAL;');
+  db.run('PRAGMA busy_timeout = 30000;');
   db.run(BASE_TABLE_SQL);
   ensurePredictionMigrations(db);
   ensurePredictionIndexes(db);
