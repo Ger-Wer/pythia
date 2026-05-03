@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { CommandCenterPage } from "../CommandCenterPage";
@@ -20,6 +20,7 @@ function sig(id: string, priority: Signal["priority"] = "OK"): Signal {
     rationale: "rationale",
     evidence: [],
     localDecision: null,
+    serverVersion: 0,
   };
 }
 
@@ -151,5 +152,107 @@ describe("CommandCenterPage — smoke", () => {
     expect(screen.getByRole("dialog", { name: /Hotkey reference/i })).toBeInTheDocument();
     await user.keyboard("{Control>}/{/Control}");
     expect(useCommandCenterStore.getState().helpOpen).toBe(false);
+  });
+
+  function withAuthQueryString<T>(qs: string, fn: () => T): T {
+    const original = window.location.search;
+    window.history.replaceState(null, "", `/command-center${qs}`);
+    try {
+      return fn();
+    } finally {
+      window.history.replaceState(null, "", `/command-center${original}`);
+    }
+  }
+
+  it("A hotkey POSTs to gateway accept endpoint when auth query params are present", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ decision_id: "dec-1", action: "ACCEPT" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      await withAuthQueryString(
+        "?preview=1&token=tok-test&operator_id=op-1&cc_api_url=https%3A%2F%2Fgw.example",
+        async () => {
+          const user = userEvent.setup();
+          seedStore();
+          render(
+            <MemoryRouter initialEntries={["/command-center?preview=1"]}>
+              <CommandCenterPage disableFeed />
+            </MemoryRouter>,
+          );
+
+          await user.keyboard("a");
+          await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+
+          const [url, init] = fetchImpl.mock.calls[0]!;
+          // seedStore() prepends a, b, c → signalOrder = ["c", "b", "a"], cursor=0 → "c".
+          expect(url).toBe("https://gw.example/api/v1/signals/c/accept");
+          const reqInit = init as RequestInit;
+          const headers = reqInit.headers as Record<string, string>;
+          expect(headers["Authorization"]).toBe("Bearer tok-test");
+          const body = JSON.parse(reqInit.body as string);
+          expect(body).toMatchObject({
+            operator_id: "op-1",
+            expected_version: 0,
+          });
+          expect(typeof body.idempotency_key).toBe("string");
+          expect(body.idempotency_key.length).toBeGreaterThanOrEqual(8);
+
+          const state = useCommandCenterStore.getState();
+          const id = state.signalOrder[state.cursor.triageIndex]!;
+          expect(state.signals[id]?.localDecision).toBe("accept");
+        },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("A hotkey rolls back optimistic decision on 409 version_conflict", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "version_conflict",
+          actual_version: 5,
+          expected_version: 0,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      await withAuthQueryString(
+        "?preview=1&token=tok-test&operator_id=op-1&cc_api_url=https%3A%2F%2Fgw.example",
+        async () => {
+          const user = userEvent.setup();
+          seedStore();
+          render(
+            <MemoryRouter initialEntries={["/command-center?preview=1"]}>
+              <CommandCenterPage disableFeed />
+            </MemoryRouter>,
+          );
+
+          await user.keyboard("a");
+          await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+          // After server rejects with 409, optimistic decision is rolled back
+          // to its previous value (null in seedStore).
+          await waitFor(() => {
+            const s = useCommandCenterStore.getState();
+            const id = s.signalOrder[s.cursor.triageIndex]!;
+            expect(s.signals[id]?.localDecision).toBeNull();
+          });
+        },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

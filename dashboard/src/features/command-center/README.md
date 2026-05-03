@@ -3,10 +3,13 @@
 Bloomberg-style operator console for the Pythia Dual-Loop architecture.
 Route: `/command-center` — outside the main Layout so it takes over the viewport.
 
-In Phase 1 the page is **read-only** and driven by an in-browser mock feed.
-Phase 2 swaps the mock feed for a real WSS connection to `gateway-api` and
-enables server-side mutations (accept/reject/snooze/kill). Phase 1 hotkeys
-only touch UI state.
+The page is driven by either an in-browser mock feed (when no
+`VITE_COMMAND_CENTER_WS_URL` is set) or a real WSS connection to
+`gateway-api`. Operator decision hotkeys (`A`/`R`/`S`) write through to the
+gateway when `VITE_COMMAND_CENTER_API_URL` + token + `operator_id` are
+configured; otherwise they only update the local store (preview / mock
+mode). The kill switch and bulk actions (`Shift+A`, `Shift+D`) are still
+read-only stubs and ship in a later phase.
 
 ## Feature flag
 
@@ -18,11 +21,21 @@ only touch UI state.
   unset, the mock feed runs instead.
 - `VITE_COMMAND_CENTER_WS_TOKEN` — optional build-time token for dev/demo
   sessions. Safer alternative: open `/command-center?...&token=<paseto>`.
+  The same token is reused for HTTP `Authorization: Bearer <token>` on
+  decision write-path calls.
 - `VITE_COMMAND_CENTER_WS_DEBUG=true` or page query `cc_debug=1` — logs WS
   connect / snapshot / patch application in the browser console.
 - Page query `cc_ws_url=ws://.../ws/v1` — runtime override for the gateway
   WebSocket URL, useful on shared servers where we do not want to rebuild the
   dashboard for every demo/proof run.
+- `VITE_COMMAND_CENTER_API_URL` (or page query `cc_api_url=` /
+  `api_url=`) — HTTP base URL for `POST /api/v1/signals/:id/{accept,reject,snooze}`.
+  When unset, derived from `VITE_COMMAND_CENTER_WS_URL` by replacing the
+  protocol (`ws`/`wss` → `http`/`https`) and dropping the path. Required for
+  operator decisions to actually reach the gateway.
+- `VITE_COMMAND_CENTER_OPERATOR_ID` (or page query `operator_id=`) — value
+  sent in `body.operator_id`. Must match the `sub` claim of the PASETO
+  token. Required for operator decisions.
 
 See `dashboard/.env.example`.
 
@@ -80,19 +93,19 @@ CommandCenterPage.tsx         route entry, mounts feed, wires hotkeys
 
 ## Hotkeys
 
-| Keys              | Action                                                            |
-| ----------------- | ----------------------------------------------------------------- |
-| `j` / `k`         | Move Triage cursor                                                |
-| `A`               | Mark current signal as *accept* locally + toast "Phase 1 local"   |
-| `R`               | Mark as *reject* locally + toast                                  |
-| `S`               | Mark as *snooze* locally + toast                                  |
-| `Space`           | Toggle Market Detail modal on selected row                        |
-| `Shift+A`         | Accept-all (Phase 1: toast only)                                  |
-| `Shift+D`         | Dismiss-all (Phase 1: toast only)                                 |
-| `Ctrl+Shift+K`    | Open Kill Switch disabled notice                                  |
-| `Ctrl+Shift+P`    | Toggle dev FPS HUD                                                |
-| `?` / `Ctrl+/`    | Toggle hotkey help overlay                                        |
-| `Escape`          | Close any open modal                                              |
+| Keys              | Action                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `j` / `k`         | Move Triage cursor                                                                  |
+| `A`               | Optimistically *accept* + `POST /api/v1/signals/:id/accept` (rollback on 409/404/403) |
+| `R`               | Optimistically *reject* + `POST /api/v1/signals/:id/reject` (default reason)        |
+| `S`               | Optimistically *snooze* + `POST /api/v1/signals/:id/snooze` (default 1h)            |
+| `Space`           | Toggle Market Detail modal on selected row                                          |
+| `Shift+A`         | Accept-all — not wired yet                                                          |
+| `Shift+D`         | Dismiss-all — not wired yet                                                         |
+| `Ctrl+Shift+K`    | Open Kill Switch placeholder                                                        |
+| `Ctrl+Shift+P`    | Toggle dev FPS HUD                                                                  |
+| `?` / `Ctrl+/`    | Toggle hotkey help overlay                                                          |
+| `Escape`          | Close any open modal                                                                |
 
 Hotkeys auto-disable when focus is on an input/textarea/select, or when
 the focused element has `data-keyboard-safe="true"`.

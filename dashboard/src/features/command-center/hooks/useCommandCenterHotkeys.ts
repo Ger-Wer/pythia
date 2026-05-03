@@ -1,11 +1,29 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useCommandCenterStore } from "../store/useCommandCenterStore";
+import type { LocalDecision, Signal } from "../store/types";
 import type { Toast } from "./useToasts";
+import { resolveCommandCenterAuth, type CommandCenterAuth } from "../api/auth";
+import {
+  decideAccept,
+  decideReject,
+  decideSnooze,
+  type DecideClientOptions,
+  type DecideResult,
+} from "../api/decideClient";
 
 interface Options {
   pushToast: (t: Omit<Toast, "id"> & { ttl?: number }) => void;
+  /** Test hook: skip the live HTTP path and only do optimistic store updates. */
+  disableHttp?: boolean;
+  /** Test hook: inject a custom fetch (e.g. vi.fn). */
+  fetchImpl?: typeof fetch;
+  /** Test hook: inject auth resolver result. */
+  authOverride?: CommandCenterAuth;
 }
+
+const SNOOZE_DEFAULT_MS = 60 * 60 * 1000; // 1 hour
+const REJECT_DEFAULT_REASON = "Operator reject (Command Center hotkey)";
 
 function focusedTag(): string {
   const el = typeof document !== "undefined" ? document.activeElement : null;
@@ -16,7 +34,30 @@ function focusedTag(): string {
   return "";
 }
 
-export function useCommandCenterHotkeys({ pushToast }: Options) {
+function describeError(result: Extract<DecideResult, { ok: false }>): string {
+  switch (result.kind) {
+    case "no_auth":
+      return "no backend auth — recorded locally only";
+    case "version_conflict":
+      return `version conflict (server v${result.actualVersion ?? "?"}); refresh and retry`;
+    case "unauthorized":
+      return "auth expired — re-login required";
+    case "forbidden":
+      return "forbidden — operator_id mismatch";
+    case "not_found":
+      return "signal no longer exists on server";
+    case "rate_limited":
+      return "rate limited by gateway";
+    case "network":
+      return "network error reaching gateway";
+    case "server":
+      return "gateway 5xx — recorded locally";
+    default:
+      return `failed: ${result.message}`;
+  }
+}
+
+export function useCommandCenterHotkeys({ pushToast, disableHttp, fetchImpl, authOverride }: Options) {
   const moveCursor = useCommandCenterStore((s) => s.moveCursor);
   const setLocalDecision = useCommandCenterStore((s) => s.setLocalDecision);
   const setDetailOpen = useCommandCenterStore((s) => s.setDetailOpen);
@@ -24,11 +65,70 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
   const setHelpOpen = useCommandCenterStore((s) => s.setHelpOpen);
   const togglePerfHud = useCommandCenterStore((s) => s.togglePerfHud);
 
-  const currentSignal = useCallback(() => {
+  const auth: CommandCenterAuth = useMemo(
+    () => authOverride ?? resolveCommandCenterAuth(),
+    [authOverride],
+  );
+
+  const clientOptions: DecideClientOptions = useMemo(
+    () => ({ auth, fetchImpl }),
+    [auth, fetchImpl],
+  );
+
+  const currentSignal = useCallback((): Signal | null => {
     const s = useCommandCenterStore.getState();
     const id = s.signalOrder[s.cursor.triageIndex];
-    return id ? s.signals[id] : null;
+    return id ? s.signals[id] ?? null : null;
   }, []);
+
+  // Apply optimistic local decision, fire backend request, roll back on
+  // hard error. Soft errors (no_auth, network, server 5xx) keep the
+  // optimistic decision so the operator still sees their intent — the
+  // authoritative WS update will reconcile on reconnect.
+  const submit = useCallback(
+    async (
+      sig: Signal,
+      decision: LocalDecision,
+      run: (opts: DecideClientOptions) => Promise<DecideResult>,
+    ): Promise<void> => {
+      const previous = sig.localDecision;
+      setLocalDecision(sig.id, decision);
+
+      if (disableHttp || !decision) return;
+      if (!auth.ready) {
+        pushToast({
+          message: `${decision} ${sig.market} — local only (HTTP auth not configured)`,
+          variant: "info",
+        });
+        return;
+      }
+
+      const variantForDecision = decision === "accept" ? "accept" : decision === "reject" ? "reject" : "snooze";
+      const result = await run(clientOptions);
+      if (result.ok) {
+        pushToast({
+          message: `${decision} ${sig.market} accepted by gateway`,
+          variant: variantForDecision,
+        });
+        return;
+      }
+
+      const detail = describeError(result);
+      // Hard rollback only for conflicts the server explicitly rejected.
+      const rollback =
+        result.kind === "version_conflict" ||
+        result.kind === "not_found" ||
+        result.kind === "forbidden";
+      if (rollback) {
+        setLocalDecision(sig.id, previous);
+      }
+      pushToast({
+        message: `${decision} ${sig.market} — ${detail}`,
+        variant: "warn",
+      });
+    },
+    [auth, clientOptions, disableHttp, pushToast, setLocalDecision],
+  );
 
   const guard = () => focusedTag() === "";
 
@@ -55,11 +155,9 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
       if (!guard()) return;
       const sig = currentSignal();
       if (!sig) return;
-      setLocalDecision(sig.id, "accept");
-      pushToast({
-        message: `(Phase 1) accept ${sig.market} recorded locally, not sent to backend`,
-        variant: "accept",
-      });
+      void submit(sig, "accept", (opts) =>
+        decideAccept({ signalId: sig.id, expectedVersion: sig.serverVersion }, opts),
+      );
     },
     { enableOnFormTags: false },
   );
@@ -69,11 +167,16 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
       if (!guard()) return;
       const sig = currentSignal();
       if (!sig) return;
-      setLocalDecision(sig.id, "reject");
-      pushToast({
-        message: `(Phase 1) reject ${sig.market} recorded locally, not sent to backend`,
-        variant: "reject",
-      });
+      void submit(sig, "reject", (opts) =>
+        decideReject(
+          {
+            signalId: sig.id,
+            expectedVersion: sig.serverVersion,
+            reason: REJECT_DEFAULT_REASON,
+          },
+          opts,
+        ),
+      );
     },
     { enableOnFormTags: false },
   );
@@ -83,11 +186,13 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
       if (!guard()) return;
       const sig = currentSignal();
       if (!sig) return;
-      setLocalDecision(sig.id, "snooze");
-      pushToast({
-        message: `(Phase 1) snooze ${sig.market} recorded locally, not sent to backend`,
-        variant: "snooze",
-      });
+      const snoozeUntilUnixMs = Date.now() + SNOOZE_DEFAULT_MS;
+      void submit(sig, "snooze", (opts) =>
+        decideSnooze(
+          { signalId: sig.id, expectedVersion: sig.serverVersion, snoozeUntilUnixMs },
+          opts,
+        ),
+      );
     },
     { enableOnFormTags: false },
   );
@@ -107,7 +212,10 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
     "shift+a",
     () => {
       if (!guard()) return;
-      pushToast({ message: "(Phase 1) accept-all recorded locally", variant: "accept" });
+      pushToast({
+        message: "accept-all not wired yet — use single-signal A",
+        variant: "warn",
+      });
     },
     { enableOnFormTags: false },
   );
@@ -115,7 +223,10 @@ export function useCommandCenterHotkeys({ pushToast }: Options) {
     "shift+d",
     () => {
       if (!guard()) return;
-      pushToast({ message: "(Phase 1) dismiss-all recorded locally", variant: "warn" });
+      pushToast({
+        message: "dismiss-all not wired yet — use single-signal R",
+        variant: "warn",
+      });
     },
     { enableOnFormTags: false },
   );

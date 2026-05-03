@@ -4,12 +4,12 @@ import { useCommandCenterStore } from "../store/useCommandCenterStore";
 
 const ROWS: { keys: string[]; action: string }[] = [
   { keys: ["j", "k"], action: "Navigate Triage Queue" },
-  { keys: ["A"], action: "Accept signal (Phase 1: local)" },
-  { keys: ["R"], action: "Reject signal (Phase 1: local)" },
-  { keys: ["S"], action: "Snooze signal (Phase 1: local)" },
+  { keys: ["A"], action: "Accept signal (POST to gateway)" },
+  { keys: ["R"], action: "Reject signal (POST to gateway)" },
+  { keys: ["S"], action: "Snooze signal 1h (POST to gateway)" },
   { keys: ["Space"], action: "Toggle Market Detail modal" },
-  { keys: ["Shift", "A"], action: "Accept all pending (Phase 1: toast)" },
-  { keys: ["Shift", "D"], action: "Dismiss all pending (Phase 1: toast)" },
+  { keys: ["Shift", "A"], action: "Accept all pending (not wired yet)" },
+  { keys: ["Shift", "D"], action: "Dismiss all pending (not wired yet)" },
   { keys: ["Ctrl", "Shift", "K"], action: "Kill Switch (disabled in Phase 1)" },
   { keys: ["Ctrl", "Shift", "P"], action: "Toggle perf HUD" },
   { keys: ["?"], action: "Toggle this help" },

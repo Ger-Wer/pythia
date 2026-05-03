@@ -51,6 +51,7 @@ function buildRandomSignal(): Signal {
       "https://example.com/article",
     ],
     localDecision: null,
+    serverVersion: 0,
   };
 }
 
