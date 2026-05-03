@@ -328,6 +328,7 @@ export function createGatewayProjection(): GatewayProjection {
         rationale: signal.llm_rationale,
         evidence: signal.evidence_urls,
         localDecision: mapDecision(signal.decision?.action),
+        serverVersion: signal.server_version,
       };
     }
 

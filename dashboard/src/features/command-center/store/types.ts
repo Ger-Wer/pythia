@@ -17,6 +17,9 @@ export interface Signal {
   rationale: string;
   evidence: string[];
   localDecision: LocalDecision;
+  // Server-authoritative version used for optimistic concurrency control on
+  // accept/reject/snooze write paths. Mirrors `GatewaySignal.server_version`.
+  serverVersion: number;
 }
 
 export interface WatchlistRow {

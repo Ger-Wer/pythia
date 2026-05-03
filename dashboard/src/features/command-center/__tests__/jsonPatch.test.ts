@@ -16,6 +16,7 @@ function makeSignal(id: string, edge: number): Signal {
     rationale: "",
     evidence: [],
     localDecision: null,
+    serverVersion: 0,
   };
 }
 

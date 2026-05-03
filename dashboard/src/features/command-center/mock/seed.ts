@@ -46,6 +46,7 @@ export function seedInitialSignals(now: number): Signal[] {
         "https://example.com/analyst-report",
       ],
       localDecision: null,
+      serverVersion: 0,
     };
   });
 }

@@ -94,7 +94,7 @@ export const CommandCenterPage = memo(function CommandCenterPage({ disableFeed }
         <EdgeHeatmap />
         <LatencyHistograms />
         <div className="cc-area-status cc-status-strip" role="contentinfo">
-          <span>PYTHIA dual-loop · Phase 1 · read-only</span>
+          <span>PYTHIA dual-loop · operator decisions wired</span>
           <span>
             <span className="cc-kbd">?</span> help · <span className="cc-kbd">Ctrl</span>+
             <span className="cc-kbd">Shift</span>+<span className="cc-kbd">P</span> perf
