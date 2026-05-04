@@ -7,7 +7,7 @@
 - `Phase 0` завершена.
 - `Phase 1` в основном уже влита в `main`: bus/contracts, gateway-api foundation, live Command Center feed, shadow PG.
 - `gateway-api` больше не purely JSON-only на receive-side: inbound bridge уже умеет проецировать protobuf Redis payloads в UI state, сохраняя JSON fallback для тестов и legacy-path.
-- `gateway-api` на publish-side тоже сдвинут в proto-first сторону: `signals.decisions` и `control.kill` теперь кодируются в protobuf при доступных codecs, но compatibility fallback на JSON еще не убран полностью.
+- `gateway-api` на publish-side теперь строго protobuf-only: `signals.decisions` и `control.kill` кодируются исключительно через ts-proto, а если codec недоступен или encode падает, route отвечает HTTP 503 `proto_codecs_unavailable`; compatibility fallback на JSON убран (gate #5).
 - `Phase 2` уже доказана в dev/paper-контуре: `sniper-ingest` и `sniper-risk` реализованы, `sniper-executor` уже вмещает paper submit/fill/revert lifecycle, nonce actor, stuck-timeout loop, `control.kill` consumer/ack path и встроенный `RiskGuard` pre-trade gate перед nonce allocation, а real mempool path через Anvil WS + UMA adapter decode + `market_specific_key` matching прошел E2E. End-to-end release DoD и CI discipline пока не закрыты.
 - `origin/devin/phase1-foundation-corrections` по сути интегрирована: wire contracts переведены на fixed-point (`*_ppm`, `*_bps`, `*_unix_ms`; без финансовых `double`).
 - `origin/devin/phase1-track-c-command-center-ui` интегрирована и уже читает живой gateway state по WebSocket; preview-mode остается только dev/smoke fallback.
@@ -58,7 +58,7 @@
 - [ ] Сигналы из Pythia появляются в **реальном** Command Center < 500ms.
 - [ ] Оператор может Accept/Reject из самого Command Center UI (backend routes есть, UI write-path еще не закончен).
 - [ ] Synthetic load test: 1k signals/min без drop.
-- [ ] Убрать residual JSON fallback для `signals.decisions` / `control.kill` и довести `gateway-api` до чистого protobuf control-plane.
+- [x] Убрать residual JSON fallback для `signals.decisions` / `control.kill` и довести `gateway-api` до чистого protobuf control-plane (gate #5).
 - [ ] Shadow PG live 7 дней без дельт с SQLite на критических запросах.
 
 ## Phase 2 — Sniper MVP: Ingest & Paper Execution (3–4 недели) — **частично реализована**

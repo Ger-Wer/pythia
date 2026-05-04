@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import RedisMock from "ioredis-mock";
 import type { Config } from "../config.ts";
 import { makeLogger } from "../logger.ts";
-import { buildServer, type ServerHandle } from "../server.ts";
+import { buildServer, type ServerHandle, type ServerDeps } from "../server.ts";
 import { issueToken } from "../auth/paseto.ts";
 import { hashPassword } from "../auth/password.ts";
 import { MemoryBusClient } from "../bus/memory_bus.ts";
@@ -25,6 +25,7 @@ const sharedPasetoKey: Buffer = randomBytes(32);
 
 export async function makeTestContext(
   overrides: Partial<Config> = {},
+  serverOverrides: Partial<Pick<ServerDeps, "encodeProto">> = {},
 ): Promise<TestContext> {
   const operatorId = "test-operator";
   const password = "testpass";
@@ -59,6 +60,7 @@ export async function makeTestContext(
     log,
     redis: redis as unknown as import("ioredis").Redis,
     bus,
+    encodeProto: serverOverrides.encodeProto,
   });
   await handle.app.listen({ host: "127.0.0.1", port: 0 });
 

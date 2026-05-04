@@ -5,8 +5,13 @@
 // messages from dead consumers (task spec §4; 04-bus-protocol.md §77).
 //
 // Receive-side: preserves raw protobuf bytes when the `payload` field is not
-// parseable JSON. Publish-side: still writes JSON compatibility envelopes for
-// gateway-originated operator mutations.
+// parseable JSON; falls back to the parsed JSON envelope for hermetic tests
+// and any legacy producers. Publish-side (gate #5): the only operator
+// mutations the gateway emits — `signals.decisions` and `control.kill` — go
+// through the route layer and are now strictly protobuf; the route returns
+// 503 if the codec is missing or encoding fails. The JSON branch on
+// `RedisBusClient.publish` is therefore reachable only from in-process tests
+// that exercise the consumer side directly.
 
 import { randomUUID } from "node:crypto";
 import type { Redis } from "ioredis";

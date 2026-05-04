@@ -26,7 +26,7 @@ import {
 import { installAuthErrorHandler, registerAuthRoutes } from "./routes/auth.ts";
 import { registerControlRoutes } from "./routes/control.ts";
 import { registerHealthRoutes } from "./routes/health.ts";
-import { registerSignalsRoutes } from "./routes/signals.ts";
+import { type ProtoEncoder, registerSignalsRoutes } from "./routes/signals.ts";
 import { registerSnapshotRoutes } from "./routes/snapshot.ts";
 import { registerWsRoute } from "./routes/ws.ts";
 import { EventStore } from "./state/store.ts";
@@ -36,6 +36,12 @@ export interface ServerDeps {
   log: Logger;
   redis: Redis | null;
   bus: BusClient | null;
+  /**
+   * Optional override for the protobuf encoder. Tests inject a stub that
+   * returns `null` to exercise the gate #5 "refuse publish" path without
+   * polluting global module state.
+   */
+  encodeProto?: ProtoEncoder;
 }
 
 export interface ServerHandle {
@@ -126,6 +132,7 @@ export async function buildServer(deps: ServerDeps): Promise<ServerHandle> {
     bus,
     audit,
     idempotency,
+    encodeProto: deps.encodeProto,
   });
   registerControlRoutes(app, {
     config,
@@ -134,6 +141,7 @@ export async function buildServer(deps: ServerDeps): Promise<ServerHandle> {
     bridge,
     audit,
     idempotency,
+    encodeProto: deps.encodeProto,
   });
   registerWsRoute(app, { config, store });
 

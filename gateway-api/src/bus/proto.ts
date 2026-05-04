@@ -98,7 +98,7 @@ async function loadProtoBundle(log: Logger): Promise<ProtoBundle | null> {
     warnOnce(
       log,
       "proto-modules-missing",
-      "protobuf codecs unavailable; gateway bridge is running JSON-only",
+      "protobuf codecs unavailable; receive-side falls back to JSON projection but operator publish (gate #5) will be refused with HTTP 503",
       { hint: "Run root bun install + bun run proto:gen before live dual-loop use." },
     );
   }
@@ -483,7 +483,7 @@ export async function encodeProtoPublishPayload(
         return null;
     }
   } catch (error) {
-    warnOnce(log, `proto-encode-failed:${stream}`, "protobuf encode failed; keeping JSON publish fallback", {
+    warnOnce(log, `proto-encode-failed:${stream}`, "protobuf encode failed; publish will be refused (gate #5: protobuf-only egress)", {
       stream,
       error: error instanceof Error ? error.message : String(error),
     });

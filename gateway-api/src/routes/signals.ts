@@ -20,8 +20,12 @@ import type { AuditLog } from "../audit.ts";
 import type { Config } from "../config.ts";
 import { makeLogger } from "../logger.ts";
 import type { BusClient } from "../bus/types.ts";
-import { encodeProtoPublishPayload } from "../bus/proto.ts";
+import { encodeProtoPublishPayload as defaultEncodeProtoPublishPayload } from "../bus/proto.ts";
 import { STREAM_SIGNALS_DECISIONS } from "../bus/topics.ts";
+
+/** Encoder signature; tests inject a stub to simulate codec unavailability. */
+export type ProtoEncoder = typeof defaultEncodeProtoPublishPayload;
+
 import type { IdempotencyStore } from "../middleware/idempotency.ts";
 import { decisionsPublishedTotal } from "../metrics.ts";
 import type { EventStore } from "../state/store.ts";
@@ -55,9 +59,11 @@ export function registerSignalsRoutes(
     bus: BusClient | null;
     audit: AuditLog;
     idempotency: IdempotencyStore;
+    encodeProto?: ProtoEncoder;
   },
 ): void {
   const { config, store, bus, audit, idempotency } = deps;
+  const encodeProto = deps.encodeProto ?? defaultEncodeProtoPublishPayload;
   const protoLog = makeLogger("warn", { component: "signals-proto-publish" });
 
   async function decide(
@@ -148,12 +154,32 @@ export function registerSignalsRoutes(
       payload.snooze_until_unix_ms = req.body.snooze_until_unix_ms ?? 0;
 
     if (bus) {
-      const payloadBytes = await encodeProtoPublishPayload(
+      const payloadBytes = await encodeProto(
         STREAM_SIGNALS_DECISIONS,
         payload,
         protoLog,
       );
-      await bus.publish(STREAM_SIGNALS_DECISIONS, payload, payloadBytes ?? undefined);
+      if (!payloadBytes) {
+        // Control-plane is protobuf-only on egress (gate #5). If codecs
+        // are unavailable or the encoder rejects this payload we refuse
+        // to publish rather than silently fall through to a JSON
+        // envelope that downstream consumers may not accept.
+        protoLog.error(
+          "decisions.proto encode unavailable; refusing publish",
+          { stream: STREAM_SIGNALS_DECISIONS, signal_id: signalId, decision_id: decisionId },
+        );
+        const body = { error: "proto_codecs_unavailable" };
+        reply.code(503);
+        const out = { status: 503, body };
+        await idempotency.save(
+          user.operator_id,
+          req.body.idempotency_key,
+          out,
+          config.idempotencyTtlSeconds,
+        );
+        return out;
+      }
+      await bus.publish(STREAM_SIGNALS_DECISIONS, payload, payloadBytes);
     }
     decisionsPublishedTotal.inc({ action });
 

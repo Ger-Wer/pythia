@@ -38,7 +38,7 @@ Dual-Loop — это следующая фаза развития. Пока су
 
 Важное архитектурное решение на текущий момент: `phase1b-pg-listen-notify` не считается каноническим transport-path. Межсервисный source of truth остается Redis/NATS bus; LISTEN/NOTIFY допускается только как best-effort side-channel.
 
-Текущее transitional состояние шины: `gateway-api` уже умеет ingest'ить protobuf Redis payloads на receive-side и кормит живой Command Center по WebSocket, а для outbound operator mutations (`signals.decisions`, `control.kill`) теперь предпочитает protobuf publish, но пока сохраняет JSON fallback.
+Текущее transitional состояние шины: `gateway-api` уже умеет ingest'ить protobuf Redis payloads на receive-side и кормит живой Command Center по WebSocket. На publish-side egress для operator mutations (`signals.decisions`, `control.kill`) теперь строго protobuf-only — если codec недоступен или encode падает, route отвечает HTTP 503 `proto_codecs_unavailable` и не публикует ничего. JSON fallback на receive-side оставлен только для hermetic тестов и legacy producer'ов.
 
 См. [`06-roadmap.md`](./06-roadmap.md) для деталей.
 
