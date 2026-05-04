@@ -19,8 +19,8 @@
 Актуально на `2026-04-28`:
 
 - inbound Redis Streams в `gateway-api` уже могут приходить как raw protobuf bytes в поле `payload`; bridge декодирует их в UI-friendly JSON projection;
-- для hermetic тестов и legacy-path bridge сохраняет JSON fallback;
-- outbound publish из `gateway-api` для `dl.v1.signals.decisions` и `dl.v1.control.kill` пока остается JSON envelope, а не raw protobuf bytes.
+- для hermetic тестов и legacy producer'ов bridge сохраняет JSON fallback на receive-side;
+- outbound publish из `gateway-api` для `dl.v1.signals.decisions` и `dl.v1.control.kill` теперь строго protobuf-only: если codec недоступен или encode падает, route отвечает HTTP 503 `proto_codecs_unavailable` и не XADD'ит ничего. JSON envelope на egress больше не используется (gate #5).
 
 ## Schema registry
 

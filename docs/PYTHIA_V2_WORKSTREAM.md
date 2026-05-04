@@ -126,7 +126,7 @@
 - [x] canonical bus topics `dl.v1.*`
 - [x] `gateway-api` foundation
 - [x] inbound protobuf bridge в `gateway-api` (с JSON fallback для тестов/legacy)
-- [x] outbound protobuf-first publish path в `gateway-api` для `signals.decisions` и `control.kill` (с JSON fallback при отсутствии codecs)
+- [x] outbound protobuf-only publish path в `gateway-api` для `signals.decisions` и `control.kill` (HTTP 503 `proto_codecs_unavailable` если codec недоступен; JSON fallback убран в gate #5)
 - [x] Command Center route `/command-center`
 - [x] `sniper-ingest` foundation + matcher + replay/test surface
 - [x] `sniper-risk` pre-trade checks foundation
@@ -171,7 +171,7 @@
 - [x] Command Center UI с live gateway feed
 - [x] `sniper-ingest`
 - [x] `sniper-risk`
-- [ ] убрать residual JSON fallback в `gateway-api` publish-side (`signals.decisions`, `control.kill`) и довести весь control-plane до одного protobuf пути без compatibility режима
+- [x] убрать residual JSON fallback в `gateway-api` publish-side (`signals.decisions`, `control.kill`) и довести весь control-plane до одного protobuf пути без compatibility режима (gate #5)
 - [ ] автоматическая прокидка `market_specific_key` из Slow Loop producer path во все watchlist publish flows
 - [ ] `services/market-data` / order book tracker для реального edge-quality контура
 - [ ] release-hardening: secret rotation, stable shadow/audit persistence, 72h paper soak

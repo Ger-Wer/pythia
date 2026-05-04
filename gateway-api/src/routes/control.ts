@@ -11,7 +11,8 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { AuditLog } from "../audit.ts";
-import { encodeProtoPublishPayload } from "../bus/proto.ts";
+import { encodeProtoPublishPayload as defaultEncodeProtoPublishPayload } from "../bus/proto.ts";
+import type { ProtoEncoder } from "./signals.ts";
 import type { BusClient } from "../bus/types.ts";
 import { STREAM_CONTROL_KILL } from "../bus/topics.ts";
 import type { BridgeHandle } from "../bus/bridge.ts";
@@ -77,9 +78,11 @@ export function registerControlRoutes(
     bridge: BridgeHandle | null;
     audit: AuditLog;
     idempotency: IdempotencyStore;
+    encodeProto?: ProtoEncoder;
   },
 ): void {
   const { config, store, bus, bridge, audit, idempotency } = deps;
+  const encodeProto = deps.encodeProto ?? defaultEncodeProtoPublishPayload;
   const protoLog = makeLogger("warn", { component: "control-proto-publish" });
 
   app.post<{ Body: KillBody }>(
@@ -193,12 +196,36 @@ export function registerControlRoutes(
       };
 
       if (bus) {
-        const payloadBytes = await encodeProtoPublishPayload(
+        const payloadBytes = await encodeProto(
           STREAM_CONTROL_KILL,
           envelope,
           protoLog,
         );
-        await bus.publish(STREAM_CONTROL_KILL, envelope, payloadBytes ?? undefined);
+        if (!payloadBytes) {
+          // Control-plane is protobuf-only on egress (gate #5). If codecs
+          // are unavailable or the encoder rejects this kill envelope we
+          // refuse to publish — the executor only consumes proto, and a
+          // silent JSON fallback would mean the kill is accepted by the
+          // gateway but never reaches sniper-executor.
+          //
+          // Importantly: do NOT save this 503 into the idempotency store.
+          // Kill switch is the most safety-critical operator action; the
+          // condition is transient (codecs may finish loading any moment,
+          // or a deploy may roll out). An operator hitting retry with the
+          // same idempotency_key must be allowed to re-attempt rather
+          // than getting a cached 503 for the full TTL. The slot stays
+          // in RESERVED state; the next call with the same key busy-waits
+          // briefly and then falls through to a fresh attempt (see
+          // `IdempotencyStore.reserveOrGet`).
+          killCommandsTotal.inc({ scope: b.scope, status: "rejected_proto_unavailable" });
+          protoLog.error(
+            "control.kill proto encode unavailable; refusing publish",
+            { stream: STREAM_CONTROL_KILL, command_id: messageId, scope: b.scope },
+          );
+          reply.code(503);
+          return { error: "proto_codecs_unavailable" };
+        }
+        await bus.publish(STREAM_CONTROL_KILL, envelope, payloadBytes);
       }
 
       store.apply("exec_status", (s) => {
