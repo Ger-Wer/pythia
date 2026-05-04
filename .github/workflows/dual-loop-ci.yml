@@ -16,14 +16,17 @@ on:
       - scripts/contract/**
       - scripts/proto-gen-ts.sh
       - gateway-api/**
+      - dashboard/**
       - sql/**
       - src/db/**
+      - src/services/db.ts
       - src/services/db_pg.ts
       - src/services/db_shadow.ts
       - src/services/db_parity.ts
       - src/services/__tests__/**
       - scripts/pg_*.sh
       - scripts/pg_initial_load.ts
+      - supercronic.crontab
       - drizzle.config.ts
       - package.json
       - bun.lock
@@ -41,14 +44,17 @@ on:
       - scripts/contract/**
       - scripts/proto-gen-ts.sh
       - gateway-api/**
+      - dashboard/**
       - sql/**
       - src/db/**
+      - src/services/db.ts
       - src/services/db_pg.ts
       - src/services/db_shadow.ts
       - src/services/db_parity.ts
       - src/services/__tests__/**
       - scripts/pg_*.sh
       - scripts/pg_initial_load.ts
+      - supercronic.crontab
       - drizzle.config.ts
       - package.json
       - bun.lock
@@ -225,6 +231,33 @@ jobs:
         run: bun test
 
       - name: bun run build
+        run: bun run build
+
+  dashboard:
+    name: dashboard (Bun — typecheck + vitest + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+
+      - name: bun install
+        run: bun install --frozen-lockfile || bun install
+
+      - name: typecheck (tsc --noEmit)
+        run: bunx tsc --noEmit
+
+      - name: vitest
+        run: bun run test
+
+      - name: vite build
         run: bun run build
 
   docs:
