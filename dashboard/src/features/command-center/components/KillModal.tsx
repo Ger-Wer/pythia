@@ -153,6 +153,12 @@ export const KillModal = memo(function KillModal({ authOverride, fetchImpl }: Pr
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<KillResult | null>(null);
   const confirmRef = useRef<HTMLInputElement | null>(null);
+  // Synchronous in-flight guard. React state updates from `setPhase`
+  // are batched, so a second `fire()` invocation on the same render
+  // tick could still see `phase === "idle"` in the captured
+  // `submitArmed` closure and double-submit. A ref flips immediately,
+  // closing the rapid-Ctrl+Enter / Ctrl+click race.
+  const firingRef = useRef(false);
 
   const reset = useCallback(() => {
     setScope("GLOBAL");
@@ -161,6 +167,7 @@ export const KillModal = memo(function KillModal({ authOverride, fetchImpl }: Pr
     setConfirmText("");
     setPhase("idle");
     setResult(null);
+    firingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -174,16 +181,21 @@ export const KillModal = memo(function KillModal({ authOverride, fetchImpl }: Pr
   const submitArmed = reasonValid && marketIdValid && phraseMatches && phase === "idle";
 
   const fire = useCallback(async () => {
-    if (!submitArmed) return;
+    if (!submitArmed || firingRef.current) return;
+    firingRef.current = true;
     setPhase("sending");
     const input: KillInput = {
       scope,
       reason: reason.trim(),
       ...(scope === "MARKET" ? { marketId: marketId.trim() } : {}),
     };
-    const r = await submitKill(input, { auth, fetchImpl });
-    setResult(r);
-    setPhase("result");
+    try {
+      const r = await submitKill(input, { auth, fetchImpl });
+      setResult(r);
+      setPhase("result");
+    } finally {
+      firingRef.current = false;
+    }
   }, [submitArmed, scope, reason, marketId, auth, fetchImpl]);
 
   const onConfirmKeyDown = useCallback(

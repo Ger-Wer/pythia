@@ -134,6 +134,43 @@ describe("KillModal — live submit flow", () => {
     });
   });
 
+  it("rapid Ctrl+Enter does not double-submit (synchronous in-flight guard)", async () => {
+    const user = userEvent.setup();
+    // Hold the fetch in-flight long enough for a second keystroke to land
+    // before React has flushed the first setPhase("sending").
+    let resolveFetch: (value: Response) => void;
+    const fetchImpl = vi.fn().mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+
+    openKillModal();
+    render(<KillModal authOverride={KILL_AUTH} fetchImpl={fetchImpl as unknown as typeof fetch} />);
+
+    await user.type(screen.getByLabelText(/Kill reason/i), "operator drill");
+    await user.type(screen.getByLabelText(/Confirm phrase/i), "KILL GLOBAL");
+
+    // Fire twice in immediate succession — second invocation must hit the
+    // ref-guard and NOT issue another fetch even though the first
+    // `setPhase("sending")` may not have been flushed yet.
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    await user.keyboard("{Control>}{Enter}{/Control}");
+
+    // Resolve the in-flight fetch and let the microtask queue drain.
+    resolveFetch!(
+      jsonResponse(202, {
+        command_id: "cmd-rapid",
+        scope: "GLOBAL",
+        ack_status: "COMPLETE",
+      }),
+    );
+
+    await screen.findByTestId("cc-kill-result");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("renders error result on 401 invalid_signature without crashing", async () => {
     const user = userEvent.setup();
     const fetchImpl = vi.fn().mockResolvedValue(
