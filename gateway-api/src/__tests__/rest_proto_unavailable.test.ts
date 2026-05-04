@@ -107,10 +107,13 @@ describe("REST proto-unavailable (gate #5)", () => {
       return originalPublish(stream, payload, payloadBytes);
     };
 
-    // Capture audit baseline BEFORE the request. `ioredis-mock` shares
-    // its in-memory store across instances, so prior tests in the same
-    // process may have left rows in `gateway:audit:kill`.
+    // Capture baselines BEFORE the request. `ioredis-mock` shares its
+    // in-memory store across instances, so prior tests in the same
+    // process may have left rows in `gateway:audit:kill` AND a persisted
+    // `gateway:state` snapshot with `kill.engaged: true` that the fresh
+    // EventStore re-hydrates on boot.
     const beforeAudit = await ctx.handle.audit.recent("kill", 1024);
+    const beforeKill = { ...ctx.handle.store.getState().kill };
 
     const issuedAt = Date.now();
     const signature = createHmac("sha256", ctx.config.killHmacSecret)
@@ -149,8 +152,10 @@ describe("REST proto-unavailable (gate #5)", () => {
     const afterAudit = await ctx.handle.audit.recent("kill", 1024);
     expect(afterAudit.length).toBe(beforeAudit.length);
 
-    // Kill state was not flipped to engaged.
+    // Kill state was not flipped by THIS request — every field is
+    // unchanged from the baseline (which itself may already be engaged
+    // if a prior test persisted such a snapshot to the shared mock).
     const snap = ctx.handle.store.getState();
-    expect(snap.kill.engaged).toBe(false);
+    expect(snap.kill).toEqual(beforeKill);
   });
 });
