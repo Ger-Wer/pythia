@@ -80,8 +80,8 @@ describe("CommandCenterPage — smoke", () => {
     expect(screen.getByText(/Execution/i)).toBeInTheDocument();
     expect(screen.getByText(/Latency/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/System status banner/i)).toBeInTheDocument();
-    // Status strip + kill switch placeholder copy.
-    expect(screen.getByText(/disabled in Phase 1/i)).toBeInTheDocument();
+    // Status strip — Kill Switch hotkey hint.
+    expect(screen.getByText(/Kill Switch/)).toBeInTheDocument();
   });
 
   it("hides UI when flag disabled and no preview query", () => {
@@ -134,13 +134,17 @@ describe("CommandCenterPage — smoke", () => {
     expect(useCommandCenterStore.getState().detailOpen).toBe(false);
   });
 
-  it("Ctrl+Shift+K opens kill switch disabled modal", async () => {
+  it("Ctrl+Shift+K opens the kill switch modal in read-only mode without auth", async () => {
     const user = userEvent.setup();
     seedStore();
     renderPage();
     await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
     expect(useCommandCenterStore.getState().killModalOpen).toBe(true);
-    expect(screen.getByRole("dialog", { name: /Kill switch disabled/i })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /Kill switch/i })).toBeInTheDocument();
+    // Without auth, the read-only banner is shown and FIRE is disabled.
+    expect(screen.getByTestId("cc-kill-blocked-banner")).toBeInTheDocument();
+    const fire = screen.getByTestId("cc-kill-fire");
+    expect(fire).toBeDisabled();
   });
 
   it("Ctrl+/ toggles hotkey help overlay", async () => {

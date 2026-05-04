@@ -8,6 +8,7 @@ import { resolveCommandCenterAuth } from "../auth";
 
 const READY_AUTH = {
   ready: true,
+  killReady: false,
   apiBaseUrl: "https://gateway.example/",
   token: "v4.local.test-token",
   operatorId: "op-1",
@@ -155,7 +156,13 @@ describe("decideClient", () => {
     const result = await decideAccept(
       { signalId: "sig-1", expectedVersion: 0 },
       {
-        auth: { ready: false, apiBaseUrl: undefined, token: undefined, operatorId: undefined },
+        auth: {
+          ready: false,
+          killReady: false,
+          apiBaseUrl: undefined,
+          token: undefined,
+          operatorId: undefined,
+        },
         fetchImpl,
       },
     );
@@ -175,10 +182,44 @@ describe("resolveCommandCenterAuth", () => {
     });
     expect(auth).toEqual({
       ready: true,
+      killReady: false,
       apiBaseUrl: "https://api.example",
       token: "tok",
       operatorId: "op-x",
+      killHmacSecret: undefined,
     });
+  });
+
+  it("includes killHmacSecret + killReady when explicit override + decision auth supplied", () => {
+    const auth = resolveCommandCenterAuth({
+      apiBaseUrl: "https://api.example",
+      token: "tok",
+      operatorId: "op-x",
+      killHmacSecret: "shared-hmac",
+    });
+    expect(auth.ready).toBe(true);
+    expect(auth.killReady).toBe(true);
+    expect(auth.killHmacSecret).toBe("shared-hmac");
+  });
+
+  it("reads kill_hmac from query string", () => {
+    const auth = resolveCommandCenterAuth({
+      apiBaseUrl: "https://api.example",
+      token: "t",
+      operatorId: "op",
+      locationSearch: "?kill_hmac=q-secret",
+    });
+    expect(auth.killReady).toBe(true);
+    expect(auth.killHmacSecret).toBe("q-secret");
+  });
+
+  it("killReady false when decision auth missing even if kill_hmac present", () => {
+    const auth = resolveCommandCenterAuth({
+      locationSearch: "?kill_hmac=q-secret",
+    });
+    expect(auth.ready).toBe(false);
+    expect(auth.killReady).toBe(false);
+    expect(auth.killHmacSecret).toBe("q-secret");
   });
 
   it("reads token + operator_id from query string", () => {

@@ -3,26 +3,33 @@
 // priority order:
 //
 // 1. explicit option overrides (test hooks),
-// 2. URL query string (?token=, ?operator_id=, ?cc_api_url=, ?api_url=),
+// 2. URL query string (?token=, ?operator_id=, ?cc_api_url=, ?api_url=,
+//    ?kill_hmac=),
 // 3. import.meta.env.VITE_COMMAND_CENTER_* build-time env vars,
 // 4. derived from the WS URL when it is an http(s)/ws(s) URL pointing at
 //    the same gateway-api host (we strip a trailing /ws/v1 path).
 //
-// When any of {api base, token, operator_id} is missing we return a
-// degraded auth — callers must check `auth.ready` and fall back to
-// optimistic-only behavior (mock feed / preview mode).
+// `ready` covers the decision write-path (api / token / operator_id).
+// `killReady` is a separate flag because the Kill Switch additionally
+// requires a shared HMAC secret (`KILL_HMAC_SECRET` on the server, baked
+// into the operator console as `VITE_COMMAND_CENTER_KILL_HMAC_SECRET` or
+// passed at runtime via `?kill_hmac=`). When killReady is false the modal
+// renders read-only with an explanatory banner.
 
 export interface CommandCenterAuth {
   ready: boolean;
+  killReady: boolean;
   apiBaseUrl?: string;
   token?: string;
   operatorId?: string;
+  killHmacSecret?: string;
 }
 
 export interface ResolveAuthOptions {
   apiBaseUrl?: string;
   token?: string;
   operatorId?: string;
+  killHmacSecret?: string;
   wsUrl?: string;
   locationSearch?: string;
 }
@@ -74,10 +81,12 @@ export function resolveCommandCenterAuth(
     readQuery(search, "cc_api_url") ?? readQuery(search, "api_url");
   const queryToken = readQuery(search, "token");
   const queryOperator = readQuery(search, "operator_id");
+  const queryKillHmac = readQuery(search, "kill_hmac");
 
   const envApi = readEnv("VITE_COMMAND_CENTER_API_URL");
   const envToken = readEnv("VITE_COMMAND_CENTER_WS_TOKEN");
   const envOperator = readEnv("VITE_COMMAND_CENTER_OPERATOR_ID");
+  const envKillHmac = readEnv("VITE_COMMAND_CENTER_KILL_HMAC_SECRET");
 
   const wsUrl =
     options.wsUrl ??
@@ -89,7 +98,10 @@ export function resolveCommandCenterAuth(
     options.apiBaseUrl ?? queryApi ?? envApi ?? deriveHttpBaseFromWs(wsUrl);
   const token = options.token ?? queryToken ?? envToken;
   const operatorId = options.operatorId ?? queryOperator ?? envOperator;
+  const killHmacSecret =
+    options.killHmacSecret ?? queryKillHmac ?? envKillHmac;
 
   const ready = Boolean(apiBaseUrl && token && operatorId);
-  return { ready, apiBaseUrl, token, operatorId };
+  const killReady = ready && Boolean(killHmacSecret);
+  return { ready, killReady, apiBaseUrl, token, operatorId, killHmacSecret };
 }

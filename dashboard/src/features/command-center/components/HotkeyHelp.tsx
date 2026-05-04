@@ -10,7 +10,7 @@ const ROWS: { keys: string[]; action: string }[] = [
   { keys: ["Space"], action: "Toggle Market Detail modal" },
   { keys: ["Shift", "A"], action: "Accept all pending (not wired yet)" },
   { keys: ["Shift", "D"], action: "Dismiss all pending (not wired yet)" },
-  { keys: ["Ctrl", "Shift", "K"], action: "Kill Switch (disabled in Phase 1)" },
+  { keys: ["Ctrl", "Shift", "K"], action: "Open Kill Switch (two-key confirm + reason)" },
   { keys: ["Ctrl", "Shift", "P"], action: "Toggle perf HUD" },
   { keys: ["?"], action: "Toggle this help" },
 ];
