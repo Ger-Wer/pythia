@@ -207,21 +207,23 @@ export function registerControlRoutes(
           // refuse to publish — the executor only consumes proto, and a
           // silent JSON fallback would mean the kill is accepted by the
           // gateway but never reaches sniper-executor.
+          //
+          // Importantly: do NOT save this 503 into the idempotency store.
+          // Kill switch is the most safety-critical operator action; the
+          // condition is transient (codecs may finish loading any moment,
+          // or a deploy may roll out). An operator hitting retry with the
+          // same idempotency_key must be allowed to re-attempt rather
+          // than getting a cached 503 for the full TTL. The slot stays
+          // in RESERVED state; the next call with the same key busy-waits
+          // briefly and then falls through to a fresh attempt (see
+          // `IdempotencyStore.reserveOrGet`).
           killCommandsTotal.inc({ scope: b.scope, status: "rejected_proto_unavailable" });
           protoLog.error(
             "control.kill proto encode unavailable; refusing publish",
             { stream: STREAM_CONTROL_KILL, command_id: messageId, scope: b.scope },
           );
-          const body = { error: "proto_codecs_unavailable" };
           reply.code(503);
-          const out = { status: 503, body };
-          await idempotency.save(
-            user.operator_id,
-            b.idempotency_key,
-            out,
-            config.idempotencyTtlSeconds,
-          );
-          return body;
+          return { error: "proto_codecs_unavailable" };
         }
         await bus.publish(STREAM_CONTROL_KILL, envelope, payloadBytes);
       }

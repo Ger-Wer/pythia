@@ -6,9 +6,10 @@
 //
 // Drives both routes via `app.inject(...)` with a stub `encodeProto` that
 // always returns `null`, then asserts (a) HTTP 503 with
-// `proto_codecs_unavailable`, (b) the bus did not see a publish, (c) the
-// audit log did not record the action, (d) signal/store state is not
-// mutated, (e) idempotency is preserved across retries with the same key.
+// `proto_codecs_unavailable`, (b) the bus did not see a publish, (c) audit
+// + state side-effects did not happen, (d) the 503 is NOT cached in the
+// idempotency store — retry with the same key MUST re-attempt the encode
+// path because proto-unavailable is a transient condition.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
@@ -42,10 +43,23 @@ function sampleSignal(overrides: Partial<Signal> = {}): Signal {
 
 describe("REST proto-unavailable (gate #5)", () => {
   let ctx: TestContext;
+  let encodeAttempts: number;
 
   beforeEach(async () => {
-    // Inject a stub encoder that always reports the codec as unavailable.
-    ctx = await makeTestContext({}, { encodeProto: async () => null });
+    encodeAttempts = 0;
+    // Inject a stub encoder that reports the codec as unavailable AND
+    // tracks how many times it was called. The retry-not-cached assertion
+    // depends on this counter incrementing across requests with the same
+    // idempotency_key.
+    ctx = await makeTestContext(
+      {},
+      {
+        encodeProto: async () => {
+          encodeAttempts += 1;
+          return null;
+        },
+      },
+    );
     await ctx.bus.publish("dl.v1.signals.emitted", {
       ...sampleSignal(),
     } as unknown as Record<string, unknown>);
@@ -77,9 +91,12 @@ describe("REST proto-unavailable (gate #5)", () => {
     const body = res.json() as { error: string };
     expect(body.error).toBe("proto_codecs_unavailable");
     expect(decisionsPublished).toBe(0);
+    expect(encodeAttempts).toBe(1);
 
-    // Idempotency: retrying the same key returns the same 503 + still no
-    // double publish.
+    // Retry with the SAME idempotency_key must NOT return a cached 503 —
+    // proto-unavailable is a transient condition and the operator must be
+    // allowed to re-attempt. The encoder is called again; bus is still
+    // not published to; the response is a fresh 503.
     const retry = await ctx.handle.app.inject({
       method: "POST",
       url: "/api/v1/signals/SIG-PROTO-OFF/accept",
@@ -92,6 +109,7 @@ describe("REST proto-unavailable (gate #5)", () => {
     });
     expect(retry.statusCode).toBe(503);
     expect(decisionsPublished).toBe(0);
+    expect(encodeAttempts).toBeGreaterThanOrEqual(2);
 
     // Signal state was NOT advanced — server_version stays at 1, no decision.
     const snap = ctx.handle.store.getState();
@@ -116,17 +134,12 @@ describe("REST proto-unavailable (gate #5)", () => {
     const beforeKill = { ...ctx.handle.store.getState().kill };
 
     const issuedAt = Date.now();
-    const signature = createHmac("sha256", ctx.config.killHmacSecret)
-      .update(
-        [
-          ctx.operatorId,
-          "GLOBAL",
-          "",
-          String(99),
-          String(issuedAt),
-        ].join("|"),
-      )
-      .digest("hex");
+    const sign = (nonce: number) =>
+      createHmac("sha256", ctx.config.killHmacSecret)
+        .update(
+          [ctx.operatorId, "GLOBAL", "", String(nonce), String(issuedAt)].join("|"),
+        )
+        .digest("hex");
 
     const res = await ctx.handle.app.inject({
       method: "POST",
@@ -138,7 +151,7 @@ describe("REST proto-unavailable (gate #5)", () => {
         scope: "GLOBAL",
         nonce: 99,
         issued_at_unix_ms: issuedAt,
-        signature,
+        signature: sign(99),
         reason: "regression: proto codecs unavailable",
       },
     });
@@ -146,6 +159,29 @@ describe("REST proto-unavailable (gate #5)", () => {
     const body = res.json() as { error: string };
     expect(body.error).toBe("proto_codecs_unavailable");
     expect(killsPublished).toBe(0);
+    expect(encodeAttempts).toBe(1);
+
+    // Retry with the SAME idempotency_key MUST re-attempt encoding. The
+    // kill switch is the most safety-critical operator action; caching a
+    // transient 503 would block the operator from retrying for the full
+    // idempotency TTL.
+    const retry = await ctx.handle.app.inject({
+      method: "POST",
+      url: "/api/v1/control/kill",
+      headers: { authorization: `Bearer ${ctx.token}` },
+      payload: {
+        operator_id: ctx.operatorId,
+        idempotency_key: "idem-kill-proto-off",
+        scope: "GLOBAL",
+        nonce: 99,
+        issued_at_unix_ms: issuedAt,
+        signature: sign(99),
+        reason: "regression: proto codecs unavailable",
+      },
+    });
+    expect(retry.statusCode).toBe(503);
+    expect(killsPublished).toBe(0);
+    expect(encodeAttempts).toBeGreaterThanOrEqual(2);
 
     // Gateway refused the command before audit/state side-effects: no
     // new kill row was appended.

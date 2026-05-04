@@ -164,20 +164,21 @@ export function registerSignalsRoutes(
         // are unavailable or the encoder rejects this payload we refuse
         // to publish rather than silently fall through to a JSON
         // envelope that downstream consumers may not accept.
+        //
+        // Importantly: do NOT save this 503 into the idempotency store.
+        // The condition is transient (codecs may finish loading any
+        // moment, or a deploy may roll out), and an operator hitting
+        // retry with the same idempotency_key must be allowed to
+        // re-attempt rather than getting a cached 503 for the full TTL.
+        // The slot stays in RESERVED state; the next call with the same
+        // key busy-waits briefly and then falls through to a fresh
+        // attempt (see `IdempotencyStore.reserveOrGet`).
         protoLog.error(
           "decisions.proto encode unavailable; refusing publish",
           { stream: STREAM_SIGNALS_DECISIONS, signal_id: signalId, decision_id: decisionId },
         );
-        const body = { error: "proto_codecs_unavailable" };
         reply.code(503);
-        const out = { status: 503, body };
-        await idempotency.save(
-          user.operator_id,
-          req.body.idempotency_key,
-          out,
-          config.idempotencyTtlSeconds,
-        );
-        return out;
+        return { status: 503, body: { error: "proto_codecs_unavailable" } };
       }
       await bus.publish(STREAM_SIGNALS_DECISIONS, payload, payloadBytes);
     }
