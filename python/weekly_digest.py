@@ -525,7 +525,7 @@ def format_weekly_digest_markdown(digest: dict[str, Any]) -> str:
                 f" ({positions.get('wins_this_week', 0)}W / {positions.get('losses_this_week', 0)}L)"
             )
             top_winner = positions.get("top_winner")
-            if top_winner:
+            if top_winner and (top_winner.get("pnl_usd") or 0.0) > 0:
                 parts.append(
                     f"• 🏆 Top winner: `{top_winner['market_id']}` "
                     f"{_fmt_money(top_winner['pnl_usd'])} "
