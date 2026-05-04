@@ -107,6 +107,11 @@ describe("REST proto-unavailable (gate #5)", () => {
       return originalPublish(stream, payload, payloadBytes);
     };
 
+    // Capture audit baseline BEFORE the request. `ioredis-mock` shares
+    // its in-memory store across instances, so prior tests in the same
+    // process may have left rows in `gateway:audit:kill`.
+    const beforeAudit = await ctx.handle.audit.recent("kill", 1024);
+
     const issuedAt = Date.now();
     const signature = createHmac("sha256", ctx.config.killHmacSecret)
       .update(
@@ -139,9 +144,13 @@ describe("REST proto-unavailable (gate #5)", () => {
     expect(body.error).toBe("proto_codecs_unavailable");
     expect(killsPublished).toBe(0);
 
-    // No kill audit recorded — gateway refused the command before the
-    // audit/state side-effects.
-    const killAudit = await ctx.handle.audit.recent("kill", 1);
-    expect(killAudit.length).toBe(0);
+    // Gateway refused the command before audit/state side-effects: no
+    // new kill row was appended.
+    const afterAudit = await ctx.handle.audit.recent("kill", 1024);
+    expect(afterAudit.length).toBe(beforeAudit.length);
+
+    // exec_status.kill was not flipped to engaged for this scope.
+    const snap = ctx.handle.store.getState();
+    expect(snap.exec_status?.kill?.engaged).not.toBe(true);
   });
 });
