@@ -8,8 +8,11 @@ The page is driven by either an in-browser mock feed (when no
 `gateway-api`. Operator decision hotkeys (`A`/`R`/`S`) write through to the
 gateway when `VITE_COMMAND_CENTER_API_URL` + token + `operator_id` are
 configured; otherwise they only update the local store (preview / mock
-mode). The kill switch and bulk actions (`Shift+A`, `Shift+D`) are still
-read-only stubs and ship in a later phase.
+mode). The Kill Switch (`Ctrl+Shift+K`) signs and posts a real
+`POST /api/v1/control/kill` when
+`VITE_COMMAND_CENTER_KILL_HMAC_SECRET` is also configured, otherwise the
+modal renders read-only. Bulk actions (`Shift+A`, `Shift+D`) are still
+stubs and ship in a later phase.
 
 ## Feature flag
 
@@ -36,6 +39,12 @@ read-only stubs and ship in a later phase.
 - `VITE_COMMAND_CENTER_OPERATOR_ID` (or page query `operator_id=`) — value
   sent in `body.operator_id`. Must match the `sub` claim of the PASETO
   token. Required for operator decisions.
+- `VITE_COMMAND_CENTER_KILL_HMAC_SECRET` (or page query `kill_hmac=`) —
+  shared HMAC-SHA256 secret for the Kill Switch. Must match
+  `KILL_HMAC_SECRET` on `gateway-api`. The dashboard signs every kill
+  command with this secret in the browser. When unset, `Ctrl+Shift+K`
+  still opens the modal but renders read-only with an explanatory
+  banner.
 
 See `dashboard/.env.example`.
 
@@ -50,7 +59,7 @@ CommandCenterPage.tsx         route entry, mounts feed, wires hotkeys
 ├── components/ExecutionPanel.tsx    W5 — last N triggers (fired/blocked/submitted/filled/reverted) + copy txhash
 ├── components/LatencyHistograms.tsx W6 — 3 SVG sparklines (mempool→broadcast, broadcast→mined, Gamma poll)
 ├── components/MarketDetailModal.tsx W8 — Space on selected triage row
-├── components/KillModal.tsx         W7 — Ctrl+Shift+K placeholder "disabled in Phase 1"
+├── components/KillModal.tsx         W7 — Ctrl+Shift+K live two-key kill (scope/reason/confirm phrase)
 ├── components/HotkeyHelp.tsx        ?/Ctrl+/ overlay
 ├── components/PerfHud.tsx           Ctrl+Shift+P dev FPS counter
 └── components/ToastHost.tsx         bottom-right transient messages
@@ -102,7 +111,7 @@ CommandCenterPage.tsx         route entry, mounts feed, wires hotkeys
 | `Space`           | Toggle Market Detail modal on selected row                                          |
 | `Shift+A`         | Accept-all — not wired yet                                                          |
 | `Shift+D`         | Dismiss-all — not wired yet                                                         |
-| `Ctrl+Shift+K`    | Open Kill Switch placeholder                                                        |
+| `Ctrl+Shift+K`    | Open Kill Switch (two-key: phrase + `Ctrl+Enter` / `Ctrl+click FIRE`)               |
 | `Ctrl+Shift+P`    | Toggle dev FPS HUD                                                                  |
 | `?` / `Ctrl+/`    | Toggle hotkey help overlay                                                          |
 | `Escape`          | Close any open modal                                                                |
@@ -128,17 +137,44 @@ the focused element has `data-keyboard-safe="true"`.
 
 ## Tests
 
-`__tests__/jsonPatch.test.ts`     — store + JSON Patch applier unit tests.
+`__tests__/jsonPatch.test.ts`            — store + JSON Patch applier unit tests.
 `__tests__/CommandCenter.smoke.test.tsx` — RTL smoke: renders all regions,
 hotkeys (`j`/`k`, `A`, `R`, `Space`, `Ctrl+Shift+K`, `?`) update store state.
+`__tests__/KillModal.smoke.test.tsx`     — RTL: live submit flow (auth gate,
+two-key submit, MARKET scope, error states).
+`api/__tests__/decideClient.test.ts`     — write-path HTTP client unit tests.
+`api/__tests__/killClient.test.ts`       — kill HTTP client + HMAC unit tests.
 
 Run: `bun test` from `dashboard/`.
+
+## Kill Switch flow
+
+1. `Ctrl+Shift+K` opens the modal (always — even without auth, in
+   read-only mode).
+2. Operator picks a scope: `GLOBAL`, `NEW_TRIGGERS`, or `MARKET`. For
+   `MARKET`, a `market_id` field appears.
+3. Operator types a `reason` (8–256 chars) — recorded in the gateway
+   audit log under `gateway:audit:kill`.
+4. Operator types the confirm phrase. The phrase is `KILL <SCOPE>` for
+   GLOBAL/NEW_TRIGGERS or `KILL <market_id>` for MARKET.
+5. Operator submits with the second key — either `Ctrl+Enter` while
+   focused on the confirm input, or `Ctrl+click` (or `Cmd+click` on
+   macOS) on the FIRE button. Plain Enter / plain click do not fire.
+6. Dashboard computes `HMAC_SHA256(killHmacSecret,
+   operator_id|scope|market_id|nonce|issued_at_unix_ms)` via
+   `crypto.subtle`, attaches `Bearer <token>`, and POSTs the kill
+   command. The reason is sent in the body but is NOT signed.
+7. The modal renders the gateway response: `COMPLETE` (green) means
+   the executor confirmed the drain; `ACCEPTED`/`DRAINING` (amber)
+   means the executor accepted but is still draining; `timeout` /
+   `no_bus` (red) means the dual-loop side did not ack within
+   `KILL_ACK_TIMEOUT_MS` and operator must verify state manually;
+   `REJECTED_BAD_SIGNATURE` / `REJECTED_REPLAY` (red) point at clock
+   skew / nonce reuse / wrong shared secret.
 
 ## Out of scope (Phase 1)
 
 - Real WSS to gateway (arrives in Phase 2; see `ws/client.ts` skeleton).
-- Functional Kill Switch — disabled placeholder only (Phase 3 ships the real
-  two-key confirm).
 - Responsive layout (desktop 1920×1080 only).
 - Mutation endpoints on `gateway-api` (Phase 2 adds `/api/v1/signals/:id/accept`
   etc.).

@@ -31,6 +31,8 @@ interface KillBody {
   nonce: number;
   issued_at_unix_ms: number;
   signature: string;
+  /** Free-text justification recorded in audit log. Not signed. */
+  reason?: string;
 }
 
 const CLOCK_SKEW_MS = 5_000;
@@ -111,6 +113,7 @@ export function registerControlRoutes(
               minLength: 64,
               maxLength: 128,
             },
+            reason: { type: "string", maxLength: 256 },
           },
         },
       },
@@ -218,6 +221,7 @@ export function registerControlRoutes(
           scope: b.scope,
           market_id: b.market_id,
           nonce: b.nonce,
+          reason: b.reason,
         },
       });
 

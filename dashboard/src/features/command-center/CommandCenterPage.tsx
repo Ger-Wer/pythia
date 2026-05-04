@@ -102,7 +102,6 @@ export const CommandCenterPage = memo(function CommandCenterPage({ disableFeed }
           <span className="cc-spacer" />
           <span>
             Kill Switch{" "}
-            <span style={{ color: "var(--cc-text-faint)" }}>disabled in Phase 1</span>{" "}
             <span className="cc-kbd">Ctrl</span>+<span className="cc-kbd">Shift</span>+
             <span className="cc-kbd">K</span>
           </span>

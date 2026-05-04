@@ -185,6 +185,7 @@ describe("REST", () => {
         nonce: 77,
         issued_at_unix_ms: issuedAt,
         signature,
+        reason: "operator drill — dual-loop triage halted",
       },
     });
 
@@ -200,6 +201,45 @@ describe("REST", () => {
       expect(lastPayloadBytes).toBeInstanceOf(Uint8Array);
       expect(lastPayloadBytes?.length).toBeGreaterThan(0);
     }
+
+    const killAudit = await ctx.handle.audit.recent("kill", 1);
+    expect(killAudit.length).toBe(1);
+    expect(killAudit[0]?.detail).toMatchObject({
+      scope: "NEW_TRIGGERS",
+      nonce: 77,
+      reason: "operator drill — dual-loop triage halted",
+    });
+  });
+
+  test("kill rejects reason longer than 256 chars", async () => {
+    const issuedAt = Date.now();
+    const signature = createHmac("sha256", ctx.config.killHmacSecret)
+      .update(
+        [
+          ctx.operatorId,
+          "GLOBAL",
+          "",
+          String(78),
+          String(issuedAt),
+        ].join("|"),
+      )
+      .digest("hex");
+
+    const res = await ctx.handle.app.inject({
+      method: "POST",
+      url: "/api/v1/control/kill",
+      headers: { authorization: `Bearer ${ctx.token}` },
+      payload: {
+        operator_id: ctx.operatorId,
+        idempotency_key: "idem-kill-bad-reason",
+        scope: "GLOBAL",
+        nonce: 78,
+        issued_at_unix_ms: issuedAt,
+        signature,
+        reason: "x".repeat(257),
+      },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   test("reject requires reason", async () => {
