@@ -149,8 +149,8 @@ describe("REST proto-unavailable (gate #5)", () => {
     const afterAudit = await ctx.handle.audit.recent("kill", 1024);
     expect(afterAudit.length).toBe(beforeAudit.length);
 
-    // exec_status.kill was not flipped to engaged for this scope.
+    // Kill state was not flipped to engaged.
     const snap = ctx.handle.store.getState();
-    expect(snap.exec_status?.kill?.engaged).not.toBe(true);
+    expect(snap.kill.engaged).toBe(false);
   });
 });
