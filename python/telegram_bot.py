@@ -7,7 +7,7 @@ Pythia Telegram Bot
 import argparse
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -21,6 +21,7 @@ from python.operator_core import OperatorCore
 from python.watchlist_store import (
     ensure_watchlist_engine_schema,
 )
+from python.weekly_digest import compose_weekly_digest, format_weekly_digest_markdown
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -31,20 +32,6 @@ LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 def dashboard_base_url() -> str:
     return os.getenv("DASHBOARD_PUBLIC_BASE_URL", "").rstrip("/")
-
-
-def prediction_columns(conn: sqlite3.Connection) -> set[str]:
-    return {
-        str(row[1])
-        for row in conn.execute("PRAGMA table_info(predictions)").fetchall()
-    }
-
-
-def valid_filter(conn: sqlite3.Connection, alias: str = "") -> str:
-    if "is_valid" not in prediction_columns(conn):
-        return ""
-    prefix = f"{alias}." if alias else ""
-    return f" AND {prefix}is_valid = 1"
 
 
 def send_message(text: str) -> bool:
@@ -100,71 +87,23 @@ def send_photo(path: str, caption: str = "") -> bool:
 
 
 def weekly_report():
+    """Compose and send the Sunday-night digest.
+
+    Aggregates predictions, decision discipline, position activity, P&L,
+    postmortem categories, reviews, and Brier scores via
+    ``python.weekly_digest`` (gate #11). The aggregator degrades any
+    section to "нет данных" when its underlying tables are missing, so
+    this entry-point can be safely run on early-deployment DBs without
+    decision_core schema applied yet.
+    """
+
     conn = sqlite3.connect(DB_PATH)
-    table_exists = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'"
-    ).fetchone()
-    if not table_exists:
+    try:
+        digest = compose_weekly_digest(conn)
+    finally:
         conn.close()
-        send_message("Pythia: таблица predictions ещё не создана, еженедельный отчёт пока недоступен.")
-        return
 
-    validity_suffix = valid_filter(conn)
-    total = conn.execute(f"SELECT COUNT(*) FROM predictions WHERE 1=1{validity_suffix}").fetchone()[0]
-    resolved = conn.execute(
-        f"SELECT COUNT(*) FROM predictions WHERE outcome IS NOT NULL AND outcome IN (0,1){validity_suffix}"
-    ).fetchone()[0]
-
-    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    new_this_week = conn.execute(
-        f"SELECT COUNT(*) FROM predictions WHERE forecast_timestamp > ?{validity_suffix}",
-        (week_ago,),
-    ).fetchone()[0]
-    resolved_this_week = conn.execute(
-        f"SELECT COUNT(*) FROM predictions WHERE resolved_at > ? AND outcome IN (0,1){validity_suffix}",
-        (week_ago,),
-    ).fetchone()[0]
-
-    brier_data = conn.execute(
-        """
-        SELECT
-            AVG(brier_dexter),
-            AVG(brier_naked),
-            AVG(brier_market)
-        FROM predictions
-        WHERE outcome IS NOT NULL AND outcome IN (0,1)
-        """
-        + validity_suffix
-    ).fetchone()
-
-    month_start = datetime.now().replace(day=1).isoformat()
-    month_cost = conn.execute(
-        f"SELECT COALESCE(SUM(api_cost_usd), 0) FROM predictions WHERE forecast_timestamp > ?{validity_suffix}",
-        (month_start,),
-    ).fetchone()[0]
-
-    conn.close()
-
-    msg = f"""📊 *Еженедельный отчёт Pythia*
-_{datetime.now().strftime('%Y-%m-%d')}_
-
-*За неделю:*
-• Новых прогнозов: {new_this_week}
-• Разрешившихся маркетов: {resolved_this_week}
-
-*С начала наблюдений:*
-• Всего прогнозов: {total}
-• Разрешилось: {resolved}
-• В ожидании: {total - resolved}
-
-*Brier score (↓ меньше = лучше):*
-• Research+R1: {f'{brier_data[0]:.4f}' if brier_data[0] is not None else 'N/A'}
-• Naked R1: {f'{brier_data[1]:.4f}' if brier_data[1] is not None else 'N/A'}
-• Рыночная цена: {f'{brier_data[2]:.4f}' if brier_data[2] is not None else 'N/A'}
-
-*Расход API в этом месяце:* ${month_cost:.2f}
-"""
-
+    msg = format_weekly_digest_markdown(digest)
     send_message(msg)
 
     cal_path = os.path.join(

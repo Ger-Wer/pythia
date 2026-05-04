@@ -8,6 +8,27 @@ from python.test_support import seed_prediction, seed_watch_update, temp_db
 from python.attention_store import list_pending_attention_items
 
 
+class WeeklyReportEntrypointTests(unittest.TestCase):
+    def test_weekly_report_sends_digest_via_send_message(self):
+        """``weekly_report()`` must compose the digest from the new
+        ``python.weekly_digest`` aggregator and ship it via
+        ``send_message`` even when the DB is empty (gate #11)."""
+
+        with temp_db() as db_path:
+            with patch.object(telegram_bot, "DB_PATH", db_path), \
+                patch.object(telegram_bot, "BOT_TOKEN", "test-token"), \
+                patch.object(telegram_bot, "CHAT_ID", "123"), \
+                patch("python.telegram_bot.requests.post") as mock_post:
+                mock_post.return_value = Mock(ok=True, status_code=200)
+
+                telegram_bot.weekly_report()
+
+                # exactly one Telegram call (no calibration PNG present)
+                self.assertEqual(mock_post.call_count, 1)
+                sent_text = mock_post.call_args.kwargs["json"]["text"]
+                self.assertIn("Еженедельный отчёт Pythia", sent_text)
+
+
 class TelegramBotTests(unittest.TestCase):
     def test_watch_updates_include_dashboard_link_and_mark_delivery_only_after_success(self):
         with temp_db() as db_path:
