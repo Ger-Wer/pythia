@@ -372,9 +372,14 @@ def _postmortems_section(
     }
 
 
-def _reviews_section(conn: sqlite3.Connection) -> dict[str, Any]:
+def _reviews_section(
+    conn: sqlite3.Connection,
+    *,
+    now: datetime,
+) -> dict[str, Any]:
     if not _table_exists(conn, "reviews"):
         return {"available": False}
+    week_ago = (now - timedelta(days=WEEK_DAYS)).isoformat()
     due = _scalar(
         conn,
         "SELECT COUNT(*) FROM reviews WHERE status='due'",
@@ -382,7 +387,7 @@ def _reviews_section(conn: sqlite3.Connection) -> dict[str, Any]:
     completed_week = _scalar(
         conn,
         "SELECT COUNT(*) FROM reviews WHERE status='completed' AND resolved_at > ?",
-        ((_utc_now() - timedelta(days=WEEK_DAYS)).isoformat(),),
+        (week_ago,),
     ) or 0
     return {
         "available": True,
@@ -433,7 +438,7 @@ def compose_weekly_digest(
         "decisions": _decisions_section(conn, now=now),
         "positions": _positions_section(conn, now=now),
         "postmortems": _postmortems_section(conn, now=now),
-        "reviews": _reviews_section(conn),
+        "reviews": _reviews_section(conn, now=now),
         "api_cost": _api_cost_section(conn, now=now),
     }
 

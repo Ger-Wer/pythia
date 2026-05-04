@@ -401,6 +401,64 @@ class WeeklyDigestComposeTests(unittest.TestCase):
         self.assertEqual(postmortems["management_error"], 0)
 
 
+class WeeklyDigestReviewsTimeWindowTests(unittest.TestCase):
+    """Regression for ``_reviews_section`` purity (Devin Review on PR #22).
+
+    The reviews "completed this week" window must derive from the
+    injected ``now``, not from wall-clock ``utcnow()``. Otherwise the
+    section's window drifts from every other section's week boundary
+    and tests injecting ``FIXED_NOW`` are non-deterministic.
+    """
+
+    def test_reviews_completed_window_uses_injected_now(self):
+        with temp_db() as db_path:
+            with sqlite3.connect(db_path) as conn:
+                _ensure_decision_core(conn)
+                # Seed two reviews: one resolved 3 days before FIXED_NOW
+                # (inside window), one resolved 12 days before (outside).
+                conn.execute(
+                    """
+                    INSERT INTO reviews (
+                        position_id, market_id, review_type, due_at, status,
+                        resolved_at, created_at, updated_at
+                    ) VALUES
+                        (1, 'mkt-A', 'thesis_cycle', ?, 'completed', ?, ?, ?),
+                        (2, 'mkt-B', 'thesis_cycle', ?, 'completed', ?, ?, ?)
+                    """,
+                    (
+                        (FIXED_NOW - timedelta(days=4)).isoformat(),
+                        (FIXED_NOW - timedelta(days=3)).isoformat(),
+                        (FIXED_NOW - timedelta(days=4)).isoformat(),
+                        (FIXED_NOW - timedelta(days=4)).isoformat(),
+                        (FIXED_NOW - timedelta(days=14)).isoformat(),
+                        (FIXED_NOW - timedelta(days=12)).isoformat(),
+                        (FIXED_NOW - timedelta(days=14)).isoformat(),
+                        (FIXED_NOW - timedelta(days=14)).isoformat(),
+                    ),
+                )
+                # And one due review (must not be counted as completed).
+                conn.execute(
+                    """
+                    INSERT INTO reviews (
+                        position_id, market_id, review_type, due_at, status,
+                        created_at, updated_at
+                    ) VALUES (3, 'mkt-C', 'thesis_cycle', ?, 'due', ?, ?)
+                    """,
+                    (
+                        (FIXED_NOW - timedelta(days=1)).isoformat(),
+                        (FIXED_NOW - timedelta(days=2)).isoformat(),
+                        (FIXED_NOW - timedelta(days=2)).isoformat(),
+                    ),
+                )
+                conn.commit()
+                digest = compose_weekly_digest(conn, now=FIXED_NOW)
+
+        reviews = digest["reviews"]
+        self.assertTrue(reviews["available"])
+        self.assertEqual(reviews["completed_this_week"], 1)
+        self.assertEqual(reviews["due"], 1)
+
+
 class WeeklyDigestFormatTests(unittest.TestCase):
     def test_empty_digest_renders_predictions_unavailable_notice(self):
         digest = {
