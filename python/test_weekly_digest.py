@@ -550,6 +550,84 @@ class WeeklyDigestFormatTests(unittest.TestCase):
         self.assertIn("$12.34", msg)
         self.assertIn("Realized P&L: $8.25", msg)
 
+    def test_top_winner_hidden_when_all_closed_positions_are_losses(self):
+        """Devin Review on PR #22: ``top_winner`` is selected via
+        ``ORDER BY pnl_usd DESC LIMIT 1`` over closed positions with
+        non-NULL pnl_usd. When every closed position lost money the
+        query returns the least-negative loser, which must NOT be
+        rendered as "Top winner". Without the ``> 0`` guard the same
+        row could even appear simultaneously as winner and loser.
+        """
+
+        digest = {
+            "generated_at": "2026-05-04T20:00:00+00:00",
+            "predictions": {"available": False},
+            "brier": {"available": False},
+            "decisions": {"available": False},
+            "positions": {
+                "available": True,
+                "opened_this_week_by_mode": {"shadow": 1},
+                "closed_this_week_by_mode": {
+                    "shadow": {"n": 1, "realized_pnl_usd": -5.00},
+                },
+                "open_by_mode": {},
+                "realized_pnl_week_usd": -5.00,
+                "wins_this_week": 0,
+                "losses_this_week": 1,
+                "closed_this_week_count": 1,
+                "win_rate_this_week": 0.0,
+                # Same row returned by both ORDER BY DESC and ASC because
+                # there's only one closed position and it lost money.
+                "top_winner": {
+                    "market_id": "poly-only-loser",
+                    "pnl_usd": -5.00,
+                    "pnl_percent": -5.0,
+                },
+                "top_loser": {
+                    "market_id": "poly-only-loser",
+                    "pnl_usd": -5.00,
+                    "pnl_percent": -5.0,
+                },
+            },
+            "postmortems": {"available": False},
+            "reviews": {"available": False},
+            "api_cost": {"available": False},
+        }
+        msg = format_weekly_digest_markdown(digest)
+        self.assertNotIn("Top winner", msg, "loss must not be rendered as winner")
+        self.assertIn("Top loser", msg, "loss must still appear as loser")
+        self.assertIn("poly-only-loser", msg)
+
+    def test_top_winner_shown_when_pnl_positive(self):
+        """Symmetric positive case: a real winner must still render."""
+
+        digest = {
+            "generated_at": "2026-05-04T20:00:00+00:00",
+            "predictions": {"available": False},
+            "brier": {"available": False},
+            "decisions": {"available": False},
+            "positions": {
+                "available": True,
+                "opened_this_week_by_mode": {"shadow": 1},
+                "closed_this_week_by_mode": {"shadow": {"n": 1, "realized_pnl_usd": 12.50}},
+                "open_by_mode": {},
+                "realized_pnl_week_usd": 12.50,
+                "wins_this_week": 1,
+                "losses_this_week": 0,
+                "closed_this_week_count": 1,
+                "win_rate_this_week": 1.0,
+                "top_winner": {"market_id": "poly-W", "pnl_usd": 12.50, "pnl_percent": 12.5},
+                "top_loser": None,
+            },
+            "postmortems": {"available": False},
+            "reviews": {"available": False},
+            "api_cost": {"available": False},
+        }
+        msg = format_weekly_digest_markdown(digest)
+        self.assertIn("Top winner", msg)
+        self.assertIn("poly-W", msg)
+        self.assertNotIn("Top loser", msg)
+
     def test_negative_brier_delta_emits_warning(self):
         digest = {
             "generated_at": "2026-05-04T20:00:00+00:00",
