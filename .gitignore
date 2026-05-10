@@ -36,6 +36,8 @@ Thumbs.db
 # Dual-Loop: Rust build artifacts
 services/target/
 services/**/target/
+tools/target/
+tools/**/target/
 
 # Dual-Loop: generated protobuf clients (kept out of VCS; regenerate with `make proto-gen`)
 # Rust output lands in $OUT_DIR (not the source tree); only TS output is written under src/.

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - services/**
+      - tools/**
       - schemas/**
       - docs/dual_loop/**
       - .github/workflows/dual-loop-ci.yml
@@ -35,6 +36,7 @@ on:
   pull_request:
     paths:
       - services/**
+      - tools/**
       - schemas/**
       - docs/dual_loop/**
       - .github/workflows/dual-loop-ci.yml
@@ -103,6 +105,35 @@ jobs:
       - name: cargo build --release
         run: cargo build --workspace --release
 
+  tools-rust:
+    name: Tools workspace (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
   replay-determinism:
     name: Replay determinism (gate #9)
     runs-on: ubuntu-latest
@@ -158,6 +189,117 @@ jobs:
 
       - name: Run integration test (covers binary + golden via cargo)
         run: cargo test -p sniper-ingest --test replay_determinism
+
+  load-harness-smoke:
+    name: Load harness smoke (gate #4 #8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo (services)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services
+          key: load-harness-services
+
+      - name: Cache cargo (tools)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools
+          key: load-harness-tools
+
+      # GitHub Actions `services:` does not let us pass extra args to
+      # the container, so we cannot ask the official `nats:2.10-alpine`
+      # service entry to enable JetStream (which the harness consumer
+      # needs). Run a standalone `nats-server -js` sidecar instead.
+      - name: Start NATS with JetStream (sidecar, port 4222)
+        run: |
+          docker run -d --rm --name nats-js -p 4222:4222 nats:2.10-alpine -js
+          for i in {1..20}; do
+            if (echo > /dev/tcp/127.0.0.1/4222) 2>/dev/null; then
+              echo "NATS sidecar ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::NATS sidecar did not become ready"
+          exit 1
+
+      - name: Build sniper-ingest (release)
+        working-directory: services
+        run: cargo build -p sniper-ingest --bin sniper-ingest --release
+
+      - name: Build load_harness (release)
+        working-directory: tools
+        run: cargo build -p load_harness --bin load_harness --release
+
+      - name: Start sniper-ingest (mock mempool consumer + matcher)
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          NATS_URL: nats://127.0.0.1:4222
+          MOCK_MEMPOOL_ENABLED: "true"
+          METRICS_ADDR: 127.0.0.1:9101
+          RUST_LOG: info
+        run: |
+          nohup ./services/target/release/sniper-ingest \
+            > /tmp/sniper-ingest.log 2>&1 &
+          echo $! > /tmp/sniper-ingest.pid
+          # Give it a moment to register bus consumers + connect NATS.
+          sleep 3
+          if ! kill -0 "$(cat /tmp/sniper-ingest.pid)"; then
+            echo "::error::sniper-ingest exited during startup"
+            tail -100 /tmp/sniper-ingest.log
+            exit 1
+          fi
+
+      - name: Run load_harness (1k/min, 30s, p95 < 50ms relaxed)
+        working-directory: tools
+        run: |
+          ./target/release/load_harness \
+            --redis-url redis://127.0.0.1:6379 \
+            --nats-url nats://127.0.0.1:4222 \
+            --rate-per-min 1000 \
+            --duration-secs 30 \
+            --warmup-secs 3 \
+            --drain-secs 5 \
+            --markets 4 \
+            --target-p95-ms 50.0 \
+            --max-drop-rate 0.0 \
+            --min-rate-ratio 0.85 \
+            --output json | tee /tmp/load_harness_report.json
+
+      - name: Show sniper-ingest tail (debug)
+        if: always()
+        run: |
+          echo "--- sniper-ingest tail ---"
+          tail -60 /tmp/sniper-ingest.log || true
+
+      - name: Stop sniper-ingest
+        if: always()
+        run: |
+          kill "$(cat /tmp/sniper-ingest.pid)" 2>/dev/null || true
+          docker stop nats-js 2>/dev/null || true
+
+      - name: Upload load harness JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-harness-report
+          path: /tmp/load_harness_report.json
+          if-no-files-found: ignore
 
   proto:
     name: Protobuf (lint + breaking)
