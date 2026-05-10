@@ -1,0 +1,4 @@
+# Synthetic golden watchlist for replay-determinism CI gate (gate #9).
+# Each line is one watchlist entry. Comments and blank lines are skipped.
+# Documented schema: services/sniper-ingest/src/bin/replay.rs `WatchlistEntryJson`.
+{"polymarket_id":"replay-golden-market-1","ctf_address":"0xe111180000d2663c0091e4f400237545b87b996b","p_fundamental_ppm":720000,"edge_ppm":150000,"confidence_ppm":900000,"side_hint":1,"max_slippage_bps":50,"ttl_ms":3600000,"min_independent_sources":1,"allowed_kinds":["LARGE_FILL"]}

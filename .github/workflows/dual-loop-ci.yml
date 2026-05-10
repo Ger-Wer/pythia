@@ -103,6 +103,62 @@ jobs:
       - name: cargo build --release
         run: cargo build --workspace --release
 
+  replay-determinism:
+    name: Replay determinism (gate #9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services
+
+      - name: Build replay binary (release)
+        run: cargo build -p sniper-ingest --bin replay --release
+
+      - name: Run replay once → /tmp/replay1.jsonl
+        run: |
+          ./target/release/replay \
+            --dump sniper-ingest/tests/fixtures/replay/dump.jsonl \
+            --watchlist sniper-ingest/tests/fixtures/replay/watchlist.jsonl \
+            --clock-mode frozen \
+            --deterministic-ids \
+            > /tmp/replay1.jsonl
+
+      - name: Run replay again → /tmp/replay2.jsonl
+        run: |
+          ./target/release/replay \
+            --dump sniper-ingest/tests/fixtures/replay/dump.jsonl \
+            --watchlist sniper-ingest/tests/fixtures/replay/watchlist.jsonl \
+            --clock-mode frozen \
+            --deterministic-ids \
+            > /tmp/replay2.jsonl
+
+      - name: Assert byte-identical between two runs
+        run: |
+          if ! diff -u /tmp/replay1.jsonl /tmp/replay2.jsonl; then
+            echo "::error::replay output is non-deterministic across two runs (gate #9 broken)"
+            exit 1
+          fi
+
+      - name: Assert match against committed expected.jsonl golden
+        run: |
+          if ! diff -u sniper-ingest/tests/fixtures/replay/expected.jsonl /tmp/replay1.jsonl; then
+            echo "::error::replay output drifted from committed golden (gate #9). If intentional, regenerate fixtures (see services/sniper-ingest/tests/replay_determinism.rs)."
+            exit 1
+          fi
+
+      - name: Run integration test (covers binary + golden via cargo)
+        run: cargo test -p sniper-ingest --test replay_determinism
+
   proto:
     name: Protobuf (lint + breaking)
     runs-on: ubuntu-latest
