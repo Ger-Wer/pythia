@@ -487,6 +487,9 @@ jobs:
       - name: pytest python/
         run: python -m pytest python/ -v
 
+      - name: pytest tools/soak/ (gate #7 unit tests; soak run itself is manual)
+        run: python -m pytest tools/soak/ -v
+
   docs:
     name: Docs (markdown link-check, light)
     runs-on: ubuntu-latest
