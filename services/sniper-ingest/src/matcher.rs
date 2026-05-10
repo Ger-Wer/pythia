@@ -6,18 +6,159 @@
 //! - Immutable watchlist snapshot via `arc_swap` for lock-free reads.
 //! - Source counting with a sliding 2-second window per market.
 
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use ahash::AHashMap;
 use alloy_primitives::Address;
+use blake3::Hasher as Blake3Hasher;
 use dual_loop_common::abi::DecodedEvent;
-use dual_loop_common::proto::common::Money;
+use dual_loop_common::proto::common::{Money, Uuid};
 use dual_loop_common::proto::new_uuid_v7;
 use dual_loop_common::proto::trigger::Trigger;
 use dual_loop_common::proto::watchlist::TriggerKind;
 use smallvec::SmallVec;
 
 use crate::watchlist::{MarketKey, WatchlistStore};
+
+/// Source of "now" for the matcher.
+///
+/// Production uses [`RealClock`]. Replay/tests inject a deterministic
+/// implementation so that `issued_at_unix_ms`, source-window TTLs and the
+/// emitted `Trigger.evidence_hash` (in deterministic-id mode) are stable
+/// across runs.
+pub trait MatcherClock: Send + Sync {
+    /// Wall-clock as Unix epoch milliseconds.
+    fn now_ms(&self) -> i64;
+    /// Monotonic instant for sliding-window source counting and latency
+    /// measurement.
+    fn instant_now(&self) -> Instant;
+}
+
+/// Production clock — wraps `StampedTime::now()` and `Instant::now()`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct RealClock;
+
+impl MatcherClock for RealClock {
+    #[inline]
+    fn now_ms(&self) -> i64 {
+        dual_loop_common::time::StampedTime::now().wall_clock_unix_ms
+    }
+    #[inline]
+    fn instant_now(&self) -> Instant {
+        Instant::now()
+    }
+}
+
+/// Frozen wall-clock + monotonic instant. Calls advance the instant by
+/// `step_ns` per `instant_now()` so the source-tracker sliding window can
+/// still operate deterministically.
+#[derive(Debug)]
+pub struct FrozenClock {
+    now_ms: AtomicI64,
+    base_instant: Instant,
+    elapsed_ns: AtomicU64,
+    step_ns: u64,
+}
+
+impl FrozenClock {
+    /// Create a frozen clock anchored at `now_ms` with monotonic ticks of
+    /// `step_ns` per call to [`MatcherClock::instant_now`].
+    pub fn new(now_ms: i64, step_ns: u64) -> Self {
+        Self {
+            now_ms: AtomicI64::new(now_ms),
+            base_instant: Instant::now(),
+            elapsed_ns: AtomicU64::new(0),
+            step_ns,
+        }
+    }
+
+    /// Advance `now_ms` to a new value. The monotonic instant continues to
+    /// tick from where it was.
+    pub fn set_now_ms(&self, now_ms: i64) {
+        self.now_ms.store(now_ms, Ordering::Relaxed);
+    }
+}
+
+impl MatcherClock for FrozenClock {
+    #[inline]
+    fn now_ms(&self) -> i64 {
+        self.now_ms.load(Ordering::Relaxed)
+    }
+    #[inline]
+    fn instant_now(&self) -> Instant {
+        let prev = self.elapsed_ns.fetch_add(self.step_ns, Ordering::Relaxed);
+        self.base_instant + Duration::from_nanos(prev)
+    }
+}
+
+/// Generates `Trigger.message_id` UUIDs.
+///
+/// Replay/golden tests use [`DeterministicIdGenerator`] so the same input
+/// dump always produces the same UUIDs (byte-for-byte equality). Production
+/// uses [`UuidV7Generator`] for time-ordered globally-unique IDs.
+pub trait IdGenerator: Send + Sync {
+    fn next_id(&self) -> Uuid;
+}
+
+/// Production ID generator — UUID v7 (time-ordered, random tail).
+#[derive(Debug, Default, Clone, Copy)]
+pub struct UuidV7Generator;
+
+impl IdGenerator for UuidV7Generator {
+    #[inline]
+    fn next_id(&self) -> Uuid {
+        new_uuid_v7()
+    }
+}
+
+/// Deterministic ID generator: BLAKE3(seed || counter), output truncated to
+/// 16 bytes. Identical seeds + identical call ordering → identical IDs.
+#[derive(Debug)]
+pub struct DeterministicIdGenerator {
+    seed: [u8; 32],
+    counter: Mutex<u64>,
+}
+
+impl DeterministicIdGenerator {
+    /// Create from a 32-byte seed.
+    pub fn new(seed: [u8; 32]) -> Self {
+        Self {
+            seed,
+            counter: Mutex::new(0),
+        }
+    }
+
+    /// Convenience: derive a 32-byte seed from an arbitrary string label.
+    pub fn from_label(label: &str) -> Self {
+        let mut hasher = Blake3Hasher::new();
+        hasher.update(b"sniper-ingest:deterministic-id-gen:v1:");
+        hasher.update(label.as_bytes());
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(hasher.finalize().as_bytes());
+        Self::new(seed)
+    }
+}
+
+impl IdGenerator for DeterministicIdGenerator {
+    fn next_id(&self) -> Uuid {
+        let mut guard = self.counter.lock().expect("id-gen mutex poisoned");
+        let n = *guard;
+        *guard = n.wrapping_add(1);
+        drop(guard);
+
+        let mut hasher = Blake3Hasher::new();
+        hasher.update(&self.seed);
+        hasher.update(&n.to_le_bytes());
+        let digest = hasher.finalize();
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&digest.as_bytes()[..16]);
+        Uuid {
+            value: prost::bytes::Bytes::copy_from_slice(&bytes),
+        }
+    }
+}
 
 #[inline]
 fn expected_price_money(p_fundamental_ppm: i64) -> Money {
@@ -86,13 +227,29 @@ impl SourceTracker {
 pub struct TriggerMatcher {
     store: WatchlistStore,
     source_trackers: AHashMap<MarketKey, SourceTracker>,
+    clock: Box<dyn MatcherClock>,
+    id_gen: Box<dyn IdGenerator>,
 }
 
 impl TriggerMatcher {
+    /// Create a matcher with production clock + UUIDv7 ID generation. This
+    /// is the path used by the live `sniper-ingest` daemon.
     pub fn new(store: WatchlistStore) -> Self {
+        Self::with_dependencies(store, Box::new(RealClock), Box::new(UuidV7Generator))
+    }
+
+    /// Create a matcher with explicit clock + ID generator. Used by replay
+    /// and unit tests to pin both wall-clock time and message_id sequences.
+    pub fn with_dependencies(
+        store: WatchlistStore,
+        clock: Box<dyn MatcherClock>,
+        id_gen: Box<dyn IdGenerator>,
+    ) -> Self {
         Self {
             store,
             source_trackers: AHashMap::new(),
+            clock,
+            id_gen,
         }
     }
 
@@ -146,6 +303,12 @@ impl TriggerMatcher {
         observed_at_ns: u64,
         evidence_hash: Vec<u8>,
     ) -> Option<Trigger> {
+        // Histogram start: the first thing we do once we know the market
+        // could match. The corresponding stop is right before each Some(_)
+        // arm below so the histogram captures the full work the matcher
+        // does for an observed event that ultimately fires a trigger.
+        let started_at = self.clock.instant_now();
+
         let entry = self.store.get(&market_key)?;
 
         // Check allowed_kinds.
@@ -158,23 +321,24 @@ impl TriggerMatcher {
             }
 
             // TTL check: don't fire if entry is expired.
-            let now_ms = dual_loop_common::time::StampedTime::now().wall_clock_unix_ms;
+            let now_ms = self.clock.now_ms();
             if now_ms > entry.expires_at_unix_ms {
                 return None;
             }
 
             // Source counting.
             let tracker = self.source_trackers.entry(market_key.clone()).or_default();
-            let source_count = tracker.record_and_count(kind, Instant::now());
+            let source_count = tracker.record_and_count(kind, self.clock.instant_now());
 
             if source_count < policy.min_independent_sources {
                 return None;
             }
 
             metrics::counter!("trigger_fired_total", "market" => market_key.0.clone(), "kind" => format!("{kind:?}")).increment(1);
+            record_matcher_latency(started_at, self.clock.instant_now());
 
             Some(Trigger {
-                message_id: Some(new_uuid_v7()),
+                message_id: Some(self.id_gen.next_id()),
                 market: Some(dual_loop_common::proto::common::MarketId {
                     polymarket_id: market_key.0,
                     ctf_address: market_key.1,
@@ -192,11 +356,12 @@ impl TriggerMatcher {
             })
         } else {
             // No policy → fire unconditionally.
-            let now_ms = dual_loop_common::time::StampedTime::now().wall_clock_unix_ms;
+            let now_ms = self.clock.now_ms();
             metrics::counter!("trigger_fired_total", "market" => market_key.0.clone(), "kind" => format!("{kind:?}")).increment(1);
+            record_matcher_latency(started_at, self.clock.instant_now());
 
             Some(Trigger {
-                message_id: Some(new_uuid_v7()),
+                message_id: Some(self.id_gen.next_id()),
                 market: Some(dual_loop_common::proto::common::MarketId {
                     polymarket_id: market_key.0,
                     ctf_address: market_key.1,
@@ -240,13 +405,33 @@ impl TriggerMatcher {
     }
 }
 
-/// Compute a simple evidence hash from the decoded event (for dedup).
+/// Record a `trigger_matcher_latency_ns` histogram sample. Called only on
+/// the success path so the metric measures the cost of fired triggers,
+/// not no-op rejections.
+#[inline]
+fn record_matcher_latency(started_at: Instant, ended_at: Instant) {
+    let elapsed_ns = ended_at
+        .saturating_duration_since(started_at)
+        .as_nanos()
+        .min(u64::MAX as u128) as u64;
+    metrics::histogram!("trigger_matcher_latency_ns").record(elapsed_ns as f64);
+}
+
+/// Compute a deterministic evidence hash from the decoded event (for dedup).
+///
+/// Uses BLAKE3 with a fixed domain-separation prefix, so the same event
+/// produces the same hash across processes / machines / replay runs. The
+/// previous implementation used `ahash::AHasher::default()`, which seeds
+/// each process with random bytes for HashDoS resistance and therefore
+/// broke replay byte-equality (gate #9).
 fn compute_evidence_hash(event: &DecodedEvent) -> Vec<u8> {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = ahash::AHasher::default();
-    // Hash the debug representation as a cheap deterministic fingerprint.
-    format!("{event:?}").hash(&mut hasher);
-    hasher.finish().to_le_bytes().to_vec()
+    let mut hasher = Blake3Hasher::new();
+    hasher.update(b"sniper-ingest:evidence-hash:v1:");
+    hasher.update(format!("{event:?}").as_bytes());
+    let digest = hasher.finalize();
+    // Truncate to 8 bytes — same length the old AHash output produced, so
+    // downstream code that assumes a compact fingerprint is unaffected.
+    digest.as_bytes()[..8].to_vec()
 }
 
 #[cfg(test)]
@@ -425,5 +610,102 @@ mod tests {
             .as_ref()
             .map(|value| value.watchlist_valid_until_unix_ms > value.issued_at_unix_ms)
             .unwrap_or(false));
+    }
+
+    // --- gate #9 (replay determinism) foundation tests ---
+
+    #[test]
+    fn frozen_clock_pins_wall_time_and_advances_instant() {
+        let clock = FrozenClock::new(1_700_000_000_000, 1_000);
+        // Wall time stays put no matter how often we ask.
+        assert_eq!(clock.now_ms(), 1_700_000_000_000);
+        assert_eq!(clock.now_ms(), 1_700_000_000_000);
+
+        // Monotonic instant advances by `step_ns` per call.
+        let i1 = clock.instant_now();
+        let i2 = clock.instant_now();
+        let i3 = clock.instant_now();
+        assert!(i2 > i1);
+        assert!(i3 > i2);
+        let delta = i2.saturating_duration_since(i1).as_nanos();
+        assert_eq!(delta, 1_000);
+
+        // set_now_ms is sticky.
+        clock.set_now_ms(1_700_000_005_000);
+        assert_eq!(clock.now_ms(), 1_700_000_005_000);
+    }
+
+    #[test]
+    fn frozen_clock_pins_issued_at_unix_ms() {
+        let (store, ctf_addr) = make_store_with_entry();
+        let frozen_now = 1_710_000_000_000_i64;
+        let matcher = TriggerMatcher::with_dependencies(
+            store,
+            Box::new(FrozenClock::new(frozen_now, 1_000)),
+            Box::new(UuidV7Generator),
+        );
+        let mut matcher = matcher;
+
+        let event = DecodedEvent::CtfOrderFilled {
+            order_hash: b256!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            maker: address!("1111111111111111111111111111111111111111"),
+            taker: address!("2222222222222222222222222222222222222222"),
+            maker_asset_id: U256::from(1u64),
+            taker_asset_id: U256::from(2u64),
+            maker_amount_filled: U256::from(1000u64),
+            taker_amount_filled: U256::from(2000u64),
+            fee: U256::from(5u64),
+        };
+
+        let trigger = matcher
+            .try_match(&event, ctf_addr, 12345)
+            .expect("matcher should fire");
+        // Frozen clock pins issued_at to the anchor exactly.
+        assert_eq!(trigger.issued_at_unix_ms, frozen_now);
+        // watchlist_valid_until_unix_ms comes from the upsert's own
+        // `issued_at_unix_ms + ttl_ms` (set inside `make_store_with_entry`),
+        // not from the matcher clock — it's a property of the watchlist
+        // entry, not the matcher tick. Assert only that it is sane.
+        assert!(trigger.watchlist_valid_until_unix_ms > 0);
+    }
+
+    #[test]
+    fn deterministic_id_generator_is_reproducible() {
+        let g1 = DeterministicIdGenerator::from_label("test-seed");
+        let g2 = DeterministicIdGenerator::from_label("test-seed");
+        let a1 = g1.next_id();
+        let a2 = g1.next_id();
+        let b1 = g2.next_id();
+        let b2 = g2.next_id();
+        // Same seed + same call ordering → identical IDs.
+        assert_eq!(a1.value, b1.value);
+        assert_eq!(a2.value, b2.value);
+        // Sequential IDs differ.
+        assert_ne!(a1.value, a2.value);
+        // 16-byte UUID-shaped output.
+        assert_eq!(a1.value.len(), 16);
+
+        // A different seed produces a different sequence.
+        let g3 = DeterministicIdGenerator::from_label("other-seed");
+        let c1 = g3.next_id();
+        assert_ne!(a1.value, c1.value);
+    }
+
+    #[test]
+    fn evidence_hash_is_deterministic_across_calls() {
+        let event = DecodedEvent::CtfOrderFilled {
+            order_hash: b256!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            maker: address!("1111111111111111111111111111111111111111"),
+            taker: address!("2222222222222222222222222222222222222222"),
+            maker_asset_id: U256::from(1u64),
+            taker_asset_id: U256::from(2u64),
+            maker_amount_filled: U256::from(1000u64),
+            taker_amount_filled: U256::from(2000u64),
+            fee: U256::from(5u64),
+        };
+        let h1 = compute_evidence_hash(&event);
+        let h2 = compute_evidence_hash(&event);
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 8);
     }
 }

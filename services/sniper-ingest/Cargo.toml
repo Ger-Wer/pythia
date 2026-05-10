@@ -52,6 +52,9 @@ arc-swap.workspace = true
 clap.workspace = true
 hex.workspace = true
 
+# Deterministic ID generation (replay/golden tests)
+blake3.workspace = true
+
 # Logging
 tracing-subscriber.workspace = true
 

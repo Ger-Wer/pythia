@@ -74,6 +74,7 @@ clap = { version = "4.5", features = ["derive"] }
 hex = "0.4"
 hmac = "0.12"
 sha2 = "0.10"
+blake3 = "1.5"
 
 # Benchmarks
 criterion = { version = "0.5", features = ["html_reports"] }
