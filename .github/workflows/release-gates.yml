@@ -1,0 +1,81 @@
+# Release Gates (manual)
+#
+# Manually-triggered audit run for the Paper Operator Release gates.
+# Runs the lightweight automated gate checks inline. Heavyweight rituals
+# (live load_harness, signal_probe vs staging, 72h soak, Shadow Postgres
+# diff review) remain MANUAL — see `tools/*/README.md` and the summary
+# step at the bottom of this workflow for the exact commands.
+#
+# Trigger via the Actions tab → "Release Gates (manual)" → "Run workflow".
+
+name: Release Gates (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are we running release gates?"
+        required: false
+        default: "pre-release audit"
+
+permissions:
+  contents: read
+
+jobs:
+  replay-determinism:
+    name: gate #9 — replay byte-equality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults: { run: { working-directory: services } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: services }
+      - run: cargo test -p sniper-ingest --test replay_determinism
+
+  soak-orchestrator:
+    name: gate #7 — soak orchestrator unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install --quiet pytest
+      - run: python -m pytest tools/soak/ -v
+
+  signal-probe:
+    name: gate #3 — signal_probe unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults: { run: { working-directory: tools/signal_probe } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.3.13" }
+      - run: bun install --frozen-lockfile || bun install
+      - run: bun test
+
+  release-checklist:
+    name: manual rituals checklist
+    runs-on: ubuntu-latest
+    needs: [replay-determinism, soak-orchestrator, signal-probe]
+    if: always()
+    steps:
+      - name: Print pre-release ritual checklist
+        env:
+          REASON: ${{ inputs.reason }}
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          # Release Gates Summary
+          - **Reason:** ${REASON}
+          - **Automated gates run:** replay (#9), soak unit (#7), signal_probe unit (#3)
+          - **Load harness smoke (#4 #8):** runs on every push to main — verify the latest \`main\` CI run passed before tagging.
+          - **Manual pre-release rituals (run on staging):**
+              1. \`tools/load_harness\` — 60s @ 1000/min strict (\`--target-p95-ms 8.0 --max-drop-rate 0.0\`).
+              2. \`tools/signal_probe\` — 30s against staging gateway, expect p95 < 500ms.
+              3. \`tools/soak/run_72h_paper.py\` — 72h attached to running sniper-executor.
+              4. Shadow Postgres — review 7-day parity diff log.
+          See \`tools/*/README.md\` for exact commands.
+          EOF
