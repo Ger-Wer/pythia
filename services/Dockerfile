@@ -20,14 +20,17 @@ COPY services/common/Cargo.toml ./services/common/
 COPY services/sniper-ingest/Cargo.toml ./services/sniper-ingest/
 COPY services/sniper-executor/Cargo.toml ./services/sniper-executor/
 COPY services/sniper-risk/Cargo.toml ./services/sniper-risk/
+COPY services/sniper-orderbook/Cargo.toml ./services/sniper-orderbook/
 
 # Dummy source to materialise the dependency graph.
 RUN mkdir -p services/common/src services/sniper-ingest/src \
-             services/sniper-executor/src services/sniper-risk/src && \
+             services/sniper-executor/src services/sniper-risk/src \
+             services/sniper-orderbook/src && \
     echo 'fn main() {}' > services/sniper-ingest/src/main.rs && \
     echo 'fn main() {}' > services/sniper-executor/src/main.rs && \
     echo 'fn main() {}' > services/sniper-risk/src/main.rs && \
-    touch services/common/src/lib.rs
+    touch services/common/src/lib.rs && \
+    touch services/sniper-orderbook/src/lib.rs
 
 # Copy the real sources.
 COPY services/ ./services/

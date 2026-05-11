@@ -4205,6 +4205,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sniper-orderbook"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "proptest",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "sniper-risk"
 version = "0.1.0"
 dependencies = [
