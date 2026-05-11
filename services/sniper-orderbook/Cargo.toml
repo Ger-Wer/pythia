@@ -10,14 +10,35 @@ description = "Fast Loop: Polymarket L2 order-book tracker (REST snapshot + WS i
 name = "sniper_orderbook"
 path = "src/lib.rs"
 
+[features]
+# Live Polymarket REST + WS clients. Pulled in by `orderbook_probe` and any
+# host that drives a real connection. Off by default so unit tests on the
+# state-machine layer stay hermetic and cargo-test cheap.
+default = ["polymarket-live"]
+polymarket-live = [
+    "dep:tokio",
+    "dep:tokio-tungstenite",
+    "dep:reqwest",
+    "dep:futures",
+    "dep:serde_json",
+    "dep:url",
+    "dep:anyhow",
+]
+
 [dependencies]
-# Skeleton stage (gate #10, milestone 1):
-# This crate exposes types + the synchronization state machine ONLY.
-# Live Polymarket REST/WS clients land in a follow-up PR.
 thiserror.workspace = true
 tracing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 metrics.workspace = true
 
+tokio = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+
 [dev-dependencies]
 proptest = "1.5"
+serde_json = { workspace = true }

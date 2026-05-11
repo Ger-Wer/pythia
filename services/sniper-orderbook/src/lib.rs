@@ -2,17 +2,17 @@
 //!
 //! # Status
 //!
-//! **Milestone 1 — skeleton (gate #10).** This crate exposes:
+//! **Milestone 2 — live Polymarket adapters (gate #10).** This crate exposes:
 //!
 //! * Data types ([`OrderBook`], [`BookSnapshot`], [`BookUpdate`], [`PriceLevel`]).
 //! * The synchronization state machine ([`TrackerState`], [`TrackerEvent`],
 //!   [`Tracker`]) that orchestrates a strict REST-snapshot + WS-incremental
 //!   join, with sequence-number based reconciliation.
-//!
-//! It does **not** include live Polymarket REST or WebSocket clients —
-//! those land in a follow-up PR. The point of this milestone is to ship a
-//! deterministic, fully unit-tested state machine that the network layer
-//! can drive.
+//! * Live Polymarket REST + WebSocket adapters under [`polymarket`] (behind
+//!   the default-on `polymarket-live` feature).
+//! * `OrderBook::is_crossed()` + tracker warn-only crossed-book detection,
+//!   per the M2 brief: a crossed top-of-book is transient HFT noise, not a
+//!   degrade condition; we log + count it and wait for the next delta.
 //!
 //! # Architecture
 //!
@@ -59,22 +59,18 @@
 //! convention. No `f64`/`f32` anywhere on hot path — IEEE-754 rounding ruins
 //! sequence reconciliation. See [`PriceLevel`].
 //!
-//! Sequence numbers are exchange-monotonic `u64`. We assume strict +1
-//! increments on the WS feed (Polymarket's convention) and treat any
-//! non-contiguous sequence as a gap.
-//!
-//! # Non-goals (milestone 1)
-//!
-//! * No live network IO. No `reqwest`. No `tokio-tungstenite`.
-//! * No persistence. No Redis writes. No bus publishes.
-//! * No metric histograms (counters are stubbed via `metrics::counter!`,
-//!   visible once a binary host is wired in).
-//! * No tracker manager / multi-market driver. That comes once the
-//!   single-market state machine has been validated end-to-end.
+//! Sequence numbers are host-monotonic `u64`. Polymarket's WS contract
+//! does **not** guarantee `+1` increments, so the host assigns sequence
+//! on WS-message receive (see [`polymarket::SequenceCursor`]); the
+//! [`OrderBook::apply_update`] state machine then enforces continuity
+//! downstream.
 
 pub mod book;
 pub mod state;
 pub mod tracker;
+
+#[cfg(feature = "polymarket-live")]
+pub mod polymarket;
 
 pub use book::{BookSide, BookSnapshot, BookUpdate, OrderBook, PriceLevel};
 pub use state::{TrackerEvent, TrackerState, TransitionError};
