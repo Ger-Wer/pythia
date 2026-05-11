@@ -56,6 +56,11 @@ protoc-bin-vendored = "3.1"
 redis = { version = "0.27", default-features = false, features = ["aio", "tokio-comp", "streams", "script"] }
 async-nats = "0.38"
 
+# HTTP / WebSocket clients (Polymarket CLOB integration in sniper-orderbook)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+url = "2.5"
+
 # Alloy (EVM)
 alloy = { version = "0.8", features = ["full", "provider-ws", "provider-ipc", "pubsub", "rpc-types-trace"] }
 alloy-sol-types = "0.8"

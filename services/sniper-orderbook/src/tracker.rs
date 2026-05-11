@@ -117,7 +117,10 @@ impl Tracker {
                 TickResult { new_state, action }
             }
             Action::ApplyDelta => match self.book.apply_update(&update) {
-                Ok(()) => TickResult { new_state, action },
+                Ok(()) => {
+                    self.observe_crossed_if_any();
+                    TickResult { new_state, action }
+                }
                 Err(ApplyError::SequenceGap { .. }) => {
                     self.drive(&TrackerEvent::SequenceGapDetected)
                 }
@@ -167,7 +170,7 @@ impl Tracker {
 
         for u in pending {
             match self.book.apply_update(&u) {
-                Ok(()) => {}
+                Ok(()) => self.observe_crossed_if_any(),
                 Err(ApplyError::SequenceGap { .. }) | Err(ApplyError::NotInitialized) => {
                     return self.drive(&TrackerEvent::SequenceGapDetected);
                 }
@@ -189,6 +192,27 @@ impl Tracker {
     }
 
     // -------------------- internals --------------------
+
+    /// Detect (best_bid >= best_ask) after a delta apply. Crossed books
+    /// are a normal transient anomaly on hybrid CLOB venues like
+    /// Polymarket: log + count, do not degrade or panic.
+    fn observe_crossed_if_any(&mut self) {
+        if !self.book.is_crossed() {
+            return;
+        }
+        let (bid, ask) = match (self.book.best_bid(), self.book.best_ask()) {
+            (Some(b), Some(a)) => (b, a),
+            _ => return,
+        };
+        metrics::counter!("sniper_orderbook_crossed_observed_total").increment(1);
+        tracing::warn!(
+            best_bid_micros = bid.price_micros,
+            best_bid_size_micros = bid.size_micros,
+            best_ask_micros = ask.price_micros,
+            best_ask_size_micros = ask.size_micros,
+            "crossed book observed (transient); awaiting next delta to restore spread",
+        );
+    }
 
     fn drive(&mut self, event: &TrackerEvent) -> TickResult {
         match transition(&self.state, event) {
@@ -463,5 +487,30 @@ mod tests {
         let r = t.on_snapshot_received(mk_snapshot(20));
         assert_eq!(r.new_state, TrackerState::Tracking);
         assert_eq!(t.book().last_sequence(), Some(20));
+    }
+
+    #[test]
+    fn crossed_book_in_tracking_does_not_degrade() {
+        // Seed Tracking with a normal book (bid 450k, ask 460k).
+        let mut t = Tracker::new(TrackerConfig::default());
+        t.on_ws_connected();
+        t.request_snapshot();
+        let r = t.on_snapshot_received(mk_snapshot(100));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        assert!(!t.book().is_crossed());
+
+        // Apply a delta that pushes best_bid above best_ask. The
+        // Tracker must log + count it but stay in Tracking — no
+        // degrade, no panic, no state transition.
+        let r = t.on_ws_message(mk_update(101, BookSide::Bid, 470_000, 1_000_000));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        assert!(t.book().is_crossed());
+        assert_eq!(t.book().last_sequence(), Some(101));
+
+        // The very next delta restores the spread — Tracker remains
+        // in Tracking, crossed flag clears.
+        let r = t.on_ws_message(mk_update(102, BookSide::Bid, 470_000, 0));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        assert!(!t.book().is_crossed());
     }
 }

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "load_harness",
+    "orderbook_probe",
 ]
 
 # Standalone workspace for non-production tooling. Kept SEPARATE from the
@@ -46,6 +47,7 @@ hex = "0.4"
 # Path-dep into the production workspace for protobuf types + topic
 # constants. The other workspace is the source of truth for wire format.
 dual_loop_common = { path = "../services/common" }
+sniper-orderbook = { path = "../services/sniper-orderbook" }
 
 [profile.release]
 opt-level = 3

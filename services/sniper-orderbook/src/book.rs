@@ -184,10 +184,45 @@ impl OrderBook {
     }
 
     /// Spread (ask − bid) in micros, if both sides have liquidity.
+    /// May be negative if the book is momentarily [crossed](Self::is_crossed).
     pub fn spread_micros(&self) -> Option<i64> {
         let bid = self.best_bid()?.price_micros;
         let ask = self.best_ask()?.price_micros;
         Some(ask - bid)
+    }
+
+    /// Whether the top of book is currently crossed: `best_bid >= best_ask`.
+    ///
+    /// On Polymarket (and other hybrid CLOB venues) this can happen
+    /// briefly during normal operation, when a delta has been applied
+    /// out-of-time-order relative to another delta on the opposite side
+    /// — network jitter, not corruption. The tracker treats this as a
+    /// warning condition (logs + metric increment), not a degrade. It
+    /// expects the very next delta to restore a healthy spread.
+    pub fn is_crossed(&self) -> bool {
+        match (self.best_bid(), self.best_ask()) {
+            (Some(b), Some(a)) => b.price_micros >= a.price_micros,
+            _ => false,
+        }
+    }
+
+    /// Top-N price levels on the bid side, best (highest) first.
+    pub fn top_bids(&self, n: usize) -> Vec<PriceLevel> {
+        self.bids
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(p, s)| PriceLevel::new(*p, *s))
+            .collect()
+    }
+
+    /// Top-N price levels on the ask side, best (lowest) first.
+    pub fn top_asks(&self, n: usize) -> Vec<PriceLevel> {
+        self.asks
+            .iter()
+            .take(n)
+            .map(|(p, s)| PriceLevel::new(*p, *s))
+            .collect()
     }
 
     /// Last applied sequence number.
@@ -369,5 +404,88 @@ mod tests {
         assert_eq!(book.best_ask(), None);
         assert_eq!(book.spread_micros(), None);
         assert_eq!(book.mid_micros(), None);
+    }
+
+    #[test]
+    fn is_crossed_false_on_normal_book_and_empty_sides() {
+        let empty = OrderBook::new();
+        assert!(!empty.is_crossed());
+
+        let mut book = OrderBook::new();
+        book.apply_snapshot(&BookSnapshot {
+            sequence: 0,
+            bids: vec![PriceLevel::new(450_000, 1_000_000)],
+            asks: vec![PriceLevel::new(460_000, 1_000_000)],
+            taken_at_unix_ms: 0,
+        });
+        assert!(!book.is_crossed());
+        assert_eq!(book.spread_micros(), Some(10_000));
+    }
+
+    #[test]
+    fn is_crossed_true_when_bid_meets_or_exceeds_ask() {
+        let mut book = OrderBook::new();
+        // Equal — counts as crossed.
+        book.apply_snapshot(&BookSnapshot {
+            sequence: 0,
+            bids: vec![PriceLevel::new(500_000, 1_000_000)],
+            asks: vec![PriceLevel::new(500_000, 1_000_000)],
+            taken_at_unix_ms: 0,
+        });
+        assert!(book.is_crossed());
+        assert_eq!(book.spread_micros(), Some(0));
+
+        // Bid > Ask: a transient HFT cross.
+        book.apply_snapshot(&BookSnapshot {
+            sequence: 1,
+            bids: vec![PriceLevel::new(520_000, 1_000_000)],
+            asks: vec![PriceLevel::new(500_000, 1_000_000)],
+            taken_at_unix_ms: 0,
+        });
+        assert!(book.is_crossed());
+        assert_eq!(book.spread_micros(), Some(-20_000));
+    }
+
+    #[test]
+    fn top_bids_and_top_asks_respect_n_and_ordering() {
+        let mut book = OrderBook::new();
+        book.apply_snapshot(&BookSnapshot {
+            sequence: 0,
+            bids: vec![
+                PriceLevel::new(440_000, 1),
+                PriceLevel::new(450_000, 2),
+                PriceLevel::new(430_000, 3),
+                PriceLevel::new(460_000, 4),
+            ],
+            asks: vec![
+                PriceLevel::new(490_000, 9),
+                PriceLevel::new(470_000, 7),
+                PriceLevel::new(480_000, 8),
+                PriceLevel::new(500_000, 10),
+            ],
+            taken_at_unix_ms: 0,
+        });
+
+        // Bids descending (best first).
+        let top_b = book.top_bids(3);
+        assert_eq!(top_b.len(), 3);
+        assert_eq!(top_b[0].price_micros, 460_000);
+        assert_eq!(top_b[1].price_micros, 450_000);
+        assert_eq!(top_b[2].price_micros, 440_000);
+
+        // Asks ascending (best first).
+        let top_a = book.top_asks(3);
+        assert_eq!(top_a.len(), 3);
+        assert_eq!(top_a[0].price_micros, 470_000);
+        assert_eq!(top_a[1].price_micros, 480_000);
+        assert_eq!(top_a[2].price_micros, 490_000);
+
+        // Asking for more than depth returns full depth (no panic).
+        assert_eq!(book.top_bids(100).len(), 4);
+        assert_eq!(book.top_asks(100).len(), 4);
+
+        // Asking for 0 returns empty.
+        assert!(book.top_bids(0).is_empty());
+        assert!(book.top_asks(0).is_empty());
     }
 }
