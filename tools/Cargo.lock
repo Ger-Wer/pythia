@@ -3258,6 +3258,7 @@ name = "sniper-orderbook"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dual_loop_common",
  "futures",
  "metrics",
  "reqwest",

@@ -19,6 +19,7 @@
 //! as a [`TickResult`] so the host has no business logic of its own.
 
 use crate::book::{ApplyError, BookSnapshot, BookUpdate, OrderBook};
+use crate::publish::{Bbo, OrderBookPublisher, OrderBookSnapshotView, PublishError};
 use crate::state::{transition, Action, DegradeReason, TrackerEvent, TrackerState};
 
 /// Configuration knobs for a [`Tracker`].
@@ -57,6 +58,11 @@ pub struct Tracker {
     /// FIFO of WS deltas captured while not in `Tracking`. Each push
     /// also checks `max_buffer_len`; overflow degrades the tracker.
     buffer: Vec<BookUpdate>,
+    /// Top-of-book fingerprint at the time of the most recent
+    /// successful publication. Used by
+    /// [`Tracker::publish_if_bbo_changed`] to skip republishing when
+    /// the depth changed but the BBO didn't.
+    last_published_bbo: Option<Bbo>,
 }
 
 impl Tracker {
@@ -66,6 +72,7 @@ impl Tracker {
             state: TrackerState::Connecting,
             book: OrderBook::new(),
             buffer: Vec::new(),
+            last_published_bbo: None,
         }
     }
 
@@ -191,6 +198,52 @@ impl Tracker {
         self.drive(&TrackerEvent::Shutdown)
     }
 
+    // -------------------- publish (M3) --------------------
+
+    /// Publish a derived [`OrderBookSnapshotView`] **only if** the top
+    /// of book (best bid price + size, best ask price + size) changed
+    /// since the last successful publish. Depth-only changes do not
+    /// trigger publication — they don't affect snipers' slippage
+    /// assumptions and would otherwise flood the bus.
+    ///
+    /// No-op (returns `Ok(false)`) when the tracker is not in
+    /// [`TrackerState::Tracking`] — the book is partial / stale in any
+    /// other state and must not be advertised. The `last_published_bbo`
+    /// fingerprint is also wiped on [`Action::ClearAndRecover`], so the
+    /// first publish after a degrade always fires.
+    ///
+    /// Returns `Ok(true)` if a publish actually went out, `Ok(false)`
+    /// if it was skipped (state mismatch or BBO unchanged), and the
+    /// publisher's error if the transport refused.
+    pub async fn publish_if_bbo_changed<P: OrderBookPublisher>(
+        &mut self,
+        publisher: &P,
+        market_specific_key: &str,
+        asset_id: &str,
+        liquidity_depth: u32,
+        timestamp_ms: i64,
+    ) -> Result<bool, PublishError> {
+        if !matches!(self.state, TrackerState::Tracking) {
+            return Ok(false);
+        }
+        let current = Bbo::from_book(&self.book);
+        if self.last_published_bbo == Some(current) {
+            metrics::counter!("sniper_orderbook_publish_skipped_bbo_total").increment(1);
+            return Ok(false);
+        }
+        let view = OrderBookSnapshotView::derive(
+            &self.book,
+            market_specific_key.to_owned(),
+            asset_id.to_owned(),
+            liquidity_depth,
+            timestamp_ms,
+        );
+        publisher.publish(&view).await?;
+        self.last_published_bbo = Some(current);
+        metrics::counter!("sniper_orderbook_publish_emitted_total").increment(1);
+        Ok(true)
+    }
+
     // -------------------- internals --------------------
 
     /// Detect (best_bid >= best_ask) after a delta apply. Crossed books
@@ -223,6 +276,9 @@ impl Tracker {
                 if matches!(action, Action::ClearAndRecover | Action::Shutdown) {
                     self.book.clear();
                     self.buffer.clear();
+                    // BBO becomes meaningless after a wipe; the next
+                    // first publish-after-recovery should always fire.
+                    self.last_published_bbo = None;
                 }
                 metrics::counter!(
                     "sniper_orderbook_transitions_total",
@@ -512,5 +568,181 @@ mod tests {
         let r = t.on_ws_message(mk_update(102, BookSide::Bid, 470_000, 0));
         assert_eq!(r.new_state, TrackerState::Tracking);
         assert!(!t.book().is_crossed());
+    }
+
+    // -------------------- BBO publish filter (M3) --------------------
+
+    /// Lightweight publisher that records every successful publish for
+    /// assertions in BBO-filter tests. Uses an internal Mutex (Tokio's)
+    /// to remain `Send + Sync` without an `async_trait` macro.
+    #[derive(Default)]
+    struct RecordingPublisher {
+        seen: tokio::sync::Mutex<Vec<crate::publish::OrderBookSnapshotView>>,
+    }
+    impl crate::publish::OrderBookPublisher for RecordingPublisher {
+        async fn publish(
+            &self,
+            view: &crate::publish::OrderBookSnapshotView,
+        ) -> Result<(), crate::publish::PublishError> {
+            self.seen.lock().await.push(view.clone());
+            Ok(())
+        }
+    }
+
+    fn drive_to_tracking(t: &mut Tracker, snap_seq: u64) {
+        let _ = t.on_ws_connected();
+        let _ = t.request_snapshot();
+        let _ = t.on_snapshot_received(BookSnapshot {
+            sequence: snap_seq,
+            bids: vec![PriceLevel::new(450_000, 5_000_000)],
+            asks: vec![PriceLevel::new(460_000, 5_000_000)],
+            taken_at_unix_ms: 0,
+        });
+        assert_eq!(*t.state(), TrackerState::Tracking);
+    }
+
+    #[tokio::test]
+    async fn publish_skipped_outside_tracking() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        let pub_ = RecordingPublisher::default();
+        // state = Connecting → must skip.
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 0)
+            .await
+            .expect("noop is ok");
+        assert!(!emitted);
+        assert!(pub_.seen.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn first_publish_in_tracking_emits() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "0xabc", "tok", 3, 1_700_000_000_000)
+            .await
+            .unwrap();
+        assert!(emitted);
+        let seen = pub_.seen.lock().await;
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].best_bid_micros, 450_000);
+        assert_eq!(seen[0].best_ask_micros, 460_000);
+        assert_eq!(seen[0].liquidity_depth, 3);
+        assert_eq!(seen[0].market_specific_key, "0xabc");
+        assert_eq!(seen[0].asset_id, "tok");
+    }
+
+    #[tokio::test]
+    async fn second_publish_with_unchanged_bbo_is_skipped() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let _ = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 1)
+            .await
+            .unwrap();
+        // Nothing changed — must skip.
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 2)
+            .await
+            .unwrap();
+        assert!(!emitted);
+        assert_eq!(pub_.seen.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn depth_only_change_does_not_trigger_publish() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let _ = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 1)
+            .await
+            .unwrap();
+        // Add a deep level (not at BBO) — must NOT trigger republish.
+        let r = t.on_ws_message(mk_update(101, BookSide::Bid, 440_000, 1_000_000));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 2)
+            .await
+            .unwrap();
+        assert!(!emitted);
+        assert_eq!(pub_.seen.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn best_bid_size_change_triggers_publish() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let _ = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 1)
+            .await
+            .unwrap();
+        // Resize the best bid (price unchanged, size changes) — must publish.
+        let r = t.on_ws_message(mk_update(101, BookSide::Bid, 450_000, 7_500_000));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 2)
+            .await
+            .unwrap();
+        assert!(emitted);
+        let seen = pub_.seen.lock().await;
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[1].liquidity_bid_micros, 7_500_000);
+    }
+
+    #[tokio::test]
+    async fn best_bid_price_change_triggers_publish() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let _ = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 1)
+            .await
+            .unwrap();
+        // New best bid above the previous one (still below ask) — must publish.
+        let r = t.on_ws_message(mk_update(101, BookSide::Bid, 455_000, 1_000_000));
+        assert_eq!(r.new_state, TrackerState::Tracking);
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 2)
+            .await
+            .unwrap();
+        assert!(emitted);
+        let seen = pub_.seen.lock().await;
+        assert_eq!(seen[1].best_bid_micros, 455_000);
+    }
+
+    #[tokio::test]
+    async fn degrade_then_recover_re_emits_first_publish() {
+        let mut t = Tracker::new(TrackerConfig::default());
+        drive_to_tracking(&mut t, 100);
+        let pub_ = RecordingPublisher::default();
+        let _ = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 1)
+            .await
+            .unwrap();
+        // Force degrade: WS disconnect wipes the book + buffer + bbo.
+        let r = t.on_ws_disconnected();
+        assert!(matches!(r.new_state, TrackerState::Degraded { .. }));
+        // Recover back to Tracking via a fresh snapshot.
+        let _ = t.on_ws_connected();
+        let _ = t.request_snapshot();
+        let _ = t.on_snapshot_received(BookSnapshot {
+            sequence: 200,
+            bids: vec![PriceLevel::new(450_000, 5_000_000)],
+            asks: vec![PriceLevel::new(460_000, 5_000_000)],
+            taken_at_unix_ms: 0,
+        });
+        assert_eq!(*t.state(), TrackerState::Tracking);
+        // First publish after recovery MUST fire even though the BBO
+        // values are identical to the pre-degrade ones.
+        let emitted = t
+            .publish_if_bbo_changed(&pub_, "k", "a", 3, 3)
+            .await
+            .unwrap();
+        assert!(emitted);
+        assert_eq!(pub_.seen.lock().await.len(), 2);
     }
 }
