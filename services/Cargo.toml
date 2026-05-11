@@ -5,6 +5,7 @@ members = [
     "sniper-ingest",
     "sniper-executor",
     "sniper-risk",
+    "sniper-orderbook",
 ]
 
 [workspace.package]

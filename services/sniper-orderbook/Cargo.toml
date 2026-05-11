@@ -1,0 +1,23 @@
+[package]
+name = "sniper-orderbook"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Fast Loop: Polymarket L2 order-book tracker (REST snapshot + WS incremental, deterministic state machine)."
+
+[lib]
+name = "sniper_orderbook"
+path = "src/lib.rs"
+
+[dependencies]
+# Skeleton stage (gate #10, milestone 1):
+# This crate exposes types + the synchronization state machine ONLY.
+# Live Polymarket REST/WS clients land in a follow-up PR.
+thiserror.workspace = true
+tracing.workspace = true
+serde = { workspace = true, features = ["derive"] }
+metrics.workspace = true
+
+[dev-dependencies]
+proptest = "1.5"
