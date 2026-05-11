@@ -26,6 +26,7 @@ fn main() -> std::io::Result<()> {
         "dual_loop/v1/mock.proto",
         "dual_loop/v1/execution.proto",
         "dual_loop/v1/control.proto",
+        "dual_loop/v1/orderbook.proto",
     ];
 
     for f in &proto_files {
