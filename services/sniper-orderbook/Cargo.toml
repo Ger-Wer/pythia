@@ -30,6 +30,7 @@ thiserror.workspace = true
 tracing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 metrics.workspace = true
+dual_loop_common = { path = "../common" }
 
 tokio = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }

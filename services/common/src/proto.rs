@@ -57,6 +57,11 @@ pub mod control {
     pub use super::v1::{Heartbeat, KillAck, KillAckStatus, KillCommand, KillScope};
 }
 
+/// Message types originally declared in `orderbook.proto`.
+pub mod orderbook {
+    pub use super::v1::OrderBookUpdate;
+}
+
 // ---------- Fixed-point conversion helpers ----------
 
 /// 1.0 probability = 1_000_000 ppm. See [`common::FixedPointScales`].

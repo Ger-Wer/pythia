@@ -66,6 +66,7 @@
 //! downstream.
 
 pub mod book;
+pub mod publish;
 pub mod state;
 pub mod tracker;
 
@@ -73,5 +74,9 @@ pub mod tracker;
 pub mod polymarket;
 
 pub use book::{BookSide, BookSnapshot, BookUpdate, OrderBook, PriceLevel};
+pub use publish::{
+    NoopPublisher, OrderBookPublisher, OrderBookSnapshotView, PublishError,
+    TOPIC as ORDERBOOK_UPDATED_TOPIC,
+};
 pub use state::{TrackerEvent, TrackerState, TransitionError};
 pub use tracker::{Tracker, TrackerConfig};
