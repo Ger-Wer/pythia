@@ -295,7 +295,10 @@ mod tests {
         // Bid side now has 3 levels: 450_000 from snapshot + 451_000 from
         // the live continuation + 450_000 remains.
         assert_eq!(t.book().bid_depth(), 2);
-        assert_eq!(t.book().best_bid(), Some(PriceLevel::new(451_000, 7_000_000)));
+        assert_eq!(
+            t.book().best_bid(),
+            Some(PriceLevel::new(451_000, 7_000_000))
+        );
 
         // Now in Tracking, deltas apply immediately.
         let r = t.on_ws_message(mk_update(102, BookSide::Ask, 460_000, 0));
@@ -319,10 +322,7 @@ mod tests {
         // Snapshot put one ask at 460_000; delta 51 added another at 600_000.
         // Best ask is the lower one (snapshot's), depth should be 2.
         assert_eq!(t.book().ask_depth(), 2);
-        assert_eq!(
-            t.book().best_ask().map(|l| l.price_micros),
-            Some(460_000)
-        );
+        assert_eq!(t.book().best_ask().map(|l| l.price_micros), Some(460_000));
     }
 
     #[test]

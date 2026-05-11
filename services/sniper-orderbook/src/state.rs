@@ -340,8 +340,11 @@ mod tests {
 
     #[test]
     fn snapshot_failure_degrades() {
-        let (next, act) =
-            transition(&TrackerState::FetchingSnapshot, &TrackerEvent::SnapshotFailed).unwrap();
+        let (next, act) = transition(
+            &TrackerState::FetchingSnapshot,
+            &TrackerEvent::SnapshotFailed,
+        )
+        .unwrap();
         assert!(matches!(
             next,
             TrackerState::Degraded {
@@ -380,8 +383,7 @@ mod tests {
         assert!(matches!(err, TransitionError::Invalid { .. }));
 
         // SyncCompleted while Connecting is invalid.
-        let err =
-            transition(&TrackerState::Connecting, &TrackerEvent::SyncCompleted).unwrap_err();
+        let err = transition(&TrackerState::Connecting, &TrackerEvent::SyncCompleted).unwrap_err();
         assert!(matches!(err, TransitionError::Invalid { .. }));
 
         // Stopped accepts nothing but Shutdown.
