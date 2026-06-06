@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from python.db_pg_shadow import pg_shadow_update_outcome
 from python.decision_store import ensure_decision_core_schema
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -185,6 +186,7 @@ def update_resolved_market(conn: sqlite3.Connection, market_id: str, outcome: in
             + filter_suffix,
             (outcome, resolved_at, outcome, outcome, outcome, outcome, outcome, outcome, market_id),
         )
+        pg_shadow_update_outcome(market_id, outcome, resolved_at)
     else:
         conn.execute(
             """
