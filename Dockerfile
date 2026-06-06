@@ -20,6 +20,7 @@ RUN apt-get update \
        ca-certificates \
        curl \
        jq \
+       libpq-dev \
        pkg-config \
        procps \
        sqlite3 \
