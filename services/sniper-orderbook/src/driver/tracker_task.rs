@@ -5,7 +5,6 @@
 
 use crate::state::TrackerState;
 use crate::tracker::{Tracker, TrackerConfig};
-use std::time::Duration;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 
@@ -78,7 +77,8 @@ impl TrackerTask {
             let rest_client = match PolymarketRestClient::new(token_id.clone()) {
                 Ok(client) => client,
                 Err(e) => {
-                    // If client init fails, spawn a task that immediately errors
+                    // If client init fails, send Degraded health before spawning error task
+                    health_tx.send(TrackerHealth::Degraded(format!("RestClient init failed: {}", e))).ok();
                     let task = tokio::spawn(async move {
                         Err(TrackerError::WebSocketConnection(format!(
                             "RestClient init failed: {}",
@@ -179,7 +179,6 @@ impl TrackerTask {
                         ws.close().await;
                     }
                     self.health_tx.send(TrackerHealth::Stopping).ok();
-                    tokio::time::sleep(Duration::from_millis(10)).await;
                     return Err(TrackerError::ShutdownSignal);
                 }
                 msg = async {
@@ -219,12 +218,10 @@ impl TrackerTask {
         match self.shutdown_rx.await {
             Ok(()) => {
                 self.health_tx.send(TrackerHealth::Stopping).ok();
-                tokio::time::sleep(Duration::from_millis(10)).await;
                 Err(TrackerError::ShutdownSignal)
             }
             Err(_) => {
                 self.health_tx.send(TrackerHealth::Stopping).ok();
-                tokio::time::sleep(Duration::from_millis(10)).await;
                 Err(TrackerError::ShutdownSignal)
             }
         }

@@ -67,14 +67,15 @@ impl PolymarketWsSubscriber {
                 Some(WsEvent::PriceChange(evt)) => {
                     // Convert first price change to BookUpdate.
                     // M2 wire format can have multiple changes per event;
-                    // for MVP we only process the first one.
+                    // MVP limitation: process only first change, others are dropped.
+                    // TODO: Process all changes when batch handling implemented.
                     if let Some(pc) = evt.price_changes.first() {
                         let seq = self.seq_cursor.take_next();
                         // Use current system time for received_at timestamp
                         let received_at_unix_ms = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_millis() as i64)
-                            .unwrap_or(0);
+                            .map_err(|e| format!("System clock error: {}", e))?
+                            .as_millis() as i64;
                         let update = ws_price_change_to_update(pc, seq, received_at_unix_ms)
                             .map_err(|e| format!("Wire parse failed: {}", e))?;
                         return Ok(Some(update));
