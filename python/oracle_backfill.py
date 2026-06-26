@@ -163,9 +163,6 @@ def format_backfill_post(prediction: Dict[str, Any], prophecy: Dict[str, Any]) -
     # Actual outcome
     outcome_text = 'YES' if prediction['outcome'] == 1 else 'NO'
     
-    # Polymarket link
-    polymarket_link = f"https://polymarket.com/event/{prediction['market_id']}"
-    
     post = f"""🔮 [АРХИВ {date_str}] {result_emoji} {result_text}
 
 {category_emoji} {prediction['question']}
@@ -181,7 +178,7 @@ Polymarket: {market_prob_pct:.0f}% → Пифия: {pythia_prob_pct:.0f}% {arrow
 Исход: {outcome_text}
 Brier: {prediction['brier_dexter']:.3f}
 
-⚡️ [Рынок на Polymarket]({polymarket_link})
+📊 Рынок закрыт и разрешён
 
 #pythia #archive"""
 
