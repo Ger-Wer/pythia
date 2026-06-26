@@ -257,6 +257,9 @@ impl MultiMarketDriver {
         info!("Spawned {} initial trackers from watchlist", initial_count);
 
         // 2. Main event loop
+        // TODO Task 10: Add shutdown signal to break loop cleanly
+        // Suggested approach: Add tokio::sync::watch::Receiver<bool> parameter
+        // and use tokio::select! arm to monitor for shutdown signal
         loop {
             tokio::select! {
                 // Handle watchlist.upsert messages
