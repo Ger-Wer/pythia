@@ -202,8 +202,10 @@ impl MultiMarketDriver {
         // Check circuit breaker for this asset_id
         if let Some(backoff_state) = self.backoff_registry.get(asset_id) {
             if backoff_state.is_circuit_open(self.config.circuit_breaker_threshold) {
-                return CanSpawnResult::Yes; // TODO: Return circuit breaker state
-                                            // For now, resource check is sufficient
+                return CanSpawnResult::CircuitOpen {
+                    asset_id: asset_id.clone(),
+                    failures: backoff_state.failures,
+                };
             }
         }
 
