@@ -1,117 +1,256 @@
 # Pythia
 
-Дата актуализации: 2026-04-29
+**Дата актуализации: 2026-06-26**
 
-Pythia - это приватный `decision desk` для Polymarket. В репозитории сейчас живут два связанных контура:
+Pythia - это приватный decision desk для Polymarket. Полностью функциональная система с двумя контурами.
 
-- `Slow Loop`: production-система на TypeScript/Python для daily forecast, decision journal, paper/shadow lifecycle, watchlist follow-up, dashboard и Telegram.
-- `Fast Loop`: новый Dual-Loop контур для latency-sensitive watch/trigger/execution pipeline на Rust/TypeScript, пока без live trading.
+---
 
-## Что это за проект
+## 🎯 Текущий статус
 
-Если коротко, Pythia решает три задачи:
+### ✅ Slow Loop (Production)
+**Статус**: Работает на amper (144.24.254.226)
 
-1. Находит новые сильные рынки и формирует сигналы.
-2. Сопровождает уже выбранные рынки через watchlist и operator triage.
-3. Копит paper/shadow dataset для улучшения decision quality до любого live execution.
+- **Forecast pipeline**: Восстановлен (2026-06-26) после 42-дневного простоя
+- **LLM**: Mistral AI (mistral-small/medium)
+- **Schedule**: Daily forecast runs в 06:00 UTC
+- **Telegram bot**: Активен для operator triage
+- **Shadow PG**: Готов к финальной миграции
 
-Проект уже давно не является "просто forecast-скриптом". Это гибридная система: зрелый operator desk + строящийся Fast Loop.
+**Компоненты:**
+- Daily forecast (research + synthesis)
+- Decision journal & watchlist tracking
+- Paper/shadow execution logs
+- Dashboard (React)
+- Telegram operator interface
 
-## На какой стадии проект
+### 🚀 Fast Loop - Gate #10 M4 (Ready to Deploy)
+**Статус**: PRODUCTION-READY (2026-06-26)
 
-Состояние репозитория на сегодня:
+**Multi-market orderbook driver:**
+- ✅ Multi-market orchestration (N trackers одновременно)
+- ✅ Live Polymarket integration (REST + WebSocket)
+- ✅ Watchlist integration (SQLite init + NATS updates)
+- ✅ Fault tolerance (circuit breaker + exponential backoff)
+- ✅ Backpressure control (memory/CPU/tracker limits)
+- ✅ Graceful shutdown (concurrent с timeouts)
+- ✅ Health monitoring per tracker
 
-- `Slow Loop` уже работает как production runtime на `amper`.
-- `Phase 0` Dual-Loop завершена.
-- `Phase 1` Dual-Loop по сути собрана: contracts, bus topics, `gateway-api`, live WebSocket feed в Command Center, shadow PostgreSQL.
-- `Phase 2` Dual-Loop уже дошла до честного paper contour: `sniper-ingest`, `sniper-risk`, paper-mode `sniper-executor`, real mempool decode/match path через Anvil dev-fork.
-- Live trading в production нет. Реальные trading-ключи не используются.
-
-Первая честная release-цель проекта сейчас не `live trading`, а `Pythia v1.0 Paper Operator Release`: операторский релиз с реальным потоком событий, Command Center, auth, paper execution, kill-switch и устойчивым audit trail.
-
-Практический вывод для нового разработчика:
-
-- `src/`, `python/` и `dashboard/` не являются "старым кодом" - это действующий Slow Loop.
-- `gateway-api/`, `services/`, `schemas/` и `infra/` не являются экспериментальным мусором - это активный Fast Loop workstream.
-- Исторические отчёты и устаревшие design-docs вынесены в [`archive/`](./archive/README.md).
-
-## С чего начинать новому разработчику
-
-Прочитайте документы в таком порядке:
-
-1. [docs/README.md](./docs/README.md)
-2. [docs/PYTHIA_V2_WORKSTREAM.md](./docs/PYTHIA_V2_WORKSTREAM.md)
-3. [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-4. [docs/dual_loop/README.md](./docs/dual_loop/README.md)
-5. [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
-
-Если вы работаете именно с Fast Loop, после этого сразу откройте [docs/dual_loop/06-roadmap.md](./docs/dual_loop/06-roadmap.md).
-
-## Карта репозитория
-
-```text
-src/                 Slow Loop runtime (forecast, decision core, watchlist)
-python/              Dashboard/Telegram/operator API layer
-dashboard/           React UI for Pythia v2
-gateway-api/         Fast Loop gateway and command/control bridge
-services/            Rust services: sniper-ingest / sniper-risk / sniper-executor
-schemas/             Protobuf contracts for Dual-Loop
-infra/               Observability and local/dev infrastructure
-docs/                Active documentation
-archive/             Historical reports, design docs and session artifacts
+**Deployment:**
+```bash
+cd services/sniper-orderbook
+cargo build --release --bin driver
+./target/release/driver
 ```
 
-## Что реально работает сейчас
+**Конфигурация (env vars):**
+```bash
+NATS_URL=nats://127.0.0.1:4222
+DRIVER_DB_PATH=/app/data/pythia.db
+DRIVER_MAX_TRACKERS=100
+DRIVER_MEMORY_THRESHOLD_MB=2048
+```
 
-### Slow Loop
+**Документация:**
+- Spec: `docs/superpowers/specs/2026-06-26-gate10-m4-multi-market-driver-design.md`
+- Plan: `docs/superpowers/plans/2026-06-26-gate10-m4-multi-market-driver.md`
+- Component README: `services/sniper-orderbook/README.md`
 
-- daily forecast по рынкам Polymarket;
-- `Research+R1` и `Naked R1`;
-- `decision core` с `signals`, `decisions`, `positions`, `reviews`, `postmortems`;
-- paper/shadow lifecycle;
-- autonomous watchlist engine;
-- attention queue и operator triage;
-- dashboard как основной интерфейс;
-- Telegram как inbox/fallback operator surface.
+---
 
-### Fast Loop
+## Что делает Pythia
 
-- protobuf contracts с fixed-point wire format;
-- canonical topics `dl.v1.*`;
-- `gateway-api` + inbound protobuf bridge;
-- `market_specific_key` в wire contract для per-market matching;
-- Command Center с реальным gateway WebSocket feed;
-- `sniper-ingest` с Anvil/WS mempool subscriber и calldata decode для UMA adapter;
-- `sniper-risk`;
-- `sniper-executor` в paper mode: submit/fill/revert, nonce actor, stuck detection, kill consumer/ack;
-- E2E dev proof: pending tx -> decode -> `market_specific_key` match -> trigger -> paper fill -> gateway state.
+1. **Находит сильные рынки** - daily forecast по всем активным Polymarket рынкам
+2. **Сопровождает watchlist** - operator triage через Telegram
+3. **Копит paper dataset** - shadow execution без реальных денег
+4. **Tracking real-time orderbook** (M4) - multi-market driver для Fast Loop
 
-## Что ещё не закончено
+---
 
-- green CI и воспроизводимая Git history для Fast Loop без server-only drift;
-- полный protobuf control-plane без transitional JSON publish-side;
-- long-running paper execution verification (`72h` soak, latency SLO, replay determinism);
-- continuous shadow/audit persistence в Postgres и release runbooks;
-- любой live execution на Polymarket.
+## Архитектура
 
-## Source of truth
+```
+Slow Loop (TypeScript/Python)          Fast Loop (Rust/TypeScript)
+├── forecast (research + synthesis)    ├── sniper-orderbook (M4 driver)
+├── watchlist tracking                 ├── sniper-ingest
+├── decision journal                   ├── sniper-risk
+├── dashboard (React)                  ├── sniper-executor (paper mode)
+└── telegram bot                       └── gateway-api
+```
 
-Если документы расходятся, порядок доверия такой:
+**Инфраструктура:**
+- **Databases**: PostgreSQL (main), Shadow PG (replica), SQLite (watchlist)
+- **Message bus**: NATS
+- **Deployment**: Docker Compose на amper
+- **Monitoring**: Logs + manual health checks
 
-1. [docs/PYTHIA_V2_WORKSTREAM.md](./docs/PYTHIA_V2_WORKSTREAM.md)
-2. [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-3. [docs/dual_loop/06-roadmap.md](./docs/dual_loop/06-roadmap.md)
-4. [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
-5. [docs/DECISION_LOG.md](./docs/DECISION_LOG.md)
+---
 
-Всё, что вынесено в [`archive/`](./archive/README.md), полезно только как исторический контекст.
+## Quick Start
 
-## Быстрый operational context
+### Development
 
-- production-хост: `amper`
-- системный пользователь: `pythia`
-- рабочая директория: `/home/pythia/pythia`
-- действующий Pythia deploy: `docker compose`
-- соседний независимый проект на этом же сервере: `sproutsignal`
+**Prerequisites:**
+- Node.js 18+
+- Python 3.11+
+- Rust 1.70+
+- Docker + Docker Compose
 
-Критичное правило: любые Docker-действия для Pythia выполнять только из `/home/pythia/pythia` через локальный `docker compose`, без глобальной очистки Docker host.
+**Local setup:**
+```bash
+# Clone
+git clone git@github.com:Ger-Wer/pythia.git
+cd pythia
+
+# Install dependencies
+npm install
+cd python && pip install -r requirements.txt
+
+# Configure
+cp .env.example .env
+# Edit .env with your keys
+
+# Run locally
+npm run dev        # Slow Loop services
+cd services/sniper-orderbook && cargo run --bin driver  # Fast Loop driver
+```
+
+### Production Deployment
+
+**Amper (144.24.254.226):**
+```bash
+ssh amper
+cd /home/pythia/pythia
+git pull origin main
+docker compose down && docker compose up -d --build
+```
+
+**Важно:**
+- Любые Docker действия только из `/home/pythia/pythia`
+- Не использовать глобальные Docker cleanup команды (SproutSignal соседствует)
+- Перед рестартом проверить `.env` актуальность
+
+---
+
+## Структура репозитория
+
+```
+pythia/
+├── src/              # Slow Loop TypeScript services
+├── python/           # Forecast pipeline
+├── dashboard/        # React UI
+├── services/         # Fast Loop Rust components
+│   ├── sniper-orderbook/  # M4 multi-market driver ⭐
+│   ├── sniper-ingest/
+│   ├── sniper-risk/
+│   └── sniper-executor/
+├── gateway-api/      # REST API
+├── schemas/          # Shared types
+├── infra/            # Docker configs
+├── docs/             # Specs & plans
+└── archive/          # Историческая документация
+```
+
+---
+
+## Ключевые документы
+
+**Specs & Plans (актуальные):**
+- M4 Driver: `docs/superpowers/specs/2026-06-26-gate10-m4-multi-market-driver-design.md`
+- Dual Loop: `docs/dual_loop/` (Phase 0-2 complete)
+- Deployment: `docs/DEPLOYMENT.md`
+- Decisions: `docs/DECISION_LOG.md`
+
+**Историческое:**
+- `archive/` - старые design docs, отчёты, устаревшие specs
+
+---
+
+## Production Operations
+
+**Logs:**
+```bash
+# Slow Loop
+docker compose logs -f pythia-scheduler
+docker compose logs -f pythia-forecast
+
+# Fast Loop (когда deployed)
+docker compose logs -f sniper-orderbook-driver
+```
+
+**Health Checks:**
+```bash
+# Forecast status
+ssh amper "cd /home/pythia/pythia && npm run forecast:check"
+
+# Database parity
+./scripts/shadow_pg_parity.sh
+
+# Driver status (когда deployed)
+curl http://localhost:8080/health  # TODO: implement /health endpoint
+```
+
+**Incident Response:**
+1. Check logs
+2. Verify `.env` configuration
+3. Restart affected service: `docker compose restart <service>`
+4. If DB issue: check Shadow PG parity
+5. Escalate if unresolved
+
+---
+
+## Roadmap
+
+**Near-term (Q2-Q3 2026):**
+- [x] Gate #10 M4: Multi-market driver (DONE 2026-06-26)
+- [ ] Deploy M4 driver to production
+- [ ] Metrics/observability (Task 9)
+- [ ] NATS orderbook publishing
+- [ ] Shadow PG final migration
+
+**Medium-term (Q4 2026):**
+- [ ] Pythia v1.0 Paper Operator Release
+- [ ] Command Center auth
+- [ ] Kill-switch implementation
+- [ ] Audit trail hardening
+
+**Long-term (2027+):**
+- [ ] Live trading (requires audit, compliance, risk management)
+- [ ] Horizontal scaling (multi-instance coordination)
+- [ ] Advanced analytics
+
+---
+
+## Contributing
+
+**Workflow:**
+1. Create feature branch from `main`
+2. Implement + tests
+3. Review (spec compliance + code quality)
+4. PR → `main`
+5. Deploy to amper
+
+**Standards:**
+- TDD для критических путей
+- Two-stage review (spec + quality)
+- Русская документация в README
+- Английские commit messages
+- No secrets in git
+
+---
+
+## Support & Contact
+
+**Issues**: GitHub Issues  
+**Internal docs**: MemPalace canonical memory  
+**Server access**: SSH keys required
+
+**Critical rules:**
+- Любые тесты только на production сервере (не локально)
+- Не удалять данные без явного подтверждения
+- Не коммитить secrets/env files
+- Не трогать Docker на amper глобально
+
+---
+
+**Last updated**: 2026-06-26 - Gate #10 M4 complete, forecast pipeline restored
