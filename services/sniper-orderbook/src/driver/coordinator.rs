@@ -113,7 +113,10 @@ impl MultiMarketDriver {
             .map_err(|e| DriverError::NatsSubscribe(e.to_string()))?;
 
         // Connect to SQLite
-        let db_pool = sqlx::SqlitePool::connect(config.db_path.to_str().unwrap()).await?;
+        let db_path_str = config.db_path.to_str()
+            .ok_or_else(|| DriverError::Config("Database path contains invalid UTF-8".to_string()))?;
+        let db_pool = sqlx::SqlitePool::connect(db_path_str).await
+            .map_err(|e| DriverError::DatabaseConnection(e))?;
 
         Ok(Self {
             trackers: HashMap::new(),
