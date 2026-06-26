@@ -30,7 +30,9 @@ impl BackoffState {
         self.failures += 1;
         
         // Exponential backoff: 2^(failures-1) seconds, capped at max_duration
-        let backoff_secs = 1u64 << (self.failures.saturating_sub(1).min(31));
+        // Cap exponent at 5 (2^5 = 32s) before applying max_duration cap
+        let exponent = self.failures.saturating_sub(1).min(5);
+        let backoff_secs = 1u64 << exponent;
         let backoff = Duration::from_secs(backoff_secs);
         self.next_retry = backoff.min(max_duration);
     }
