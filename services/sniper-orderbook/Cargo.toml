@@ -10,17 +10,18 @@ description = "Fast Loop: Polymarket L2 order-book tracker (REST snapshot + WS i
 name = "sniper_orderbook"
 path = "src/lib.rs"
 
+[[bin]]
+name = "driver"
+path = "src/bin/driver.rs"
+
 [features]
 # Live Polymarket REST + WS clients. Pulled in by `orderbook_probe` and any
 # host that drives a real connection. Off by default so unit tests on the
 # state-machine layer stay hermetic and cargo-test cheap.
 default = ["polymarket-live"]
 polymarket-live = [
-    "dep:tokio",
     "dep:tokio-tungstenite",
     "dep:reqwest",
-    "dep:futures",
-    "dep:serde_json",
     "dep:url",
     "dep:anyhow",
 ]
@@ -32,14 +33,19 @@ serde = { workspace = true, features = ["derive"] }
 metrics.workspace = true
 dual_loop_common = { path = "../common" }
 
-tokio = { workspace = true, optional = true, features = ["sync", "time"] }
+# tokio is always required (driver module + async-nats + sqlx depend on it)
+tokio = { workspace = true, features = ["sync", "time", "macros", "signal"] }
 tokio-tungstenite = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+# futures and serde_json needed by driver event loop (non-optional)
+futures = { workspace = true }
+serde_json = { workspace = true }
 url = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 sysinfo = "0.30"
+async-nats = "0.33"
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite"] }
+tracing-subscriber = "0.3"
 
 [dev-dependencies]
 proptest = "1.5"

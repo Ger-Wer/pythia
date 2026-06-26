@@ -23,6 +23,8 @@ pub enum CanSpawnResult {
     },
     /// Tracker count at or above limit.
     BackpressureTrackerLimit { current: usize, max: usize },
+    /// Circuit breaker is open for this asset.
+    CircuitOpen { asset_id: String, failures: u32 },
 }
 
 /// Monitors system resources and enforces backpressure limits.
