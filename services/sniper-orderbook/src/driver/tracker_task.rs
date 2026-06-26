@@ -3,6 +3,7 @@
 //! Provides lifecycle management, health monitoring, and graceful shutdown
 //! for individual orderbook trackers.
 
+use std::time::Duration;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 
@@ -90,11 +91,13 @@ impl TrackerTask {
         match self.shutdown_rx.await {
             Ok(()) => {
                 self.health_tx.send(TrackerHealth::Stopping).ok();
+                tokio::time::sleep(Duration::from_millis(10)).await; // Allow observers to see state
                 Err(TrackerError::ShutdownSignal)
             }
             Err(_) => {
                 // Sender dropped, treat as shutdown
                 self.health_tx.send(TrackerHealth::Stopping).ok();
+                tokio::time::sleep(Duration::from_millis(10)).await; // Allow observers to see state
                 Err(TrackerError::ShutdownSignal)
             }
         }
@@ -137,6 +140,18 @@ mod tests {
         let result = handle.task.await.expect("task panicked");
 
         // Verify task returns ShutdownSignal error
+        assert!(matches!(result, Err(TrackerError::ShutdownSignal)));
+    }
+
+    #[tokio::test]
+    async fn test_tracker_handle_drop_triggers_shutdown() {
+        let handle = TrackerTask::spawn("test".to_string(), "token".to_string());
+        
+        // Drop shutdown sender without sending signal
+        drop(handle.shutdown_tx);
+        
+        // Task should exit with ShutdownSignal error
+        let result = handle.task.await.expect("task panicked");
         assert!(matches!(result, Err(TrackerError::ShutdownSignal)));
     }
 }
