@@ -246,6 +246,7 @@ impl TrackerTask {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn test_tracker_health_equality() {

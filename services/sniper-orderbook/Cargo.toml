@@ -18,8 +18,6 @@ default = ["polymarket-live"]
 polymarket-live = [
     "dep:tokio-tungstenite",
     "dep:reqwest",
-    "dep:futures",
-    "dep:serde_json",
     "dep:url",
     "dep:anyhow",
 ]
@@ -32,11 +30,12 @@ metrics.workspace = true
 dual_loop_common = { path = "../common" }
 
 # tokio is always required (driver module + async-nats + sqlx depend on it)
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true, features = ["sync", "time", "macros"] }
 tokio-tungstenite = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+# futures and serde_json needed by driver event loop (non-optional)
+futures = { workspace = true }
+serde_json = { workspace = true }
 url = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 sysinfo = "0.30"

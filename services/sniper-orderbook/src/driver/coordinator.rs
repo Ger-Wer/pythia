@@ -6,6 +6,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 use thiserror::Error;
+use tracing::{info, warn};
+use futures::stream::StreamExt;
 
 use super::{
     AssetId, BackoffState, CanSpawnResult, DriverConfig, ResourceMonitor, TrackerHandle,
@@ -245,6 +247,139 @@ impl MultiMarketDriver {
     pub async fn handle_watchlist_remove(&mut self, msg: WatchlistRemove) -> Result<(), ShutdownError> {
         self.shutdown_tracker(msg.asset_id).await
     }
+
+    /// Main event loop - runs until shutdown signal
+    pub async fn run(&mut self) -> Result<(), DriverError> {
+        // 1. Load initial watchlist and spawn trackers
+        let initial_count = self.init_from_watchlist().await?;
+        info!("Spawned {} initial trackers from watchlist", initial_count);
+
+        // 2. Main event loop
+        loop {
+            tokio::select! {
+                // Handle watchlist.upsert messages
+                Some(msg) = self.watchlist_upsert_sub.as_mut().unwrap().next() => {
+                    match serde_json::from_slice::<WatchlistUpsert>(&msg.payload) {
+                        Ok(upsert) => {
+                            info!(
+                                asset_id = %upsert.asset_id,
+                                token_id = %upsert.token_id,
+                                "Received watchlist upsert"
+                            );
+                            // TODO: Circuit breaker enforcement
+                            // if self.backoff_registry.get(&upsert.asset_id)
+                            //     .map_or(false, |s| s.is_circuit_open(self.config.circuit_breaker_threshold))
+                            // {
+                            //     warn!(asset_id = %upsert.asset_id, "Circuit breaker open, skipping spawn");
+                            //     continue;
+                            // }
+                            if let Err(e) = self.handle_watchlist_upsert(upsert).await {
+                                warn!(error = %e, "Failed to spawn tracker");
+                            }
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to deserialize watchlist.upsert");
+                        }
+                    }
+                }
+
+                // Handle watchlist.remove messages
+                Some(msg) = self.watchlist_remove_sub.as_mut().unwrap().next() => {
+                    match serde_json::from_slice::<WatchlistRemove>(&msg.payload) {
+                        Ok(remove) => {
+                            info!(asset_id = %remove.asset_id, "Received watchlist remove");
+                            if let Err(e) = self.handle_watchlist_remove(remove).await {
+                                warn!(error = %e, "Failed to shutdown tracker");
+                            }
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to deserialize watchlist.remove");
+                        }
+                    }
+                }
+
+                // TODO: Handle tracker task exits (monitor JoinHandles)
+                // For MVP, trackers run until shutdown or error
+            }
+        }
+    }
+
+    /// Graceful shutdown all trackers
+    pub async fn shutdown(&mut self) -> Result<(), ShutdownError> {
+        let tracker_count = self.trackers.len();
+        info!("Shutting down {} trackers", tracker_count);
+
+        if tracker_count == 0 {
+            info!("Shutdown complete (no trackers)");
+            return Ok(());
+        }
+
+        // Collect all asset_ids and extract handles
+        let asset_ids: Vec<AssetId> = self.trackers.keys().cloned().collect();
+        let timeout_duration = Duration::from_secs(self.config.graceful_shutdown_timeout_secs);
+        let tracker_timeout = Duration::from_secs(self.config.tracker_shutdown_timeout_secs);
+
+        // Shutdown all trackers concurrently
+        let mut shutdown_tasks = Vec::new();
+        
+        for asset_id in asset_ids {
+            if let Some(handle) = self.trackers.remove(&asset_id) {
+                // Send shutdown signal (ignore error if receiver dropped)
+                let _ = handle.shutdown_tx.send(());
+                
+                // Spawn a task to await this tracker with timeout
+                let task = tokio::spawn(async move {
+                    match tokio::time::timeout(tracker_timeout, handle.task).await {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(ShutdownError::Timeout),
+                    }
+                });
+                
+                shutdown_tasks.push((asset_id, task));
+            }
+        }
+
+        // Wait for all shutdowns with global timeout
+        match tokio::time::timeout(timeout_duration, futures::future::join_all(
+            shutdown_tasks.iter_mut().map(|(_, task)| task)
+        )).await {
+            Ok(results) => {
+                let mut failed = 0;
+                for (result, (asset_id, _)) in results.into_iter().zip(shutdown_tasks.iter()) {
+                    match result {
+                        Ok(Ok(())) => {
+                            // Successful shutdown
+                            self.resource_monitor.unregister_tracker();
+                        }
+                        Ok(Err(e)) => {
+                            warn!(asset_id = %asset_id, error = %e, "Tracker shutdown failed");
+                            self.resource_monitor.unregister_tracker();
+                            failed += 1;
+                        }
+                        Err(e) => {
+                            warn!(asset_id = %asset_id, error = %e, "Tracker shutdown task panicked");
+                            self.resource_monitor.unregister_tracker();
+                            failed += 1;
+                        }
+                    }
+                }
+                
+                if failed > 0 {
+                    warn!("Failed to shutdown {} trackers gracefully", failed);
+                }
+                info!("Shutdown complete");
+                Ok(())
+            }
+            Err(_) => {
+                // Global timeout exceeded - still unregister all
+                for _ in 0..shutdown_tasks.len() {
+                    self.resource_monitor.unregister_tracker();
+                }
+                warn!("Global shutdown timeout exceeded, {} trackers may not have stopped", tracker_count);
+                Err(ShutdownError::Timeout)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -424,5 +559,81 @@ mod tests {
     async fn test_init_from_watchlist() {
         // This test requires a real or mock SQLite database
         // Defer to Task 10 end-to-end testing
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_multiple_trackers() {
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
+
+        // Spawn multiple trackers
+        for i in 0..3 {
+            driver
+                .spawn_tracker(format!("asset-{}", i), format!("token-{}", i))
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(driver.trackers.len(), 3);
+        assert_eq!(driver.resource_monitor.current_count(), 3);
+
+        // Shutdown all trackers
+        let result = driver.shutdown().await;
+        assert!(result.is_ok());
+
+        // Verify all trackers removed
+        assert_eq!(driver.trackers.len(), 0);
+        assert_eq!(driver.resource_monitor.current_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_empty_driver() {
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
+
+        // Shutdown with no trackers
+        let result = driver.shutdown().await;
+        assert!(result.is_ok());
+
+        // Verify state remains clean
+        assert_eq!(driver.trackers.len(), 0);
+        assert_eq!(driver.resource_monitor.current_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_handle_watchlist_upsert() {
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
+
+        let msg = WatchlistUpsert {
+            asset_id: "asset-1".to_string(),
+            token_id: "token-1".to_string(),
+        };
+
+        let result = driver.handle_watchlist_upsert(msg).await;
+        assert!(result.is_ok());
+
+        // Verify tracker was spawned
+        assert!(driver.trackers.contains_key("asset-1"));
+        assert_eq!(driver.trackers.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_handle_watchlist_remove() {
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
+
+        // Spawn a tracker first
+        driver
+            .spawn_tracker("asset-1".to_string(), "token-1".to_string())
+            .await
+            .unwrap();
+
+        let msg = WatchlistRemove {
+            asset_id: "asset-1".to_string(),
+        };
+
+        let result = driver.handle_watchlist_remove(msg).await;
+        assert!(result.is_ok());
+
+        // Verify tracker was removed
+        assert!(!driver.trackers.contains_key("asset-1"));
+        assert_eq!(driver.trackers.len(), 0);
     }
 }
