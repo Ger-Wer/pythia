@@ -12,10 +12,33 @@ use super::{
     TrackerTask,
 };
 
+/// Watchlist upsert event from NATS (dl.v1.watchlist.upsert)
+#[derive(Debug, serde::Deserialize)]
+pub struct WatchlistUpsert {
+    pub asset_id: String,
+    pub token_id: String,
+    // Other fields can be ignored for MVP
+}
+
+/// Watchlist remove event from NATS (dl.v1.watchlist.remove)
+#[derive(Debug, serde::Deserialize)]
+pub struct WatchlistRemove {
+    pub asset_id: String,
+}
+
 #[derive(Debug, Error)]
 pub enum DriverError {
     #[error("Configuration error: {0}")]
     Config(String),
+
+    #[error("NATS connection failed: {0}")]
+    NatsConnection(String),
+
+    #[error("NATS subscribe failed: {0}")]
+    NatsSubscribe(String),
+
+    #[error("Database connection failed: {0}")]
+    DatabaseConnection(#[from] sqlx::Error),
 }
 
 #[derive(Debug, Error)]
@@ -51,22 +74,56 @@ pub struct MultiMarketDriver {
 
     /// Configuration
     config: DriverConfig,
+
+    /// NATS client for watchlist updates (None in tests)
+    nats_client: Option<async_nats::Client>,
+
+    /// NATS subscriber for watchlist upsert events (None in tests)
+    watchlist_upsert_sub: Option<async_nats::Subscriber>,
+
+    /// NATS subscriber for watchlist remove events (None in tests)
+    watchlist_remove_sub: Option<async_nats::Subscriber>,
+
+    /// SQLite connection pool for watchlist queries (None in tests)
+    db_pool: Option<sqlx::SqlitePool>,
 }
 
 impl MultiMarketDriver {
-    /// Initialize driver with config
-    pub fn new(config: DriverConfig) -> Result<Self, DriverError> {
+    /// Initialize driver with config and connect to NATS + SQLite
+    pub async fn new(config: DriverConfig) -> Result<Self, DriverError> {
         let resource_monitor = ResourceMonitor::new(
             config.max_trackers,
             config.memory_threshold_mb,
             config.cpu_threshold_pct,
         );
 
+        // Connect to NATS
+        let nats_client = async_nats::connect(&config.nats_url)
+            .await
+            .map_err(|e| DriverError::NatsConnection(e.to_string()))?;
+
+        // Subscribe to watchlist topics
+        let watchlist_upsert_sub = nats_client
+            .subscribe("dl.v1.watchlist.upsert")
+            .await
+            .map_err(|e| DriverError::NatsSubscribe(e.to_string()))?;
+        let watchlist_remove_sub = nats_client
+            .subscribe("dl.v1.watchlist.remove")
+            .await
+            .map_err(|e| DriverError::NatsSubscribe(e.to_string()))?;
+
+        // Connect to SQLite
+        let db_pool = sqlx::SqlitePool::connect(config.db_path.to_str().unwrap()).await?;
+
         Ok(Self {
             trackers: HashMap::new(),
             resource_monitor,
             backoff_registry: HashMap::new(),
             config,
+            nats_client: Some(nats_client),
+            watchlist_upsert_sub: Some(watchlist_upsert_sub),
+            watchlist_remove_sub: Some(watchlist_remove_sub),
+            db_pool: Some(db_pool),
         })
     }
 
@@ -147,6 +204,44 @@ impl MultiMarketDriver {
 
         CanSpawnResult::Yes
     }
+
+    /// Load initial watchlist from SQLite and spawn trackers
+    pub async fn init_from_watchlist(&mut self) -> Result<usize, DriverError> {
+        let db_pool = self.db_pool.as_ref()
+            .ok_or_else(|| DriverError::Config("Database pool not initialized".to_string()))?;
+
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT asset_id, token_id FROM watchlist WHERE active = 1"
+        )
+        .fetch_all(db_pool)
+        .await?;
+
+        let mut spawned_count = 0;
+        for (asset_id, token_id) in rows {
+            match self.spawn_tracker(asset_id.clone(), token_id).await {
+                Ok(()) => spawned_count += 1,
+                Err(e) => {
+                    tracing::warn!(
+                        asset_id = %asset_id,
+                        error = %e,
+                        "Failed to spawn tracker during watchlist init, continuing"
+                    );
+                }
+            }
+        }
+
+        Ok(spawned_count)
+    }
+
+    /// Handle watchlist upsert message from NATS
+    pub async fn handle_watchlist_upsert(&mut self, msg: WatchlistUpsert) -> Result<(), SpawnError> {
+        self.spawn_tracker(msg.asset_id, msg.token_id).await
+    }
+
+    /// Handle watchlist remove message from NATS
+    pub async fn handle_watchlist_remove(&mut self, msg: WatchlistRemove) -> Result<(), ShutdownError> {
+        self.shutdown_tracker(msg.asset_id).await
+    }
 }
 
 #[cfg(test)]
@@ -162,9 +257,31 @@ mod tests {
         }
     }
 
+    // Test-only constructor that skips NATS/SQLite connections
+    impl MultiMarketDriver {
+        fn new_for_testing(config: DriverConfig) -> Self {
+            let resource_monitor = ResourceMonitor::new(
+                config.max_trackers,
+                config.memory_threshold_mb,
+                config.cpu_threshold_pct,
+            );
+
+            Self {
+                trackers: HashMap::new(),
+                resource_monitor,
+                backoff_registry: HashMap::new(),
+                config,
+                nats_client: None,
+                watchlist_upsert_sub: None,
+                watchlist_remove_sub: None,
+                db_pool: None,
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_spawn_tracker_success() {
-        let mut driver = MultiMarketDriver::new(test_config()).unwrap();
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
 
         // Spawn a tracker
         let result = driver
@@ -182,7 +299,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawn_duplicate_tracker_fails() {
-        let mut driver = MultiMarketDriver::new(test_config()).unwrap();
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
 
         // Spawn first tracker
         driver
@@ -208,7 +325,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawn_with_backpressure() {
-        let mut driver = MultiMarketDriver::new(test_config()).unwrap();
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
 
         // Spawn up to max_trackers limit (3)
         for i in 0..3 {
@@ -244,7 +361,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shutdown_tracker_success() {
-        let mut driver = MultiMarketDriver::new(test_config()).unwrap();
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
 
         // Spawn a tracker
         driver
@@ -269,7 +386,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shutdown_nonexistent_tracker() {
-        let mut driver = MultiMarketDriver::new(test_config()).unwrap();
+        let mut driver = MultiMarketDriver::new_for_testing(test_config());
 
         // Attempt to shutdown tracker that doesn't exist
         let result = driver.shutdown_tracker("nonexistent".to_string()).await;
@@ -282,5 +399,27 @@ mod tests {
 
         // Resource monitor should remain at 0
         assert_eq!(driver.resource_monitor.current_count(), 0);
+    }
+
+    #[test]
+    fn test_watchlist_upsert_deserialize() {
+        let json = r#"{"asset_id": "test-asset", "token_id": "test-token", "extra": "ignored"}"#;
+        let msg: WatchlistUpsert = serde_json::from_str(json).unwrap();
+        assert_eq!(msg.asset_id, "test-asset");
+        assert_eq!(msg.token_id, "test-token");
+    }
+
+    #[test]
+    fn test_watchlist_remove_deserialize() {
+        let json = r#"{"asset_id": "test-asset", "extra": "ignored"}"#;
+        let msg: WatchlistRemove = serde_json::from_str(json).unwrap();
+        assert_eq!(msg.asset_id, "test-asset");
+    }
+
+    #[tokio::test]
+    #[ignore] // TODO: Integration test with mock SQLite - defer to Task 10 e2e
+    async fn test_init_from_watchlist() {
+        // This test requires a real or mock SQLite database
+        // Defer to Task 10 end-to-end testing
     }
 }
