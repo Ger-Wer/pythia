@@ -5,6 +5,8 @@
 
 mod config;
 mod backoff;
+mod resource_monitor;
 
 pub use config::{ConfigError, DriverConfig};
 pub use backoff::BackoffState;
+pub use resource_monitor::{CanSpawnResult, ResourceMonitor};
