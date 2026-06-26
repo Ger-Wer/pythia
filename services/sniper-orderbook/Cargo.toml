@@ -32,7 +32,7 @@ serde = { workspace = true, features = ["derive"] }
 metrics.workspace = true
 dual_loop_common = { path = "../common" }
 
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["sync", "time"] }
 tokio-tungstenite = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
