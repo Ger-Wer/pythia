@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Oracle Score Updater - автоматическое обновление результатов закрытых рынков
-Проверяет resolution и обновляет WIN/LOSS статус + метрики.
+Проверяет resolution и обновляет WIN/LOSS статус + метрики + редактирует Telegram посты.
 """
 
 import os
@@ -11,7 +11,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
+import requests
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from python.market_categorizer import get_category_emoji
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
@@ -144,6 +148,112 @@ def update_prophecy_result(prophecy_id: int, outcome: int, resolved_at: str):
     conn.close()
     
     log_message(f"Updated prophecy {prophecy_id}: {result} | Brier: {brier_score:.3f}")
+    
+    return result, brier_score
+
+
+def edit_telegram_post(prophecy_id: int):
+    """
+    Редактировать Telegram пост после resolution рынка.
+    Добавляет результат (WIN/LOSS), actual outcome и Brier score.
+    """
+    ORACLE_BOT_TOKEN = os.getenv("ORACLE_TELEGRAM_BOT_TOKEN")
+    ORACLE_CHANNEL_ID = os.getenv("ORACLE_TELEGRAM_CHANNEL_ID")
+    
+    if not ORACLE_BOT_TOKEN or not ORACLE_CHANNEL_ID:
+        log_message("Telegram not configured, skipping post edit", "WARN")
+        return
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            telegram_message_id,
+            market_question,
+            market_category,
+            pythia_prob,
+            market_prob,
+            bet_direction,
+            confidence_level,
+            reasoning,
+            key_risk,
+            actual_outcome,
+            result,
+            brier_score,
+            published_at
+        FROM oracle_prophecies
+        WHERE id = ?
+    ''', (prophecy_id,))
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row or not row['telegram_message_id']:
+        log_message(f"No Telegram message found for prophecy {prophecy_id}", "WARN")
+        return
+    
+    # Format updated post
+    pythia_prob_pct = row['pythia_prob'] * 100
+    market_prob_pct = row['market_prob'] * 100
+    arrow = '↑' if pythia_prob_pct > market_prob_pct else '↓'
+    
+    category_emoji = get_category_emoji(row['market_category'] or 'other')
+    confidence_stars = '●' * row['confidence_level'] + '○' * (5 - row['confidence_level'])
+    
+    result_emoji = '✅' if row['result'] == 'WIN' else '❌'
+    result_text = 'WIN' if row['result'] == 'WIN' else 'LOSS'
+    outcome_text = 'YES' if row['actual_outcome'] == 1 else 'NO'
+    
+    # Parse published_at date
+    try:
+        pub_date = datetime.fromisoformat(row['published_at'].replace('Z', '+00:00'))
+        date_str = pub_date.strftime('%Y-%m-%d')
+    except:
+        date_str = row['published_at'][:10]
+    
+    updated_text = f"""🔮 [РАЗРЕШЕНО {date_str}] {result_emoji} {result_text}
+
+{category_emoji} {row['market_question']}
+
+Polymarket: {market_prob_pct:.0f}% → Пифия: {pythia_prob_pct:.0f}% {arrow}
+
+{row['reasoning']}
+
+⚠️ Риск: {row['key_risk']}
+
+Ставка: {row['bet_direction']}
+Уверенность: {confidence_stars}
+Исход: {outcome_text}
+Brier: {row['brier_score']:.3f}
+
+📊 Рынок закрыт и разрешён
+
+#pythia"""
+    
+    # Edit message via Telegram API
+    url = f"https://api.telegram.org/bot{ORACLE_BOT_TOKEN}/editMessageText"
+    
+    payload = {
+        "chat_id": ORACLE_CHANNEL_ID,
+        "message_id": row['telegram_message_id'],
+        "text": updated_text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        response.raise_for_status()
+        
+        if response.json().get('ok'):
+            log_message(f"Edited Telegram post {row['telegram_message_id']} for prophecy {prophecy_id}")
+        else:
+            log_message(f"Failed to edit Telegram post: {response.json()}", "ERROR")
+    
+    except requests.RequestException as e:
+        log_message(f"Telegram API error: {e}", "ERROR")
 
 
 def calculate_accuracy(days: Optional[int] = None) -> Dict[str, float]:
@@ -344,9 +454,13 @@ def update_oracle_scores():
             log_message(f"Market {prophecy['market_id']} not resolved yet: {prophecy['market_question'][:50]}...", "DEBUG")
             continue
         
-        # Update prophecy result
+        # Update prophecy result in DB
         resolved_at = datetime.utcnow().isoformat() + 'Z'
         update_prophecy_result(prophecy['id'], outcome, resolved_at)
+        
+        # Edit Telegram post with result
+        edit_telegram_post(prophecy['id'])
+        
         updated_count += 1
     
     log_message(f"Updated {updated_count} prophecies")
