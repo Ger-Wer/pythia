@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Driver initialized, connected to NATS and database");
 
     // 4. Spawn event loop in background task
-    let _driver_task = tokio::spawn(async move {
+    let driver_task = tokio::spawn(async move {
         match driver.run().await {
             Ok(()) => {
                 info!("Driver event loop exited normally");
@@ -45,14 +45,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 5. Wait for shutdown signal
     info!("Driver running, press Ctrl+C to shutdown");
-    match signal::ctrl_c().await {
-        Ok(()) => {
-            info!("Received Ctrl+C, initiating graceful shutdown");
+
+    // 5. Race driver task against Ctrl+C
+    tokio::select! {
+        result = driver_task => {
+            match result {
+                Ok(Ok(())) => {
+                    info!("Driver task completed successfully");
+                }
+                Ok(Err(e)) => {
+                    error!("Driver task failed: {}", e);
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    error!("Driver task panicked: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
-        Err(err) => {
-            error!("Unable to listen for shutdown signal: {}", err);
+        result = signal::ctrl_c() => {
+            match result {
+                Ok(()) => {
+                    info!("Received Ctrl+C, initiating graceful shutdown");
+                }
+                Err(err) => {
+                    error!("Unable to listen for shutdown signal: {}", err);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 
