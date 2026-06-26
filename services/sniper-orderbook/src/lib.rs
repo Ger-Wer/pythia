@@ -66,6 +66,7 @@
 //! downstream.
 
 pub mod book;
+pub mod driver;
 pub mod publish;
 pub mod state;
 pub mod tracker;
