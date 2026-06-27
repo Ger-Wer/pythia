@@ -1,216 +1,75 @@
-# Архитектура Pythia
+# Pythia Capital — Architecture
 
-Дата актуализации: 2026-04-29
+## Overview
 
-## Роль документа
+Pythia Capital is a prediction market research desk that publishes daily AI-generated calls on Polymarket markets to a public Telegram channel. Each call is tracked in a virtual portfolio with transparent ROI reporting.
 
-Этот файл объясняет, как Pythia разрезана на runtime-контуры и где искать соответствующий код.
+## Pipeline
 
-Если нужен общий статус проекта, начинайте с [docs/PYTHIA_V2_WORKSTREAM.md](./PYTHIA_V2_WORKSTREAM.md). Если нужен полный набор активных документов, начинайте с [docs/README.md](./README.md).
+```
+1. Market Selection (06:00 UTC)
+   └── selectMarkets() — fetch active Polymarket markets, filter by volume/liquidity
 
-## Система в одном абзаце
+2. Research (per market)
+   ├── multiSearch() — Brave → SearXNG → DuckDuckGo cascade
+   └── buildResearchBrief() — LLM generates structured brief (DeepSeek V4-Flash)
 
-Pythia - это Docker-first `decision desk` для Polymarket. Она каждый день ищет новые сигналы, превращает их в `signals` и paper/shadow lifecycle через `decision core`, отдельно сопровождает выбранные рынки через `watchlist engine`, а затем поднимает operator-facing triage-очередь через `attention engine`. Dashboard - главный интерфейс оператора. Telegram уже работает не только как outbound inbox, но и как inbound operator-command surface для attention/triage workflow.
+3. Prediction (per market, parallel)
+   ├── nakedR1Predict() — baseline probability (DeepSeek V4-Flash)
+   ├── runSynthesis() — research + R1 synthesis (DeepSeek V4-Flash)
+   └── predictDualLLM() — ensemble (DeepSeek V4-Pro + Mistral Small)
+       ├── ensemble_p = weighted average (60% DS + 40% Mistral)
+       └── disagreement = |DS - Mistral| → confidence level
 
-## Главные runtime-контуры
+4. Storage
+   └── insertPrediction() — saves all probabilities + reasoning to SQLite
 
-### 1. Forecast stack
+5. Publishing (5 slots/day: 07:00, 11:00, 15:00, 19:00, 23:00 UTC)
+   ├── get_recent_signals() — pull predictions from last 24h
+   ├── filter_markets() — edge ≥ 8pp, volume ≥ $500k, days 3-45
+   ├── select_top_signals(n=5) — score by edge × confidence × volume_weight
+   ├── generate_prophecy_llm() — LLM formats English reasoning (Mistral Small)
+   ├── send_to_channel() — publish to Telegram
+   ├── save_prophecy_record() — audit trail in oracle_prophecies
+   └── open_position() — virtual portfolio with Kelly stake sizing
 
-Задача:
+6. Resolution (19:00 UTC daily)
+   ├── get_pending_prophecies() — find markets past close date
+   ├── get_market_outcome() — check Polymarket resolution
+   ├── update_prophecy_result() — WIN/LOSS + Brier score
+   ├── close_position() — realized PnL
+   └── edit_telegram_post() — update original post with result
 
-- искать новые рынки;
-- делать прогнозы;
-- строить первичные `signals`.
+7. Portfolio Update (00:30 UTC)
+   ├── mark_to_market() — update unrealized PnL
+   └── update_pinned_message() — refresh pinned portfolio summary
 
-Основные файлы:
-
-- `src/main.ts`
-- `src/services/market_selector.ts`
-- `src/services/research_runner.ts`
-- `src/services/naked_r1.ts`
-- `src/prompts/synthesis.ts`
-
-### 2. Decision core
-
-Задача:
-
-- превращать прогнозы в actionable `signals`;
-- открывать и сопровождать paper/shadow позиции;
-- хранить operator decisions, reviews и postmortems.
-
-Сущности:
-
-- `signals`
-- `books`
-- `decisions`
-- `positions`
-- `position_events`
-- `reviews`
-- `postmortems`
-
-Основные файлы:
-
-- `src/services/decision_core.ts`
-- `src/services/db.ts` (primary, SQLite)
-- `src/services/db_shadow.ts` (Dual-Loop Phase 1 Track D wrapper — fan-out в Postgres при `DUAL_LOOP_SHADOW_PG=true`; no-op иначе)
-- `src/services/db_pg.ts` + `src/db/pg/schema.ts` (drizzle-orm адаптер для Postgres shadow store; см. `docs/dual_loop/db_migration.md`)
-- `python/operator_core.py`
-
-### 3. Autonomous watchlist engine
-
-Задача:
-
-- сопровождать рынки из `Избранного`;
-- создавать `watch dossier`;
-- запускать `watchlist refresh`;
-- делать дешевую monitoring-проверку;
-- запускать `deep review` только по триггерам;
-- создавать короткие `watch updates`.
-
-Сущности:
-
-- `watch_dossiers`
-- `watch_refresh_runs`
-- `watch_refresh_snapshots`
-- `watch_updates`
-
-Основные файлы:
-
-- `src/watchlist_refresh.ts`
-- `src/services/watchlist_engine.ts`
-- `python/watchlist_store.py`
-
-### 4. Operator layer
-
-Задача:
-
-- строить `attention_items` поверх watched-рынков, due reviews и system degradation;
-- отдавать данные для dashboard;
-- обеспечивать whitelisted operator actions;
-- отправлять в Telegram только `urgent/today` inbox-элементы.
-
-Сущности:
-
-- `attention_items`
-- `attention_item_events`
-
-Основные файлы:
-
-- `python/attention_store.py`
-- `python/dashboard_api.py`
-- `python/dashboard_models.py`
-- `python/operator_core.py`
-- `python/telegram_bot.py`
-- `dashboard/src/pages/*`
-
-## Как идут данные
-
-### Daily forecast
-
-```text
-Polymarket -> market selection -> research -> synthesis -> predictions
-          -> decision core -> signals / shadow positions
-          -> dashboard + Telegram alerts
+8. Weekly Scorecard (Sun 10:00 UTC)
+   └── publish_weekly_scorecard() — 7-day + 30-day performance report
 ```
 
-### Watchlist refresh
+## LLM Stack
 
-```text
-watch dossier -> current market snapshot -> monitoring mode
-              -> optional deep review -> watch update
-              -> attention item -> dashboard + Telegram inbox alert
-```
+| Stage | Model | Purpose |
+|-------|-------|---------|
+| Research | DeepSeek V4-Flash | Generate research brief from search results |
+| Naked R1 | DeepSeek V4-Flash | Baseline probability estimate |
+| Synthesis | DeepSeek V4-Flash | Research + R1 synthesis with confidence |
+| Prediction A | DeepSeek V4-Pro | High-quality probability estimate |
+| Prediction B | Mistral Small 4 | Second opinion for ensemble |
+| Post formatting | Mistral Small 4 | English quant-desk reasoning text |
 
-### Resolution flow
+## Virtual Portfolio
 
-```text
-resolved market -> update prediction outcome -> close paper positions
-                -> postmortem -> quality metrics
-```
+- **Starting AUM:** $1,000 (configurable)
+- **Stake sizing:** 0.25 fractional Kelly (quarter Kelly, conservative)
+- **Max position:** 5% of AUM
+- **Tracking:** entry price → exit price → realized PnL
+- **Pinned message:** updated daily with AUM, return, win rate, best/worst calls
 
-## Code map для нового разработчика
+## Search Stack
 
-Если нужно быстро понять проект, читайте модули в таком порядке:
-
-1. `src/main.ts`
-2. `src/services/decision_core.ts`
-3. `src/services/watchlist_engine.ts`
-4. `src/watchlist_refresh.ts`
-5. `python/operator_core.py`
-6. `python/watchlist_store.py`
-7. `python/dashboard_api.py`
-8. `dashboard/src/pages/MarketDetailPage.tsx`
-9. `dashboard/src/pages/WatchlistPage.tsx`
-
-## Dashboard-модель
-
-Текущий dashboard строится по принципу `decision-first`, но еще не стал полноценным command center.
-
-Что уже есть:
-
-- `Сводка` как command-center baseline
-- `Качество`
-- `Shadow performance`
-- `Operator vs shadow`
-- `Сигналы`
-- dossier-first `Разбор рынка`
-- `Избранное` как triage-board по `watch dossiers`
-- `Действия`
-- `attention_items` с triage-переходами в dashboard
-
-Что еще впереди:
-
-- weekly discipline/review loop поверх quality layer;
-- еще более короткий operator workflow;
-- protobuf-first operator write-path без compatibility JSON publish-side;
-- soak/latency hardening для paper execution перед первым релизом.
-
-Текущее важное transitional замечание по Dual-Loop: Command Center уже читает живой state из `gateway-api` по WebSocket, inbound bus-события (`watchlist/signals/triggers/exec/kill_ack`) уже сведены к protobuf-first projection в `gateway-api`, а outbound operator-mutation path из `gateway-api` (`signals.decisions`, `control.kill`) теперь предпочитает protobuf publish при доступных codecs, но все еще сохраняет JSON fallback. Это не целевая архитектура, а промежуточная стадия миграции.
-
-## Deployment topology
-
-Production живет на `amper`.
-
-Контейнеры:
-
-- `pythia-scheduler`
-- `pythia-telegram`
-- `pythia-dashboard`
-
-Важные свойства:
-
-- deploy только под пользователем `pythia`;
-- dashboard публикуется только на `127.0.0.1:8787`;
-- наружу он отдается через reverse proxy;
-- данные и логи лежат в bind-mounted `data/` и `logs/`.
-
-## Fast Loop dev/proving topology
-
-Dual-Loop пока не является отдельным production-runtime, но уже имеет рабочий proving-contour:
-
-- `gateway-api` как REST/WS surface для Command Center;
-- `sniper-ingest` как mempool subscriber и decoder;
-- `sniper-risk` как pre-trade policy layer;
-- `sniper-executor` как paper executor с nonce actor и kill-switch;
-- `anvil` как dev-fork для real pending-tx tests.
-
-На этой стадии уже доказан реальный paper E2E путь: `pendingTransactions` из Anvil WS -> calldata decode (`resolve` / `resolveManually`) -> `market_specific_key` match -> trigger publish -> paper submit/fill -> gateway state update.
-
-## Расписание
-
-- `forecast` - 06:00 UTC
-- `watchlist refresh` - каждые 6 часов
-- `watch alerts` - через 10 минут после каждого refresh
-- `resolution` - 18:00 UTC
-- `weekly report` - воскресенье, 20:00 UTC
-
-## Границы и не-цели
-
-Сейчас Pythia:
-
-- не ставит реальные ордера;
-- не хранит trading-ключи;
-- не является автотрейдером;
-- не открывает публичный backend без авторизации.
-
-Это важно для чтения кода: foundation `attention engine` уже в production, inbound Telegram triage и quality pages уже есть в коде, а вот live execution-автоматизация и paper executor Fast Loop пока еще не production reality.
+- **Brave Search API** (primary, free 2k req/month)
+- **SearXNG** (secondary, self-hosted in Docker, aggregates Google/Bing/DDG)
+- **DuckDuckGo Instant Answer** (emergency fallback, no key needed)
+- URL deduplication across all providers

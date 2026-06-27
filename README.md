@@ -1,256 +1,162 @@
-# Pythia
+# Pythia Capital
 
-**Дата актуализации: 2026-06-26**
-
-Pythia - это приватный decision desk для Polymarket. Полностью функциональная система с двумя контурами.
-
----
-
-## 🎯 Текущий статус
-
-### ✅ Slow Loop (Production)
-**Статус**: Работает на amper (144.24.254.226)
-
-- **Forecast pipeline**: Восстановлен (2026-06-26) после 42-дневного простоя
-- **LLM**: Mistral AI (mistral-small/medium)
-- **Schedule**: Daily forecast runs в 06:00 UTC
-- **Telegram bot**: Активен для operator triage
-- **Shadow PG**: Готов к финальной миграции
-
-**Компоненты:**
-- Daily forecast (research + synthesis)
-- Decision journal & watchlist tracking
-- Paper/shadow execution logs
-- Dashboard (React)
-- Telegram operator interface
-
-### 🚀 Fast Loop - Gate #10 M4 (Ready to Deploy)
-**Статус**: PRODUCTION-READY (2026-06-26)
-
-**Multi-market orderbook driver:**
-- ✅ Multi-market orchestration (N trackers одновременно)
-- ✅ Live Polymarket integration (REST + WebSocket)
-- ✅ Watchlist integration (SQLite init + NATS updates)
-- ✅ Fault tolerance (circuit breaker + exponential backoff)
-- ✅ Backpressure control (memory/CPU/tracker limits)
-- ✅ Graceful shutdown (concurrent с timeouts)
-- ✅ Health monitoring per tracker
-
-**Deployment:**
-```bash
-cd services/sniper-orderbook
-cargo build --release --bin driver
-./target/release/driver
-```
-
-**Конфигурация (env vars):**
-```bash
-NATS_URL=nats://127.0.0.1:4222
-DRIVER_DB_PATH=/app/data/pythia.db
-DRIVER_MAX_TRACKERS=100
-DRIVER_MEMORY_THRESHOLD_MB=2048
-```
-
-**Документация:**
-- Spec: `docs/superpowers/specs/2026-06-26-gate10-m4-multi-market-driver-design.md`
-- Plan: `docs/superpowers/plans/2026-06-26-gate10-m4-multi-market-driver.md`
-- Component README: `services/sniper-orderbook/README.md`
+**Prediction market research desk for Polymarket.**
+Publishes daily data-driven calls to a public Telegram channel with a transparent virtual portfolio.
 
 ---
 
-## Что делает Pythia
+## What it does
 
-1. **Находит сильные рынки** - daily forecast по всем активным Polymarket рынкам
-2. **Сопровождает watchlist** - operator triage через Telegram
-3. **Копит paper dataset** - shadow execution без реальных денег
-4. **Tracking real-time orderbook** (M4) - multi-market driver для Fast Loop
+1. **Forecast pipeline** — scans active Polymarket markets, runs multi-search (Brave/SearXNG/DuckDuckGo), generates research briefs via LLM, produces probability estimates
+2. **Dual-LLM ensemble** — DeepSeek V4-Pro + Mistral Small in parallel, weighted ensemble with disagreement-based confidence
+3. **Virtual portfolio** — every published pick opens a virtual position with Kelly stake sizing, tracks ROI on resolution
+4. **Telegram channel** — 5 daily publishing slots, English quant-desk format, pinned portfolio summary
+5. **Score tracking** — automatic resolution detection, Brier score calculation, weekly scorecard
 
 ---
 
-## Архитектура
+## Architecture
 
 ```
-Slow Loop (TypeScript/Python)          Fast Loop (Rust/TypeScript)
-├── forecast (research + synthesis)    ├── sniper-orderbook (M4 driver)
-├── watchlist tracking                 ├── sniper-ingest
-├── decision journal                   ├── sniper-risk
-├── dashboard (React)                  ├── sniper-executor (paper mode)
-└── telegram bot                       └── gateway-api
-```
+Forecast Pipeline (TypeScript/Bun)
+├── market_selector.ts     — select active markets
+├── research_runner.ts     — multi-search (Brave/SearXNG/DDG)
+├── naked_r1.ts            — baseline probability estimate
+├── ensemble_predictor.ts  — dual-LLM (DeepSeek + Mistral)
+├── synthesis.ts           — research + R1 synthesis
+└── main.ts                — orchestrates pipeline
 
-**Инфраструктура:**
-- **Databases**: PostgreSQL (main), Shadow PG (replica), SQLite (watchlist)
-- **Message bus**: NATS
-- **Deployment**: Docker Compose на amper
-- **Monitoring**: Logs + manual health checks
+Oracle Layer (Python)
+├── oracle_publisher.py    — selects top-N picks, formats & publishes
+├── portfolio_manager.py   — Kelly sizing, ROI tracking, pinned message
+├── oracle_score_updater.py— resolution tracking, position closing
+├── oracle_scorecard.py    — weekly performance report
+├── oracle_backfill.py     — historic archive creation
+└── market_categorizer.py  — sports subcategories (NBA, NFL, soccer, etc.)
+
+Infrastructure
+├── Docker Compose         — scheduler, telegram bot, dashboard, searxng
+├── SearXNG                — self-hosted meta-search (free)
+└── SQLite                 — predictions, oracle_prophecies, portfolio_positions
+```
 
 ---
 
 ## Quick Start
 
-### Development
-
-**Prerequisites:**
-- Node.js 18+
-- Python 3.11+
-- Rust 1.70+
+### Prerequisites
 - Docker + Docker Compose
+- API keys: DeepSeek, Mistral, Telegram Bot
 
-**Local setup:**
+### Configuration
 ```bash
-# Clone
-git clone git@github.com:Ger-Wer/pythia.git
-cd pythia
+cp .env.example .env
+# Edit .env with your keys:
+# - DEEPSEEK_API_KEY (required, for forecast pipeline)
+# - MISTRAL_API_KEY (required, for dual-LLM ensemble)
+# - ORACLE_TELEGRAM_BOT_TOKEN (required, for channel publishing)
+# - ORACLE_TELEGRAM_CHANNEL_ID (required, channel ID)
+# - BRAVE_SEARCH_API_KEY (optional, free 2k req/month)
+# - SEARXNG_BASE_URL (set automatically in Docker)
+```
 
-# Install dependencies
+### Local Development
+```bash
 npm install
 cd python && pip install -r requirements.txt
 
-# Configure
-cp .env.example .env
-# Edit .env with your keys
+# Run forecast pipeline
+npm run dev
 
-# Run locally
-npm run dev        # Slow Loop services
-cd services/sniper-orderbook && cargo run --bin driver  # Fast Loop driver
+# Run oracle publisher (dry run)
+python python/oracle_publisher.py --dry-run
+
+# Run backfill
+python python/oracle_backfill.py --dry-run --limit 5
 ```
 
 ### Production Deployment
-
-**Amper (144.24.254.226):**
 ```bash
-ssh amper
+# On server (amper):
 cd /home/pythia/pythia
 git pull origin main
-docker compose down && docker compose up -d --build
+docker compose build
+docker compose up -d --force-recreate
 ```
-
-**Важно:**
-- Любые Docker действия только из `/home/pythia/pythia`
-- Не использовать глобальные Docker cleanup команды (SproutSignal соседствует)
-- Перед рестартом проверить `.env` актуальность
 
 ---
 
-## Структура репозитория
+## Cron Schedule
+
+| Time (UTC) | Command | Description |
+|------------|---------|-------------|
+| 06:00 | `forecast` | Daily forecast run |
+| 07:00 | `oracle-publish` | Publish top-5 picks |
+| 11:00 | `oracle-publish` | Publish top-5 picks |
+| 15:00 | `oracle-publish` | Publish top-5 picks |
+| 19:00 | `oracle-publish` | Publish top-5 picks |
+| 19:00 | `oracle-update-scores` | Check resolutions, close positions |
+| 23:00 | `oracle-publish` | Publish top-5 picks |
+| 00:30 | `portfolio-update` | Update pinned portfolio message |
+| Sun 10:00 | `oracle-scorecard` | Weekly performance report |
+
+---
+
+## LLM Configuration
+
+| Stage | Model | Cost (15 picks/day) |
+|-------|-------|---------------------|
+| Research brief | DeepSeek V4-Flash (`deepseek-chat`) | ~$0.19/mo |
+| Prediction A | DeepSeek V4-Pro (`deepseek-v4-pro`) | ~$0.59/mo |
+| Prediction B | Mistral Small 4 (`mistral-small-latest`) | ~$0.27/mo |
+| Post formatting | Mistral Small 4 | included |
+| **Total** | | **~$1.05/mo** |
+
+Ensemble weights: 60% DeepSeek + 40% Mistral (configurable via `ENSEMBLE_WEIGHT_*`).
+
+---
+
+## Repository Structure
 
 ```
 pythia/
-├── src/              # Slow Loop TypeScript services
-├── python/           # Forecast pipeline
-├── dashboard/        # React UI
-├── services/         # Fast Loop Rust components
-│   ├── sniper-orderbook/  # M4 multi-market driver ⭐
-│   ├── sniper-ingest/
-│   ├── sniper-risk/
-│   └── sniper-executor/
-├── gateway-api/      # REST API
-├── schemas/          # Shared types
-├── infra/            # Docker configs
-├── docs/             # Specs & plans
-└── archive/          # Историческая документация
+├── src/                    # TypeScript forecast pipeline
+│   ├── services/
+│   │   ├── ensemble_predictor.ts  # Dual-LLM ensemble
+│   │   ├── research_runner.ts      # Multi-search (Brave/SearXNG/DDG)
+│   │   ├── naked_r1.ts            # Baseline prediction
+│   │   └── db.ts                  # SQLite + PredictionRow
+│   ├── prompts/synthesis.ts       # Synthesis prompt
+│   └── main.ts                    # Pipeline orchestrator
+├── python/                 # Oracle layer
+│   ├── oracle_publisher.py        # Pick selection & publishing
+│   ├── portfolio_manager.py       # Kelly sizing & ROI
+│   ├── oracle_score_updater.py    # Resolution tracking
+│   ├── oracle_scorecard.py        # Weekly report
+│   ├── oracle_backfill.py         # Historic archive
+│   └── market_categorizer.py      # Sports subcategories
+├── dashboard/              # React operator dashboard
+├── sql/migrations/         # Database migrations
+├── searxng/                # SearXNG config
+├── scripts/               # Entrypoint & migrations
+├── Dockerfile             # Multi-stage (Bun + Python + Node)
+└── docker-compose.yml     # Production stack
 ```
 
 ---
 
-## Ключевые документы
+## Database Schema
 
-**Specs & Plans (актуальные):**
-- M4 Driver: `docs/superpowers/specs/2026-06-26-gate10-m4-multi-market-driver-design.md`
-- Dual Loop: `docs/dual_loop/` (Phase 0-2 complete)
-- Deployment: `docs/DEPLOYMENT.md`
-- Decisions: `docs/DECISION_LOG.md`
-
-**Историческое:**
-- `archive/` - старые design docs, отчёты, устаревшие specs
+- **predictions** — forecast results (dexter_p, naked_p, ensemble_p, dual-LLM columns)
+- **oracle_prophecies** — published picks with resolution tracking
+- **portfolio_positions** — virtual positions with Kelly stakes & realized PnL
+- **portfolio_state** — singleton: AUM, cash, total trades, win count
 
 ---
 
-## Production Operations
+## Disclaimer
 
-**Logs:**
-```bash
-# Slow Loop
-docker compose logs -f pythia-scheduler
-docker compose logs -f pythia-forecast
-
-# Fast Loop (когда deployed)
-docker compose logs -f sniper-orderbook-driver
-```
-
-**Health Checks:**
-```bash
-# Forecast status
-ssh amper "cd /home/pythia/pythia && npm run forecast:check"
-
-# Database parity
-./scripts/shadow_pg_parity.sh
-
-# Driver status (когда deployed)
-curl http://localhost:8080/health  # TODO: implement /health endpoint
-```
-
-**Incident Response:**
-1. Check logs
-2. Verify `.env` configuration
-3. Restart affected service: `docker compose restart <service>`
-4. If DB issue: check Shadow PG parity
-5. Escalate if unresolved
-
----
-
-## Roadmap
-
-**Near-term (Q2-Q3 2026):**
-- [x] Gate #10 M4: Multi-market driver (DONE 2026-06-26)
-- [ ] Deploy M4 driver to production
-- [ ] Metrics/observability (Task 9)
-- [ ] NATS orderbook publishing
-- [ ] Shadow PG final migration
-
-**Medium-term (Q4 2026):**
-- [ ] Pythia v1.0 Paper Operator Release
-- [ ] Command Center auth
-- [ ] Kill-switch implementation
-- [ ] Audit trail hardening
-
-**Long-term (2027+):**
-- [ ] Live trading (requires audit, compliance, risk management)
-- [ ] Horizontal scaling (multi-instance coordination)
-- [ ] Advanced analytics
-
----
-
-## Contributing
-
-**Workflow:**
-1. Create feature branch from `main`
-2. Implement + tests
-3. Review (spec compliance + code quality)
-4. PR → `main`
-5. Deploy to amper
-
-**Standards:**
-- TDD для критических путей
-- Two-stage review (spec + quality)
-- Русская документация в README
-- Английские commit messages
-- No secrets in git
-
----
-
-## Support & Contact
-
-**Issues**: GitHub Issues  
-**Internal docs**: MemPalace canonical memory  
-**Server access**: SSH keys required
-
-**Critical rules:**
-- Любые тесты только на production сервере (не локально)
-- Не удалять данные без явного подтверждения
-- Не коммитить secrets/env files
-- Не трогать Docker на amper глобально
-
----
-
-**Last updated**: 2026-06-26 - Gate #10 M4 complete, forecast pipeline restored
+Pythia Capital publishes virtual portfolio results for research purposes.
+All predictions are AI-generated and carry no guarantee of accuracy.
+Prediction markets carry risk of financial loss.
+Not financial advice.
