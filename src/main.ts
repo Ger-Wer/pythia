@@ -20,6 +20,7 @@ import {
 import type { ResearchBrief } from './services/research_runner';
 import { selectMarkets } from './services/market_selector';
 import { nakedR1Predict } from './services/naked_r1';
+import { predictDualLLM } from './services/ensemble_predictor';
 import {
   buildSynthesisPrompt,
   parseSynthesisResponse,
@@ -158,8 +159,20 @@ async function processMarket(
     });
 
     if (!naked && !synthesis) {
-      log(`Skipping market ${market.id}: both baseline and synthesis failed.`);
+      log(`Skipping domain ${market.id}: both baseline and synthesis failed.`);
       return { saved: false, hadError: true };
+    }
+
+    // Dual-LLM ensemble prediction (DeepSeek V4-Pro + Mistral Small)
+    let dualPrediction = null;
+    try {
+      const researchBriefText = brief ? buildResearchBriefText(brief) : '';
+      dualPrediction = await predictDualLLM(market, researchBriefText);
+      if (dualPrediction) {
+        log(`Ensemble: DS=${dualPrediction.deepseek_p}% Mistral=${dualPrediction.mistral_p}% → ${dualPrediction.ensemble_p}% (${dualPrediction.confidence}, disagreement=${dualPrediction.disagreement})`);
+      }
+    } catch (error) {
+      log(`Dual-LLM ensemble failed for market ${market.id}: ${error}`);
     }
 
     insertPrediction(db, {
@@ -181,6 +194,12 @@ async function processMarket(
       forecast_timestamp: forecastTimestamp,
       api_cost_usd: costTracker.getSessionCost() - perMarketCostStart,
       is_valid: 1,
+      deepseek_v4_pro_p: dualPrediction?.deepseek_p ?? null,
+      deepseek_v4_pro_reasoning: dualPrediction?.deepseek_reasoning ?? null,
+      mistral_small_p: dualPrediction?.mistral_p ?? null,
+      mistral_small_reasoning: dualPrediction?.mistral_reasoning ?? null,
+      ensemble_p: dualPrediction?.ensemble_p ?? null,
+      llm_disagreement: dualPrediction?.disagreement ?? null,
     });
 
     const synthesisEdge = synthesis ? Math.abs(synthesis.probability - marketPrice) : 0;

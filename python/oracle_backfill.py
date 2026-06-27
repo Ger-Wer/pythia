@@ -163,24 +163,22 @@ def format_backfill_post(prediction: Dict[str, Any], prophecy: Dict[str, Any]) -
     # Actual outcome
     outcome_text = 'YES' if prediction['outcome'] == 1 else 'NO'
     
-    post = f"""🔮 [АРХИВ {date_str}] {result_emoji} {result_text}
+    post = f"""📊 [HISTORIC {date_str}] {result_emoji} {result_text}
 
 {category_emoji} {prediction['question']}
 
-Polymarket: {market_prob_pct:.0f}% → Пифия: {pythia_prob_pct:.0f}% {arrow}
+Polymarket: {market_prob_pct:.0f}¢ → Pythia: {pythia_prob_pct:.0f}¢ {arrow}
 
 {prophecy['reasoning']}
 
-⚠️ Риск: {prophecy['key_risk']}
+⚠️ Risk: {prophecy['key_risk']}
 
-Ставка: {bet_direction}
-Уверенность: {confidence_stars}
-Исход: {outcome_text}
-Brier: {prediction['brier_dexter']:.3f}
+Direction: {bet_direction}
+Outcome: {outcome_text} | Brier: {prediction['brier_dexter']:.3f}
 
-📊 Рынок закрыт и разрешён
+📊 Market closed & resolved
 
-#pythia #archive"""
+#polymarket #pythiacapital #historic"""
 
     return post
 
@@ -287,25 +285,25 @@ def save_backfill_record(prediction: Dict[str, Any], prophecy: Dict[str, Any], t
 
 def publish_intro_post():
     """
-    Публикует вступительный пост в канал после backfill.
+    Publish intro post after backfill (English, Pythia Capital style).
     """
-    intro_text = """🔮 PYTHIA ORACLE
+    intro_text = """📊 PYTHIA CAPITAL
 
-AI-оракул prediction markets на базе 2-летней research системы.
+Prediction market research desk.
+Daily calls with transparent virtual portfolio.
 
-Что ты увидишь здесь:
-• Ежедневные прогнозы по Polymarket с обоснованием
-• Публичный трекер точности (нельзя скрыть ошибки)
-• Еженедельные отчёты performance
+What you'll see here:
+• 5 daily picks with edge analysis
+• Virtual portfolio ROI ($1,000 starting AUM)
+• Weekly performance reports
+• Full track record — wins AND losses
 
-📜 Архив прогнозов апрель-июнь 2026 ниже ↓
-Текущая точность: 67% (274 resolved predictions)
+📜 Historic archive (Apr-Jun 2026) below ↓
+Live calls start after archive.
 
-Первое live пророчество: скоро
+⚠️ Not financial advice. Prediction markets carry risk of loss.
 
-⚠️ Not financial advice. DYOR.
-
-#polymarket #pythia #prediction"""
+#polymarket #pythiacapital"""
 
     if not ORACLE_BOT_TOKEN or not ORACLE_CHANNEL_ID:
         log_message("Telegram not configured", "WARN")
@@ -338,7 +336,7 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         sleep_seconds: задержка между постами
     """
     log_message("=" * 80)
-    log_message(f"ORACLE BACKFILL - Creating Archive ({limit} predictions)")
+    log_message(f"PYTHIA CAPITAL BACKFILL - Creating Archive ({limit} predictions)")
     log_message("=" * 80)
     
     # Get top predictions
@@ -349,6 +347,9 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         return
     
     log_message(f"Starting backfill of {len(predictions)} predictions...")
+    
+    from python.portfolio_manager import PortfolioManager
+    pm = PortfolioManager(DB_PATH)
     
     for i, prediction in enumerate(predictions, 1):
         log_message(f"[{i}/{len(predictions)}] Processing: {prediction['question'][:50]}...")
@@ -368,7 +369,18 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         
         # Save record
         if not dry_run or telegram_message_id:
-            save_backfill_record(prediction, prophecy, telegram_message_id)
+            prophecy_id = save_backfill_record(prediction, prophecy, telegram_message_id)
+            
+            # Create and immediately close portfolio position (historic)
+            if prophecy_id and not dry_run:
+                pythia_prob = prediction['dexter_p'] / 100.0 if prediction['dexter_p'] > 1 else prediction['dexter_p']
+                market_prob = prediction['market_price'] / 100.0 if prediction['market_price'] > 1 else prediction['market_price']
+                direction = 'YES' if pythia_prob > 0.5 else 'NO'
+                pos_id = pm.open_position(prophecy_id, market_prob, direction, pythia_prob)
+                if pos_id:
+                    outcome = prediction['outcome']
+                    exit_price = 1.0 if outcome == 1 else 0.0
+                    pm.close_position(pos_id, exit_price, outcome)
         
         # Sleep to avoid rate limits
         if not dry_run and i < len(predictions):
@@ -379,6 +391,10 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
     # Publish intro post (pinned at top)
     if not dry_run:
         log_message("Publishing intro post...")
+        publish_intro_post()
+        # Update portfolio pinned message with historic + live state
+        log_message("Updating portfolio pinned message...")
+        pm.update_pinned_message()
         publish_intro_post()
     
     log_message("=" * 80)

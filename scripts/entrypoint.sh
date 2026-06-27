@@ -68,6 +68,11 @@ case "${1:-}" in
     /app/python/venv/bin/python python/oracle_backfill.py --limit 25 --sleep 3 2>&1 | tee -a "$LOG_DIR/oracle_backfill_${TODAY}.log"
     ;;
 
+  portfolio-update)
+    cd /app
+    /app/python/venv/bin/python python/portfolio_manager.py --update-pinned 2>&1 | tee -a "$LOG_DIR/portfolio_${TODAY}.log"
+    ;;
+
   telegram)
     cd /app
     exec /app/python/venv/bin/python -m python.telegram_operator

@@ -7,7 +7,7 @@ Oracle Scorecard Publisher - еженедельный отчёт точност�
 import os
 import sqlite3
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -24,8 +24,8 @@ ORACLE_CHANNEL_ID = os.getenv("ORACLE_TELEGRAM_CHANNEL_ID", "")
 
 
 def log_message(message: str, level: str = "INFO"):
-    """Log message to console and file."""
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    """Log message."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] [{level}] {message}"
     print(log_entry)
     
@@ -45,7 +45,7 @@ def get_weekly_stats() -> Dict[str, Any]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT 
@@ -83,7 +83,7 @@ def get_monthly_stats() -> Dict[str, Any]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT 
@@ -112,13 +112,13 @@ def get_monthly_stats() -> Dict[str, Any]:
 
 def get_best_prophecy(days: int = 7) -> Optional[Dict[str, Any]]:
     """
-    Найти лучшее пророчество за период (highest edge + WIN).
+    Find best prophecy in period (highest edge + WIN).
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT 
@@ -145,13 +145,13 @@ def get_best_prophecy(days: int = 7) -> Optional[Dict[str, Any]]:
 
 def get_worst_prophecy(days: int = 7) -> Optional[Dict[str, Any]]:
     """
-    Найти худшее пророчество за период (LOSS с high confidence).
+    Find worst prophecy in period (LOSS with high confidence).
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT 
@@ -202,40 +202,43 @@ def format_scorecard(
     streak: int
 ) -> str:
     """
-    Форматирует еженедельный scorecard для Telegram.
+    Format weekly scorecard for Telegram (English, Pythia Capital style).
     """
-    # Week number
-    week_number = datetime.utcnow().isocalendar()[1]
+    week_number = datetime.now(timezone.utc).isocalendar()[1]
     
-    # Format best prophecy
-    best_text = "Нет данных"
+    # Format best call
+    best_text = "No data yet"
     if best:
         best_market = best['market_question'][:50]
-        best_text = f'"{best_market}..." → +{best["edge_pct"]:.1f}% edge'
+        best_text = f'"{best_market}..." → +{best["edge_pct"]:.1f}pp edge'
     
-    # Format worst prophecy (with brief postmortem)
+    # Format worst call
     worst_text = ""
     if worst:
         worst_market = worst['market_question'][:40]
-        worst_text = f'\n❌ Ошибка: "{worst_market}..." — переоценили уверенность'
+        worst_text = f'\n❌ Miss: "{worst_market}..." — overestimated confidence'
     
     # Streak text
     streak_text = ""
     if streak >= 3:
-        streak_text = f'\n🔥 Текущий стрик: {abs(streak)} {"верных" if streak > 0 else "ошибок"} подряд'
+        streak_text = f'\n🔥 Hot streak: {streak} wins in a row'
+    elif streak <= -3:
+        streak_text = f'\n❄️ Cold streak: {abs(streak)} misses — recalibrating'
     
-    scorecard = f"""📜 СВИТОК ПИФИИ — неделя {week_number}
+    scorecard = f"""📈 PYTHIA CAPITAL — WEEKLY REPORT (Week {week_number})
 
-За последние 7 дней:
-✅ Верных пророчеств: {weekly_stats['wins']}/{weekly_stats['total']} ({weekly_stats['win_rate']:.1f}%)
-💰 Лучшее: {best_text}{worst_text}{streak_text}
+7-Day Performance:
+✅ Wins: {weekly_stats['wins']}/{weekly_stats['total']} ({weekly_stats['win_rate']:.0f}%)
+💰 Best call: {best_text}{worst_text}{streak_text}
 
-📊 Статистика за 30 дней:
-Точность: {monthly_stats['win_rate']:.1f}%
-Средний Brier: {monthly_stats['avg_brier']:.3f}
-Всего пророчеств: {monthly_stats['total']}
+30-Day Track Record:
+Accuracy: {monthly_stats['win_rate']:.0f}%
+Avg Brier: {monthly_stats['avg_brier']:.3f} (0=perfect, 1=worst)
+Total resolved: {monthly_stats['total']}
 
-#polymarket #pythia #weekly"""
+⚠️ Not financial advice. Prediction markets carry risk of loss.
+
+#polymarket #pythiacapital #weekly"""
 
     return scorecard
 
