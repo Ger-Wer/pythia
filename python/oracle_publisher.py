@@ -9,7 +9,7 @@ import json
 import os
 import sqlite3
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -34,7 +34,7 @@ ORACLE_LLM_PROVIDER = os.getenv("ORACLE_LLM_PROVIDER", "mistral")
 ORACLE_LLM_MODEL = os.getenv("ORACLE_LLM_MODEL_REASONING", "mistral-small-2503")
 
 # Publishing thresholds
-MIN_EDGE = float(os.getenv("ORACLE_MIN_EDGE", "0.12"))
+MIN_EDGE = float(os.getenv("ORACLE_MIN_EDGE", "0.08"))
 MIN_CONFIDENCE = float(os.getenv("ORACLE_MIN_CONFIDENCE", "0.60"))
 MIN_VOLUME_USD = float(os.getenv("ORACLE_MIN_VOLUME_USD", "500000"))
 MIN_DAYS_UNTIL_CLOSE = int(os.getenv("ORACLE_MIN_DAYS_UNTIL_CLOSE", "3"))
@@ -45,7 +45,7 @@ MAX_LLM_COST_PER_DAY = float(os.getenv("ORACLE_MAX_LLM_COST_PER_DAY", "5.00"))
 
 def log_message(message: str, level: str = "INFO"):
     """Log message to console and file."""
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] [{level}] {message}"
     print(log_entry)
     
@@ -67,7 +67,7 @@ def get_recent_signals(hours: int = 24) -> List[Dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
     
     cursor.execute('''
         SELECT 
@@ -116,7 +116,7 @@ def filter_markets(signals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if signal['end_date']:
             try:
                 end_date = datetime.fromisoformat(signal['end_date'].replace('Z', '+00:00'))
-                days_until_close = (end_date - datetime.utcnow()).days
+                days_until_close = (end_date - datetime.now(timezone.utc)).days
             except Exception as e:
                 log_message(f"Error parsing end_date: {e}", "WARN")
                 days_until_close = 0
@@ -466,7 +466,7 @@ def save_prophecy_record(signal: Dict[str, Any], prophecy: Dict[str, Any], teleg
         ORACLE_LLM_PROVIDER,
         ORACLE_LLM_MODEL,
         prophecy.get('raw_output', ''),
-        datetime.utcnow().isoformat() + 'Z',
+        datetime.now(timezone.utc).isoformat() + 'Z',
         telegram_message_id,
         ORACLE_CHANNEL_USERNAME,
         0  # is_backfilled = False (это live prophecy)
@@ -485,7 +485,7 @@ def get_accuracy_30d() -> float:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cutoff = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT 
