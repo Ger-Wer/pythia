@@ -176,10 +176,10 @@ class PortfolioManager:
                 total_realized_pnl = total_realized_pnl + ?,
                 total_trades = total_trades + 1,
                 winning_trades = winning_trades + ?,
-                current_aum = cash + ? + ? + positions_value,
+                current_aum = cash + positions_value,
                 updated_at = datetime('now')
             WHERE id = 1
-        ''', (stake, realized, realized, won, stake, realized, stake))
+        ''', (stake, realized, realized, won))
 
         conn.commit()
         conn.close()
