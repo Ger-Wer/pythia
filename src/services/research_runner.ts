@@ -34,18 +34,19 @@ export interface NewsResult {
   snippet: string;
 }
 
-const exaResponseSchema = z.object({
-  results: z.array(
-    z.object({
-      title: z.string().optional(),
-      url: z.string(),
-      text: z.string().optional(),
-      highlights: z.array(z.string()).optional(),
-    }),
-  ),
+const braveResponseSchema = z.object({
+  web: z.object({
+    results: z.array(
+      z.object({
+        title: z.string().optional(),
+        url: z.string(),
+        description: z.string().optional(),
+      }),
+    ),
+  }).optional(),
 });
 
-const tavilyResponseSchema = z.object({
+const searxngResponseSchema = z.object({
   results: z.array(
     z.object({
       title: z.string().optional(),
@@ -53,6 +54,18 @@ const tavilyResponseSchema = z.object({
       content: z.string().optional(),
     }),
   ),
+});
+
+const ddgResponseSchema = z.object({
+  Heading: z.string().optional(),
+  AbstractText: z.string().optional(),
+  AbstractURL: z.string().optional(),
+  RelatedTopics: z.array(
+    z.object({
+      Text: z.string().optional(),
+      FirstURL: z.string().optional(),
+    }),
+  ).optional(),
 });
 
 const researchSchema = z.object({
@@ -256,113 +269,136 @@ export function deduplicateNewsResults(results: NewsResult[]): NewsResult[] {
   return deduplicated;
 }
 
-async function searchExa(query: string, limit: number): Promise<NewsResult[]> {
-  if (!CONFIG.exa.apiKey) {
+async function searchBrave(query: string, limit: number): Promise<NewsResult[]> {
+  if (!CONFIG.search.braveApiKey) {
     return [];
   }
 
   const response = await fetchWithRetry(async () => {
-    const res = await fetch('https://api.exa.ai/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CONFIG.exa.apiKey,
-      },
-      body: JSON.stringify({
-        query,
-        numResults: limit,
-        type: 'auto',
-        contents: {
-          text: {
-            maxCharacters: 700,
-          },
-          highlights: {
-            numSentences: 2,
-          },
+    const res = await fetch(
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${limit}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'X-Subscription-Token': CONFIG.search.braveApiKey,
         },
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
 
     if (!res.ok) {
-      throw new Error(`Exa HTTP ${res.status}: ${res.statusText}`);
+      throw new Error(`Brave HTTP ${res.status}: ${res.statusText}`);
     }
 
-    return exaResponseSchema.parse(await res.json());
+    return braveResponseSchema.parse(await res.json());
   });
 
-  return response.results.map((result) => ({
+  return (response.web?.results ?? []).map((result) => ({
     title: result.title || result.url,
     url: result.url,
-    snippet: (result.highlights?.join(' ') || result.text || '').trim(),
+    snippet: (result.description || '').trim(),
   }));
 }
 
-async function searchTavily(query: string, limit: number): Promise<NewsResult[]> {
-  if (!CONFIG.exa.tavilyApiKey) {
+async function searchSearXNG(query: string, limit: number): Promise<NewsResult[]> {
+  if (!CONFIG.search.searxngBaseUrl) {
     return [];
   }
 
   const response = await fetchWithRetry(async () => {
-    const res = await fetch('https://api.tavily.com/search', {
+    const res = await fetch(`${CONFIG.search.searxngBaseUrl}/search`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({
-        api_key: CONFIG.exa.tavilyApiKey,
-        query,
-        max_results: limit,
-        search_depth: 'basic',
-        include_answer: false,
-        include_images: false,
-        include_raw_content: false,
-      }),
+      body: new URLSearchParams({ q: query, format: 'json' }),
       signal: AbortSignal.timeout(20_000),
     });
 
     if (!res.ok) {
-      throw new Error(`Tavily HTTP ${res.status}: ${res.statusText}`);
+      throw new Error(`SearXNG HTTP ${res.status}: ${res.statusText}`);
     }
 
-    return tavilyResponseSchema.parse(await res.json());
+    return searxngResponseSchema.parse(await res.json());
   });
 
-  return response.results.map((result) => ({
+  return response.results.slice(0, limit).map((result) => ({
     title: result.title || result.url,
     url: result.url,
     snippet: (result.content || '').trim(),
   }));
 }
 
+async function searchDuckDuckGo(query: string, limit: number): Promise<NewsResult[]> {
+  const response = await fetchWithRetry(async () => {
+    const res = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`,
+      {
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+
+    if (!res.ok) {
+      throw new Error(`DuckDuckGo HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    return ddgResponseSchema.parse(await res.json());
+  });
+
+  const results: NewsResult[] = [];
+
+  if (response.AbstractText && response.AbstractURL) {
+    results.push({
+      title: response.Heading || response.AbstractURL,
+      url: response.AbstractURL,
+      snippet: response.AbstractText.trim(),
+    });
+  }
+
+  for (const topic of response.RelatedTopics ?? []) {
+    if (topic.Text && topic.FirstURL) {
+      results.push({
+        title: topic.Text.slice(0, 80),
+        url: topic.FirstURL,
+        snippet: topic.Text.trim(),
+      });
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
 export async function searchNews(query: string, limit: number): Promise<NewsResult[]> {
   try {
-    const exaResults = await searchExa(query, limit);
-    if (exaResults.length > 0) {
-      return exaResults;
+    const braveResults = await searchBrave(query, limit);
+    if (braveResults.length > 0) {
+      return braveResults;
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/Exa HTTP 401/i.test(message)) {
-      warnSearchOnce('exa-401', 'Предупреждение research-слоя: Exa API вернул 401. Переключаюсь на Tavily, если он настроен.');
+    if (/401|403/i.test(message)) {
+      warnSearchOnce('brave-auth', 'Предупреждение research-слоя: Brave Search отклонил ключ. Переключаюсь на SearXNG, если он настроен.');
     } else {
-      warnSearchOnce('exa-failed', 'Предупреждение research-слоя: поиск через Exa завершился ошибкой. Переключаюсь на Tavily, если он настроен.');
+      warnSearchOnce('brave-failed', 'Предупреждение research-слоя: поиск через Brave завершился ошибкой. Переключаюсь на SearXNG, если он настроен.');
     }
   }
 
   try {
-    const tavilyResults = await searchTavily(query, limit);
-    if (tavilyResults.length === 0 && !CONFIG.exa.tavilyApiKey) {
-      warnSearchOnce('research-off', 'Предупреждение research-слоя: не настроен ни один рабочий search provider. Продолжаю в degraded mode.');
+    const searxngResults = await searchSearXNG(query, limit);
+    if (searxngResults.length > 0) {
+      return searxngResults;
     }
-    return tavilyResults;
+    if (!CONFIG.search.braveApiKey && !CONFIG.search.searxngBaseUrl) {
+      warnSearchOnce('search-off', 'Предупреждение research-слоя: не настроен ни один search provider. Использую DuckDuckGo emergency fallback.');
+    }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/401|403/i.test(message)) {
-      warnSearchOnce('tavily-auth', 'Предупреждение research-слоя: Tavily отклонил ключ. Продолжаю в degraded mode.');
-    } else {
-      warnSearchOnce('tavily-failed', 'Предупреждение research-слоя: поиск через Tavily завершился ошибкой. Продолжаю в degraded mode.');
-    }
+    warnSearchOnce('searxng-failed', 'Предупреждение research-слоя: поиск через SearXNG завершился ошибкой. Использую DuckDuckGo emergency fallback.');
+  }
+
+  try {
+    return await searchDuckDuckGo(query, limit);
+  } catch (error) {
+    warnSearchOnce('ddg-failed', 'Предупреждение research-слоя: DuckDuckGo fallback завершился ошибкой. Продолжаю в degraded mode.');
     return [];
   }
 }
@@ -382,7 +418,7 @@ export async function multiSearch(
   return deduplicateNewsResults(aggregated).slice(0, 8);
 }
 
-// Phase 1 research path: multi-search через Exa/Tavily плюс один структурированный LLM summary-call.
+// Phase 1 research path: multi-search через Brave/SearXNG/DuckDuckGo плюс один структурированный LLM summary-call.
 // Это production research-контур Pythia, он не зависит от Dexter framework.
 export async function buildResearchBrief(
   market: PolymarketMarket,
