@@ -29,24 +29,6 @@ case "${1:-}" in
     /app/python/venv/bin/python python/resolution_checker.py 2>&1 | tee -a "$LOG_DIR/resolution_${TODAY}.log"
     ;;
 
-  watchlist-refresh)
-    cd /app
-    bun run src/watchlist_refresh.ts 2>&1 | tee -a "$LOG_DIR/watchlist_refresh_${TODAY}.log"
-    ;;
-
-  watch-alerts)
-    cd /app
-    /app/python/venv/bin/python python/telegram_bot.py --watch-updates 2>&1 | tee -a "$LOG_DIR/watch_alerts_${TODAY}.log"
-    ;;
-
-  weekly)
-    cd /app
-    {
-      /app/python/venv/bin/python python/analyze.py
-      /app/python/venv/bin/python python/telegram_bot.py --weekly-report
-    } 2>&1 | tee -a "$LOG_DIR/weekly_${TODAY}.log"
-    ;;
-
   oracle-publish)
     cd /app
     /app/python/venv/bin/python python/oracle_publisher.py 2>&1 | tee -a "$LOG_DIR/oracle_publish_${TODAY}.log"
@@ -71,11 +53,6 @@ case "${1:-}" in
   portfolio-update)
     cd /app
     /app/python/venv/bin/python python/portfolio_manager.py --update-pinned 2>&1 | tee -a "$LOG_DIR/portfolio_${TODAY}.log"
-    ;;
-
-  telegram)
-    cd /app
-    exec /app/python/venv/bin/python -m python.telegram_operator
     ;;
 
   dashboard)

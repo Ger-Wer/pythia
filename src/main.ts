@@ -207,7 +207,7 @@ async function processMarket(
     if (synthesisEdge > 15 || nakedEdge > 15) {
       await sendTelegramAlert(
         [
-          '*Pythia: сильное расхождение с рынком*',
+          '*Pythia Capital: strong market divergence*',
           `Маркет: ${escapeMarkdown(market.question)}`,
           `Рыночная цена: ${marketPrice.toFixed(1)}%`,
           synthesis ? `Research\\+R1: ${synthesis.probability}%` : 'Research\\+R1: N/A',
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
 
   const markets = await selectMarkets();
   if (markets.length === 0) {
-    await sendTelegramAlert('*Pythia: уведомление*\nНа сегодня не выбрано ни одного маркета. Завершаю работу.');
+    await sendTelegramAlert('*Pythia Capital: no markets selected today.*');
     process.exit(1);
   }
 
@@ -256,10 +256,10 @@ async function main(): Promise<void> {
       `Projected daily=$${burnProjection.projectedDailyTotal.toFixed(4)} (limit=$${CONFIG.limits.dailyCostUsd})`,
     );
     await sendTelegramAlert(
-      `*Pythia: ⚠️  Предупреждение о расходах*\n` +
-      `Почасовой темп сжигания: $${burnProjection.hourlyRate.toFixed(4)}\n` +
-      `Прогноз за день: $${burnProjection.projectedDailyTotal.toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
-      `Риск превышить лимит. Сокращаю рынки.`,
+      `*Pythia Capital: cost burn warning*\n` +
+      `Hourly burn rate: $${burnProjection.hourlyRate.toFixed(4)}\n` +
+      `Projected daily: $${burnProjection.projectedDailyTotal.toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
+      `Risk of exceeding limit. Reducing markets.`,
     );
   }
 
@@ -280,7 +280,7 @@ async function main(): Promise<void> {
     } catch (error) {
       if (error instanceof CostLimitError) {
         await sendTelegramAlert(
-          `*Pythia: уведомление*\nДостигнут лимит расходов после ${processed} маркетов: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`,
+          `*Pythia Capital: cost limit reached after ${processed} markets: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`,
         );
         process.exit(1);
       }
@@ -301,18 +301,18 @@ async function main(): Promise<void> {
 
   if (finalBurnProjection.isWarning) {
     await sendTelegramAlert(
-      `*Pythia: расходы приближаются к лимиту*\n` +
-      `Затрачено сегодня: $${(sessionCost + getTodayCost(db)).toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
-      `На сегодня осталось: ${Math.round(CONFIG.limits.dailyCostUsd - (sessionCost + getTodayCost(db))) * 100}% от лимита`,
+      `*Pythia: cost approaching limit*\n` +
+      `Spent today: $${(sessionCost + getTodayCost(db)).toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
+      `Remaining today: ${Math.round(CONFIG.limits.dailyCostUsd - (sessionCost + getTodayCost(db))) * 100}% of limit`,
     );
   }
 
   if (errors > 0) {
-    await sendTelegramAlert(`*Pythia: уведомление*\nПрогон завершён с ${errors} ошибками на уровне маркетов.`);
+    await sendTelegramAlert(`*Pythia Capital: forecast run completed with ${errors} market-level errors.`);
   }
 
   if (processed === 0) {
-    await sendTelegramAlert('*Pythia: уведомление*\nВо время прогона не удалось обработать ни один маркет.');
+    await sendTelegramAlert('*Pythia Capital: no markets were processed during the run.*');
     process.exit(1);
   }
 }
@@ -320,6 +320,6 @@ async function main(): Promise<void> {
 main().catch(async (error) => {
   console.error('Pythia run failed:', error);
   const message = error instanceof Error ? error.message : String(error);
-  await sendTelegramAlert(`*Pythia: критическая ошибка*\n${escapeMarkdown(message)}`);
+  await sendTelegramAlert(`*Pythia Capital: critical error*\n${escapeMarkdown(message)}`);
   process.exit(1);
 });
