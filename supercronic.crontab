@@ -5,7 +5,6 @@
 0 19 * * * /app/scripts/entrypoint.sh oracle-publish
 0 19 * * * /app/scripts/entrypoint.sh oracle-update-scores
 0 23 * * * /app/scripts/entrypoint.sh oracle-publish
-0 10 * * 0 /app/scripts/entrypoint.sh oracle-scorecard
-30 0 * * * /app/scripts/entrypoint.sh portfolio-update
 0 18 * * * /app/scripts/entrypoint.sh resolve
 0 10 * * 0 /app/scripts/entrypoint.sh oracle-scorecard
+30 0 * * * /app/scripts/entrypoint.sh portfolio-update
