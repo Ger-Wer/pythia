@@ -79,16 +79,20 @@ def get_recent_signals(hours: int = 24) -> List[Dict[str, Any]]:
             volume,
             end_date,
             market_price,
-            COALESCE(dexter_p, naked_p) AS best_p,
+            COALESCE(ensemble_p, dexter_p, naked_p) AS best_p,
             dexter_confidence,
             COALESCE(dexter_reasoning, naked_reasoning) AS best_reasoning,
             dexter_key_risk,
+            ensemble_p,
+            mistral_small_p,
+            deepseek_v4_pro_p,
+            llm_disagreement,
             forecast_timestamp
         FROM predictions
         WHERE forecast_timestamp >= ?
           AND is_valid = 1
           AND outcome IS NULL
-          AND (dexter_p IS NOT NULL OR naked_p IS NOT NULL)
+          AND (ensemble_p IS NOT NULL OR dexter_p IS NOT NULL OR naked_p IS NOT NULL)
         ORDER BY forecast_timestamp DESC
     ''', (cutoff,))
     

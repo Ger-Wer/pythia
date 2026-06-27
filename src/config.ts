@@ -42,6 +42,17 @@ export const CONFIG = {
       : env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'),
     modelResearch: env('MODEL_RESEARCH', 'deepseek-chat'),
     modelSynthesis: env('MODEL_SYNTHESIS', 'deepseek-reasoner'),
+    v4ProModel: env('DEEPSEEK_V4_PRO_MODEL', 'deepseek-v4-pro'),
+  },
+  mistral: {
+    apiKey: env('MISTRAL_API_KEY', ''),
+    baseUrl: env('MISTRAL_BASE_URL', 'https://api.mistral.ai/v1'),
+    smallModel: env('MISTRAL_SMALL_MODEL', 'mistral-small-latest'),
+  },
+  ensemble: {
+    weightDeepseek: numberEnv('ENSEMBLE_WEIGHT_DEEPSEEK', '0.6'),
+    weightMistral: numberEnv('ENSEMBLE_WEIGHT_MISTRAL', '0.4'),
+    disagreementThreshold: numberEnv('ENSEMBLE_DISAGREEMENT_THRESHOLD', '0.15'),
   },
   search: {
     braveApiKey: env('BRAVE_SEARCH_API_KEY', ''),

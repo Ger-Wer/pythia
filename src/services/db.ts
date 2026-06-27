@@ -25,6 +25,12 @@ export interface PredictionRow {
   forecast_timestamp: string;
   api_cost_usd: number;
   is_valid?: number | null;
+  deepseek_v4_pro_p?: number | null;
+  deepseek_v4_pro_reasoning?: string | null;
+  mistral_small_p?: number | null;
+  mistral_small_reasoning?: string | null;
+  ensemble_p?: number | null;
+  llm_disagreement?: number | null;
 }
 
 const INVALID_DATA_CUTOFF = '2026-03-29T17:37:00';
@@ -193,7 +199,13 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       research_brief_json,
       forecast_timestamp,
       api_cost_usd,
-      is_valid
+      is_valid,
+      deepseek_v4_pro_p,
+      deepseek_v4_pro_reasoning,
+      mistral_small_p,
+      mistral_small_reasoning,
+      ensemble_p,
+      llm_disagreement
     ) VALUES (
       @market_id,
       @question,
@@ -212,7 +224,13 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       @research_brief_json,
       @forecast_timestamp,
       @api_cost_usd,
-      @is_valid
+      @is_valid,
+      @deepseek_v4_pro_p,
+      @deepseek_v4_pro_reasoning,
+      @mistral_small_p,
+      @mistral_small_reasoning,
+      @ensemble_p,
+      @llm_disagreement
     )
     ON CONFLICT(market_id, forecast_timestamp) DO UPDATE SET
       question = excluded.question,
@@ -230,7 +248,13 @@ export function insertPrediction(db: Database, data: PredictionRow): void {
       naked_reasoning = excluded.naked_reasoning,
       research_brief_json = excluded.research_brief_json,
       api_cost_usd = excluded.api_cost_usd,
-      is_valid = excluded.is_valid
+      is_valid = excluded.is_valid,
+      deepseek_v4_pro_p = excluded.deepseek_v4_pro_p,
+      deepseek_v4_pro_reasoning = excluded.deepseek_v4_pro_reasoning,
+      mistral_small_p = excluded.mistral_small_p,
+      mistral_small_reasoning = excluded.mistral_small_reasoning,
+      ensemble_p = excluded.ensemble_p,
+      llm_disagreement = excluded.llm_disagreement
   `);
 
   stmt.run({
