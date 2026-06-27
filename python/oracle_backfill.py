@@ -336,7 +336,7 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         sleep_seconds: задержка между постами
     """
     log_message("=" * 80)
-    log_message(f"ORACLE BACKFILL - Creating Archive ({limit} predictions)")
+    log_message(f"PYTHIA CAPITAL BACKFILL - Creating Archive ({limit} predictions)")
     log_message("=" * 80)
     
     # Get top predictions
@@ -347,6 +347,9 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         return
     
     log_message(f"Starting backfill of {len(predictions)} predictions...")
+    
+    from python.portfolio_manager import PortfolioManager
+    pm = PortfolioManager(DB_PATH)
     
     for i, prediction in enumerate(predictions, 1):
         log_message(f"[{i}/{len(predictions)}] Processing: {prediction['question'][:50]}...")
@@ -366,7 +369,18 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
         
         # Save record
         if not dry_run or telegram_message_id:
-            save_backfill_record(prediction, prophecy, telegram_message_id)
+            prophecy_id = save_backfill_record(prediction, prophecy, telegram_message_id)
+            
+            # Create and immediately close portfolio position (historic)
+            if prophecy_id and not dry_run:
+                pythia_prob = prediction['dexter_p'] / 100.0 if prediction['dexter_p'] > 1 else prediction['dexter_p']
+                market_prob = prediction['market_price'] / 100.0 if prediction['market_price'] > 1 else prediction['market_price']
+                direction = 'YES' if pythia_prob > 0.5 else 'NO'
+                pos_id = pm.open_position(prophecy_id, market_prob, direction, pythia_prob)
+                if pos_id:
+                    outcome = prediction['outcome']
+                    exit_price = 1.0 if outcome == 1 else 0.0
+                    pm.close_position(pos_id, exit_price, outcome)
         
         # Sleep to avoid rate limits
         if not dry_run and i < len(predictions):
@@ -377,6 +391,10 @@ def backfill_archive(limit: int = 25, dry_run: bool = False, sleep_seconds: int 
     # Publish intro post (pinned at top)
     if not dry_run:
         log_message("Publishing intro post...")
+        publish_intro_post()
+        # Update portfolio pinned message with historic + live state
+        log_message("Updating portfolio pinned message...")
+        pm.update_pinned_message()
         publish_intro_post()
     
     log_message("=" * 80)
