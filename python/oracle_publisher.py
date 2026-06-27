@@ -190,6 +190,23 @@ def select_top_signal(signals: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]
     return top
 
 
+GAMMA_API = "https://gamma-api.polymarket.com"
+
+def lookup_event_slug(market_id: str) -> str:
+    """Look up the event slug for a market from Gamma API."""
+    try:
+        import requests as _requests
+        resp = _requests.get(f"{GAMMA_API}/events", params={"active": "true", "closed": "false", "limit": 200}, timeout=10)
+        if resp.ok:
+            for event in resp.json():
+                for m in event.get("markets", []):
+                    if str(m.get("id")) == str(market_id):
+                        return event.get("slug", "")
+    except Exception:
+        pass
+    return ""
+
+
 def generate_prophecy_llm(signal: Dict[str, Any]) -> Dict[str, Any]:
     """
     Генерирует текст пророчества через LLM.
@@ -362,8 +379,12 @@ def format_telegram_post(signal: Dict[str, Any], prophecy: Dict[str, Any], accur
     # Category emoji
     category_emoji = get_category_emoji(signal['category'])
     
-    # Polymarket link
-    polymarket_link = f"https://polymarket.com/event/{signal['market_id']}"
+    # Polymarket link — look up event slug for correct URL
+    event_slug = lookup_event_slug(signal['market_id'])
+    if event_slug:
+        polymarket_link = f"https://polymarket.com/event/{event_slug}"
+    else:
+        polymarket_link = f"https://polymarket.com/event/{signal['market_id']}"
     
     post = f"""🔮 ПИФИЯ ГОВОРИТ
 
