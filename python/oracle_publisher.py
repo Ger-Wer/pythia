@@ -19,6 +19,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from python.market_categorizer import categorize_market, should_exclude_category, get_category_emoji
+from python.portfolio_manager import PortfolioManager
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "pythia.db"))
@@ -634,8 +635,19 @@ def publish_daily_prophecy(dry_run: bool = False):
             telegram_message_id = send_to_channel(post_text)
         
         if not dry_run or telegram_message_id:
-            save_prophecy_record(signal, prophecy, telegram_message_id)
+            prophecy_id = save_prophecy_record(signal, prophecy, telegram_message_id)
             published += 1
+            
+            # Open virtual portfolio position
+            if prophecy_id and not dry_run:
+                pm = PortfolioManager(DB_PATH)
+                bet_direction = 'YES' if signal['pythia_prob'] > 0.5 else 'NO'
+                pm.open_position(
+                    prophecy_id=prophecy_id,
+                    entry_price=signal['market_prob'],
+                    direction=bet_direction,
+                    pythia_prob=signal['pythia_prob']
+                )
         
         # Rate limit: 2s between posts
         if not dry_run and signal != top_signals[-1]:

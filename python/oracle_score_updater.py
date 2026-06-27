@@ -7,7 +7,7 @@ Oracle Score Updater - автоматическое обновление рез�
 import os
 import sqlite3
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -24,7 +24,7 @@ LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 def log_message(message: str, level: str = "INFO"):
     """Log message to console and file."""
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] [{level}] {message}"
     print(log_entry)
     
@@ -45,7 +45,7 @@ def get_pending_prophecies() -> List[Dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    now = datetime.utcnow().isoformat() + 'Z'
+    now = datetime.now(timezone.utc).isoformat() + 'Z'
     
     cursor.execute('''
         SELECT 
@@ -150,6 +150,30 @@ def update_prophecy_result(prophecy_id: int, outcome: int, resolved_at: str):
     log_message(f"Updated prophecy {prophecy_id}: {result} | Brier: {brier_score:.3f}")
     
     return result, brier_score
+
+
+def close_portfolio_position(prophecy_id: int, outcome: int):
+    """Close the virtual portfolio position for a resolved prophecy."""
+    try:
+        from python.portfolio_manager import PortfolioManager
+        pm = PortfolioManager(DB_PATH)
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT pp.id, pp.entry_price, pp.direction
+            FROM portfolio_positions pp
+            WHERE pp.prophecy_id = ? AND pp.status = 'open'
+        ''', (prophecy_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            position_id, entry_price, direction = row
+            # exit_price: if YES won, exit=1.0; if NO won, exit=0.0
+            exit_price = 1.0 if outcome == 1 else 0.0
+            pm.close_position(position_id, exit_price, outcome)
+            log_message(f"Closed portfolio position {position_id} for prophecy {prophecy_id}")
+    except Exception as e:
+        log_message(f"Failed to close portfolio position: {e}", "ERROR")
 
 
 def edit_telegram_post(prophecy_id: int):
@@ -270,7 +294,7 @@ def calculate_accuracy(days: Optional[int] = None) -> Dict[str, float]:
     cursor = conn.cursor()
     
     if days:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
         cursor.execute('''
             SELECT 
                 COUNT(*) as total,
@@ -419,7 +443,7 @@ def update_oracle_metrics():
         metrics_30d['avg_brier'],
         metrics_all['avg_brier'],
         avg_edge,
-        datetime.utcnow().isoformat() + 'Z'
+        datetime.now(timezone.utc).isoformat() + 'Z'
     ))
     
     conn.commit()
@@ -455,8 +479,11 @@ def update_oracle_scores():
             continue
         
         # Update prophecy result in DB
-        resolved_at = datetime.utcnow().isoformat() + 'Z'
-        update_prophecy_result(prophecy['id'], outcome, resolved_at)
+        resolved_at = datetime.now(timezone.utc).isoformat() + 'Z'
+        result, brier = update_prophecy_result(prophecy['id'], outcome, resolved_at)
+        
+        # Close virtual portfolio position
+        close_portfolio_position(prophecy['id'], outcome)
         
         # Edit Telegram post with result
         edit_telegram_post(prophecy['id'])

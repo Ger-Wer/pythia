@@ -10,3 +10,4 @@
 40 */6 * * * /app/scripts/entrypoint.sh watch-alerts
 0 18 * * * /app/scripts/entrypoint.sh resolve
 0 20 * * 0 /app/scripts/entrypoint.sh weekly
+30 0 * * * /app/scripts/entrypoint.sh portfolio-update
