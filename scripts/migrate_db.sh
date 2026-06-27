@@ -33,10 +33,20 @@ else
   echo "✓ research_status_detail column already exists"
 fi
 
-# Apply all .sql migration files in order
+# Apply all .sql migration files in order (skip PostgreSQL drizzle-kit files)
 if [ -d "$MIGRATIONS_DIR" ]; then
   for sql_file in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
     filename=$(basename "$sql_file")
+    # Skip drizzle-kit PostgreSQL migrations (0000_init is PG, not SQLite)
+    if [ "$filename" = "0000_init.sql" ]; then
+      echo "✓ Skipping $filename (PostgreSQL drizzle-kit, not SQLite)"
+      continue
+    fi
+    # Skip files with PostgreSQL-specific syntax
+    if grep -q "USING btree\|CREATE TYPE\|jsonb\|SERIAL\|::" "$sql_file" 2>/dev/null; then
+      echo "✓ Skipping $filename (PostgreSQL syntax detected)"
+      continue
+    fi
     already=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM _sql_migrations WHERE filename='$filename'")
     if [ "$already" -eq 0 ]; then
       echo "Applying migration: $filename"
