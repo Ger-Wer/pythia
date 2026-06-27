@@ -9,4 +9,3 @@
 30 0 * * * /app/scripts/entrypoint.sh portfolio-update
 0 18 * * * /app/scripts/entrypoint.sh resolve
 0 20 * * 0 /app/scripts/entrypoint.sh weekly
-30 0 * * * /app/scripts/entrypoint.sh portfolio-update
