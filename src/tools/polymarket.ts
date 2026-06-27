@@ -203,10 +203,24 @@ function resolvedOutcome(raw: GammaMarketRaw): { outcome?: number; resolvedAt?: 
   return { resolvedAt };
 }
 
+const GAMMA_PAGE_SIZE = 100;
+const GAMMA_MAX_PAGES = 5;
+
 export async function fetchActiveMarkets(params: ActiveMarketsParams): Promise<PolymarketMarket[]> {
   const now = Date.now();
-  const rawMarkets = await gammaFetch<GammaMarketRaw[]>(buildActiveMarketsPath());
-  const markets = rawMarkets
+  const allRaw: GammaMarketRaw[] = [];
+
+  for (let offset = 0; offset < GAMMA_MAX_PAGES * GAMMA_PAGE_SIZE; offset += GAMMA_PAGE_SIZE) {
+    const page = await gammaFetch<GammaMarketRaw[]>(
+      `/markets?active=true&closed=false&limit=${GAMMA_PAGE_SIZE}&offset=${offset}`,
+    );
+    allRaw.push(...page);
+    if (page.length < GAMMA_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  const markets = allRaw
     .map(normalizeMarket)
     .filter((market): market is PolymarketMarket => market !== null)
     .filter((market) => market.outcomes.length === 2)

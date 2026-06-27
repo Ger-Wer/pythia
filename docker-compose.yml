@@ -110,6 +110,26 @@ services:
       timeout: 10s
       retries: 3
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: pythia-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY:-changeme}
+    networks:
+      - pythia_internal
+    mem_limit: 256m
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
 networks:
   pythia_internal:
     name: pythia_internal

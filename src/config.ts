@@ -43,9 +43,9 @@ export const CONFIG = {
     modelResearch: env('MODEL_RESEARCH', 'deepseek-chat'),
     modelSynthesis: env('MODEL_SYNTHESIS', 'deepseek-reasoner'),
   },
-  exa: {
-    apiKey: env('EXA_API_KEY', ''),
-    tavilyApiKey: env('TAVILY_API_KEY', ''),
+  search: {
+    braveApiKey: env('BRAVE_SEARCH_API_KEY', ''),
+    searxngBaseUrl: env('SEARXNG_BASE_URL', ''),
   },
   telegram: {
     botToken: env('TELEGRAM_BOT_TOKEN', ''),

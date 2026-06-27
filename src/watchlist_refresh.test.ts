@@ -3,7 +3,7 @@ import type { MonitoringInput } from './services/watchlist_engine';
 
 process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
 process.env.DEEPSEEK_MODEL = 'test-model';
-process.env.EXA_API_KEY = 'test-exa-key';
+process.env.BRAVE_SEARCH_API_KEY = 'test-brave-key';
 
 const watchlistRefreshModulePromise = import('./watchlist_refresh');
 
