@@ -214,8 +214,8 @@ Current Polymarket price: {market_prob_pct:.0f}%
 Pythia prediction: {pythia_prob_pct:.0f}%
 Bet direction: {bet_direction}
 Edge: {edge_pct:.1f}%
-Existing reasoning: {signal.get('best_reasoning', 'N/A')[:200]}
-Key risk: {signal.get('dexter_key_risk', 'N/A')[:100]}
+Existing reasoning: {(signal.get('best_reasoning') or 'N/A')[:200]}
+Key risk: {(signal.get('dexter_key_risk') or 'N/A')[:100]}
 
 Напиши пост для Telegram-канала:
 - 2-3 предложения обоснования (макс 250 символов)
@@ -246,8 +246,8 @@ Key risk: {signal.get('dexter_key_risk', 'N/A')[:100]}
         log_message(f"LLM API error: {e}", "ERROR")
         # Fallback to template
         return {
-            'reasoning': signal.get('best_reasoning', 'Анализ рынка указывает на расхождение с crowd probability.')[:250],
-            'key_risk': signal.get('dexter_key_risk', 'Неожиданные события могут изменить исход.')[:80],
+            'reasoning': (signal.get('best_reasoning') or 'Анализ рынка указывает на расхождение с crowd probability.')[:250],
+            'key_risk': (signal.get('dexter_key_risk') or 'Неожиданные события могут изменить исход.')[:80],
             'raw_output': f"ERROR: {e}",
             'cost': 0.0
         }
