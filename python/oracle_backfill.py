@@ -163,7 +163,7 @@ def format_backfill_post(prediction: Dict[str, Any], prophecy: Dict[str, Any]) -
     # Actual outcome
     outcome_text = 'YES' if prediction['outcome'] == 1 else 'NO'
     
-    post = f"""📊 [HISTORIC {date_str}] {result_emoji} {result}
+    post = f"""📊 [HISTORIC {date_str}] {result_emoji} {result_text}
 
 {category_emoji} {prediction['question']}
 
