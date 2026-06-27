@@ -107,8 +107,8 @@ def filter_markets(signals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     filtered = []
     
     for signal in signals:
-        # Calculate edge
-        pythia_prob = signal['best_p'] / 100.0 if signal['best_p'] > 1 else signal['best_p']
+        # Calculate edge — best_p is always percentage (0-100), convert to decimal
+        pythia_prob = signal['best_p'] / 100.0
         market_prob = signal['market_price'] / 100.0 if signal['market_price'] > 1 else signal['market_price']
         edge = abs(pythia_prob - market_prob)
         
