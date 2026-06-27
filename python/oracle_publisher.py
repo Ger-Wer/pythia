@@ -77,16 +77,16 @@ def get_recent_signals(hours: int = 24) -> List[Dict[str, Any]]:
             volume,
             end_date,
             market_price,
-            dexter_p,
+            COALESCE(dexter_p, naked_p) AS best_p,
             dexter_confidence,
-            dexter_reasoning,
+            COALESCE(dexter_reasoning, naked_reasoning) AS best_reasoning,
             dexter_key_risk,
             forecast_timestamp
         FROM predictions
         WHERE forecast_timestamp >= ?
           AND is_valid = 1
           AND outcome IS NULL
-          AND dexter_p IS NOT NULL
+          AND (dexter_p IS NOT NULL OR naked_p IS NOT NULL)
         ORDER BY forecast_timestamp DESC
     ''', (cutoff,))
     
@@ -108,7 +108,7 @@ def filter_markets(signals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     
     for signal in signals:
         # Calculate edge
-        pythia_prob = signal['dexter_p'] / 100.0 if signal['dexter_p'] > 1 else signal['dexter_p']
+        pythia_prob = signal['best_p'] / 100.0 if signal['best_p'] > 1 else signal['best_p']
         market_prob = signal['market_price'] / 100.0 if signal['market_price'] > 1 else signal['market_price']
         edge = abs(pythia_prob - market_prob)
         
@@ -214,7 +214,7 @@ Current Polymarket price: {market_prob_pct:.0f}%
 Pythia prediction: {pythia_prob_pct:.0f}%
 Bet direction: {bet_direction}
 Edge: {edge_pct:.1f}%
-Existing reasoning: {signal.get('dexter_reasoning', 'N/A')[:200]}
+Existing reasoning: {signal.get('best_reasoning', 'N/A')[:200]}
 Key risk: {signal.get('dexter_key_risk', 'N/A')[:100]}
 
 Напиши пост для Telegram-канала:
@@ -246,7 +246,7 @@ Key risk: {signal.get('dexter_key_risk', 'N/A')[:100]}
         log_message(f"LLM API error: {e}", "ERROR")
         # Fallback to template
         return {
-            'reasoning': signal.get('dexter_reasoning', 'Анализ рынка указывает на расхождение с crowd probability.')[:250],
+            'reasoning': signal.get('best_reasoning', 'Анализ рынка указывает на расхождение с crowd probability.')[:250],
             'key_risk': signal.get('dexter_key_risk', 'Неожиданные события могут изменить исход.')[:80],
             'raw_output': f"ERROR: {e}",
             'cost': 0.0
