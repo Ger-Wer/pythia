@@ -32,15 +32,24 @@ def categorize_market(question: str) -> str:
         'satoshi', 'mining', 'hash rate', 'halving'
     ]
     
-    # Sports keywords
-    sports_keywords = [
-        'nba', 'nfl', 'premier league', 'champions league', 'world cup',
-        'olympics', 'championship', 'finals', 'playoff', 'season',
-        'tournament', 'match', 'game', 'team', 'player', 'coach',
-        'score', 'win', 'lose', 'trophy', 'medal', 'super bowl',
-        'fifa', 'uefa', 'mlb', 'nhl', 'formula 1', 'f1', 'tennis',
-        'golf', 'boxing', 'mma', 'ufc'
-    ]
+    # Sports keywords (with subcategory detection)
+    sports_nba = ['nba', 'lakers', 'celtics', 'warriors', 'knicks', 'bulls', 'heat',
+                  'thunder', 'nuggets', 'clippers', 'playoff', 'finals mvp']
+    sports_nfl = ['nfl', 'super bowl', 'chiefs', 'eagles', 'cowboys', 'patriots',
+                  'ravens', '49ers', 'bills', 'quarterback', 'touchdown']
+    sports_soccer = ['premier league', 'champions league', 'world cup', 'la liga',
+                     'serie a', 'bundesliga', 'manchester', 'real madrid', 'barcelona',
+                     'liverpool', 'arsenal', 'chelsea', 'bayern', 'psg', 'fifa', 'uefa',
+                     'efa cup', 'euro 2026', 'copa america']
+    sports_tennis = ['tennis', 'wimbledon', 'us open', 'french open', 'australian open',
+                     'atp', 'wta', 'djokovic', 'alcaraz', 'sinner', 'swiatek']
+    sports_mma = ['ufc', 'mma', 'boxing', 'fight', 'knockout', 'title fight']
+    sports_cricket = ['cricket', 'ipl', 'test match', 't20', 'world cup cricket']
+    sports_esports = ['esports', 'league of legends', 'dota', 'csgo', 'valorant',
+                      'counter-strike', 'major tournament']
+    
+    sports_all = (sports_nba + sports_nfl + sports_soccer + sports_tennis +
+                  sports_mma + sports_cricket + sports_esports)
     
     # Pop culture keywords
     pop_culture_keywords = [
@@ -66,7 +75,14 @@ def categorize_market(question: str) -> str:
     scores = {
         'politics': count_matches(politics_keywords),
         'crypto': count_matches(crypto_keywords),
-        'sports': count_matches(sports_keywords),
+        'sports_nba': count_matches(sports_nba),
+        'sports_nfl': count_matches(sports_nfl),
+        'sports_soccer': count_matches(sports_soccer),
+        'sports_tennis': count_matches(sports_tennis),
+        'sports_mma': count_matches(sports_mma),
+        'sports_cricket': count_matches(sports_cricket),
+        'sports_esports': count_matches(sports_esports),
+        'sports': count_matches(sports_all) - count_matches(sports_nba) - count_matches(sports_nfl) - count_matches(sports_soccer) - count_matches(sports_tennis) - count_matches(sports_mma) - count_matches(sports_cricket) - count_matches(sports_esports),
         'pop_culture': count_matches(pop_culture_keywords),
         'business': count_matches(business_keywords)
     }
@@ -85,28 +101,39 @@ def categorize_market(question: str) -> str:
 
 def should_exclude_category(category: str, exclude_list: str = "") -> bool:
     """
-    Проверяет нужно ли исключить категорию из публикации.
-    
-    Args:
-        category: категория рынка
-        exclude_list: comma-separated список исключений (из env var)
-    
-    Returns:
-        True если категорию нужно исключить
+    Check if a category should be excluded from publishing.
+    Supports sports subcategories: excluding 'sports' also excludes 'sports_nba', etc.
     """
     if not exclude_list:
         return False
     
     excluded = [cat.strip().lower() for cat in exclude_list.split(',')]
-    return category.lower() in excluded
+    category_lower = category.lower()
+    
+    # Direct match
+    if category_lower in excluded:
+        return True
+    
+    # If 'sports' is excluded, exclude all sports_* subcategories
+    if 'sports' in excluded and category_lower.startswith('sports_'):
+        return True
+    
+    return False
 
 
 def get_category_emoji(category: str) -> str:
-    """Возвращает emoji для категории."""
+    """Returns emoji for category (with sports subcategories)."""
     emoji_map = {
         'politics': '🗳️',
         'crypto': '₿',
         'sports': '⚽',
+        'sports_nba': '🏀',
+        'sports_nfl': '🏈',
+        'sports_soccer': '⚽',
+        'sports_tennis': '🎾',
+        'sports_mma': '🥊',
+        'sports_cricket': '🏏',
+        'sports_esports': '🎮',
         'pop_culture': '🎬',
         'business': '💼',
         'other': '📊'
@@ -115,18 +142,22 @@ def get_category_emoji(category: str) -> str:
 
 
 if __name__ == '__main__':
-    # Test cases
+    # Test cases with sports subcategories
     test_cases = [
         "Will Bitcoin exceed $120k by July 31?",
         "Will Trump win the 2024 presidential election?",
         "Will Manchester City win the Premier League?",
+        "Will the Lakers win the NBA Finals?",
+        "Will the Chiefs win the Super Bowl?",
+        "Will Djokovic win Wimbledon?",
         "Will Taylor Swift release a new album in 2024?",
         "Will Tesla stock hit $300?",
-        "Will it rain tomorrow in New York?"
+        "Will Israel Adesanya win the UFC title fight?",
+        "Will Mumbai Indians win the IPL?",
     ]
     
     print("Market Categorization Test:\n")
     for question in test_cases:
         category = categorize_market(question)
         emoji = get_category_emoji(category)
-        print(f"{emoji} {category:12s} | {question}")
+        print(f"{emoji} {category:16s} | {question}")

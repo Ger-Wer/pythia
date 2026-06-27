@@ -163,24 +163,22 @@ def format_backfill_post(prediction: Dict[str, Any], prophecy: Dict[str, Any]) -
     # Actual outcome
     outcome_text = 'YES' if prediction['outcome'] == 1 else 'NO'
     
-    post = f"""🔮 [АРХИВ {date_str}] {result_emoji} {result_text}
+    post = f"""📊 [HISTORIC {date_str}] {result_emoji} {result}
 
 {category_emoji} {prediction['question']}
 
-Polymarket: {market_prob_pct:.0f}% → Пифия: {pythia_prob_pct:.0f}% {arrow}
+Polymarket: {market_prob_pct:.0f}¢ → Pythia: {pythia_prob_pct:.0f}¢ {arrow}
 
 {prophecy['reasoning']}
 
-⚠️ Риск: {prophecy['key_risk']}
+⚠️ Risk: {prophecy['key_risk']}
 
-Ставка: {bet_direction}
-Уверенность: {confidence_stars}
-Исход: {outcome_text}
-Brier: {prediction['brier_dexter']:.3f}
+Direction: {bet_direction}
+Outcome: {outcome_text} | Brier: {prediction['brier_dexter']:.3f}
 
-📊 Рынок закрыт и разрешён
+📊 Market closed & resolved
 
-#pythia #archive"""
+#polymarket #pythiacapital #historic"""
 
     return post
 
@@ -287,25 +285,25 @@ def save_backfill_record(prediction: Dict[str, Any], prophecy: Dict[str, Any], t
 
 def publish_intro_post():
     """
-    Публикует вступительный пост в канал после backfill.
+    Publish intro post after backfill (English, Pythia Capital style).
     """
-    intro_text = """🔮 PYTHIA ORACLE
+    intro_text = """📊 PYTHIA CAPITAL
 
-AI-оракул prediction markets на базе 2-летней research системы.
+Prediction market research desk.
+Daily calls with transparent virtual portfolio.
 
-Что ты увидишь здесь:
-• Ежедневные прогнозы по Polymarket с обоснованием
-• Публичный трекер точности (нельзя скрыть ошибки)
-• Еженедельные отчёты performance
+What you'll see here:
+• 5 daily picks with edge analysis
+• Virtual portfolio ROI ($1,000 starting AUM)
+• Weekly performance reports
+• Full track record — wins AND losses
 
-📜 Архив прогнозов апрель-июнь 2026 ниже ↓
-Текущая точность: 67% (274 resolved predictions)
+📜 Historic archive (Apr-Jun 2026) below ↓
+Live calls start after archive.
 
-Первое live пророчество: скоро
+⚠️ Not financial advice. Prediction markets carry risk of loss.
 
-⚠️ Not financial advice. DYOR.
-
-#polymarket #pythia #prediction"""
+#polymarket #pythiacapital"""
 
     if not ORACLE_BOT_TOKEN or not ORACLE_CHANNEL_ID:
         log_message("Telegram not configured", "WARN")

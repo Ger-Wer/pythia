@@ -41,6 +41,7 @@ MIN_DAYS_UNTIL_CLOSE = int(os.getenv("ORACLE_MIN_DAYS_UNTIL_CLOSE", "3"))
 MAX_DAYS_UNTIL_CLOSE = int(os.getenv("ORACLE_MAX_DAYS_UNTIL_CLOSE", "45"))
 EXCLUDE_CATEGORIES = os.getenv("ORACLE_EXCLUDE_CATEGORIES", "")
 MAX_LLM_COST_PER_DAY = float(os.getenv("ORACLE_MAX_LLM_COST_PER_DAY", "5.00"))
+ORACLE_PICKS_PER_PUBLISH = int(os.getenv("ORACLE_PICKS_PER_PUBLISH", "5"))
 
 
 def log_message(message: str, level: str = "INFO"):
@@ -164,47 +165,61 @@ def filter_markets(signals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return filtered
 
 
-def select_top_signal(signals: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def select_top_signals(signals: List[Dict[str, Any]], n: int = 5) -> List[Dict[str, Any]]:
     """
-    Выбирает лучший signal для публикации.
+    Select top-N signals for publication.
     
-    Scoring: edge * confidence_weight
+    Scoring: edge * confidence_weight * volume_log_weight
     """
     if not signals:
-        return None
+        return []
     
     for signal in signals:
-        # Confidence weight: higher for stronger predictions
         pythia_prob = signal['pythia_prob']
         confidence_weight = max(pythia_prob, 1 - pythia_prob)
-        
-        # Score = edge * confidence
-        signal['score'] = signal['edge'] * confidence_weight
+        volume = signal.get('volume') or 10_000
+        volume_log_weight = min(1.0, max(0.1, (volume / 1_000_000)))
+        signal['score'] = signal['edge'] * confidence_weight * volume_log_weight
     
-    # Sort by score descending
     signals.sort(key=lambda x: x['score'], reverse=True)
+    top = signals[:n]
     
-    top = signals[0]
-    log_message(f"Top signal: {top['question'][:50]}... | Edge: {top['edge']:.3f} | Score: {top['score']:.3f}")
+    log_message(f"Selected {len(top)} top signals (of {len(signals)} filtered)")
+    for s in top:
+        log_message(f"  - {s['question'][:50]}... | Edge: {s['edge']:.3f} | Score: {s['score']:.3f}")
     
     return top
 
 
 GAMMA_API = "https://gamma-api.polymarket.com"
+_slug_cache: Dict[str, str] = {}
+_slug_cache_time: Optional[datetime] = None
+_SLUG_CACHE_TTL = timedelta(hours=1)
+
+
+def _get_all_event_slugs() -> Dict[str, str]:
+    """Fetch all event slugs once, cache for 1 hour."""
+    global _slug_cache, _slug_cache_time
+    if _slug_cache and _slug_cache_time and (datetime.now(timezone.utc) - _slug_cache_time) < _SLUG_CACHE_TTL:
+        return _slug_cache
+    try:
+        resp = requests.get(f"{GAMMA_API}/events", params={"active": "true", "closed": "false", "limit": 500}, timeout=15)
+        if resp.ok:
+            _slug_cache = {}
+            for event in resp.json():
+                slug = event.get("slug", "")
+                for m in event.get("markets", []):
+                    _slug_cache[str(m.get("id"))] = slug
+            _slug_cache_time = datetime.now(timezone.utc)
+            log_message(f"Cached {len(_slug_cache)} event slugs")
+    except Exception as e:
+        log_message(f"Slug cache fetch failed: {e}", "WARN")
+    return _slug_cache
+
 
 def lookup_event_slug(market_id: str) -> str:
-    """Look up the event slug for a market from Gamma API."""
-    try:
-        import requests as _requests
-        resp = _requests.get(f"{GAMMA_API}/events", params={"active": "true", "closed": "false", "limit": 200}, timeout=10)
-        if resp.ok:
-            for event in resp.json():
-                for m in event.get("markets", []):
-                    if str(m.get("id")) == str(market_id):
-                        return event.get("slug", "")
-    except Exception:
-        pass
-    return ""
+    """Look up the event slug for a domain from cached Gamma API data."""
+    return _get_all_event_slugs().get(str(market_id), "")
 
 
 def generate_prophecy_llm(signal: Dict[str, Any]) -> Dict[str, Any]:
@@ -224,28 +239,28 @@ def generate_prophecy_llm(signal: Dict[str, Any]) -> Dict[str, Any]:
     
     arrow = '↑' if signal['pythia_prob'] > signal['market_prob'] else '↓'
     
-    prompt = f"""Ты — Пифия, древний оракул prediction markets. Твой стиль: кратко, загадочно, но с конкретным data-driven обоснованием. Пиши на русском.
+    prompt = f"""You are Pythia Capital, a prediction market research desk. Your style: concise, data-driven, confident but honest. Write in English.
 
 Market: {signal['question']}
-Current Polymarket price: {market_prob_pct:.0f}%
-Pythia prediction: {pythia_prob_pct:.0f}%
-Bet direction: {bet_direction}
-Edge: {edge_pct:.1f}%
+Current Polymarket price: {market_prob_pct:.0f}¢
+Pythia prediction: {pythia_prob_pct:.0f}¢
+Speculate direction: {bet_direction}
+Edge: {edge_pct:.1f}pp
 Existing reasoning: {(signal.get('best_reasoning') or 'N/A')[:200]}
 Key risk: {(signal.get('dexter_key_risk') or 'N/A')[:100]}
 
-Напиши пост для Telegram-канала:
-- 2-3 предложения обоснования (макс 250 символов)
-- Используй конкретные факты из existing reasoning
-- Укажи ключевой риск коротко (1 предложение, макс 80 символов)
-- Тон: уверенный, но честный (признаём uncertainty)
-- НЕ используй слова "я думаю", "возможно" — ты оракул, говоришь утверждениями
-- НЕ используй восклицательные знаки и caps lock
+Write a Telegram post section:
+- 2-3 sentences of reasoning (max 250 chars)
+- Use concrete facts from existing reasoning
+- State the key risk briefly (1 sentence, max 80 chars)
+- Tone: confident quant desk analyst, not mystical
+- DO NOT use "I think", "maybe" — you are an analyst, speak in statements
+- DO NOT use exclamation marks or caps lock
 
-Формат JSON:
+JSON format:
 {{
-  "reasoning": "2-3 предложения обоснования",
-  "key_risk": "Главный риск одним предложением"
+  "reasoning": "2-3 sentences of analysis",
+  "key_risk": "Main risk in one sentence"
 }}"""
 
     # Call LLM API
@@ -263,8 +278,8 @@ Key risk: {(signal.get('dexter_key_risk') or 'N/A')[:100]}
         log_message(f"LLM API error: {e}", "ERROR")
         # Fallback to template
         return {
-            'reasoning': (signal.get('best_reasoning') or 'Анализ рынка указывает на расхождение с crowd probability.')[:250],
-            'key_risk': (signal.get('dexter_key_risk') or 'Неожиданные события могут изменить исход.')[:80],
+            'reasoning': (signal.get('best_reasoning') or 'Market analysis indicates divergence from crowd probability.')[:250],
+            'key_risk': (signal.get('dexter_key_risk') or 'Unexpected events may shift the outcome.')[:80],
             'raw_output': f"ERROR: {e}",
             'cost': 0.0
         }
@@ -303,7 +318,7 @@ def call_mistral_api(prompt: str) -> Dict[str, Any]:
         parsed = json.loads(content)
     except json.JSONDecodeError:
         # Fallback: extract text
-        parsed = {'reasoning': content[:250], 'key_risk': 'Неожиданные события.'}
+        parsed = {'reasoning': content[:250], 'key_risk': 'Unexpected events may shift outcome.'}
     
     # Estimate cost (Mistral pricing: ~$0.001/1K tokens)
     total_tokens = data.get('usage', {}).get('total_tokens', 500)
@@ -348,7 +363,7 @@ def call_deepseek_api(prompt: str) -> Dict[str, Any]:
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        parsed = {'reasoning': content[:250], 'key_risk': 'Риск неожиданных событий.'}
+        parsed = {'reasoning': content[:250], 'key_risk': 'Unexpected events.'}
     
     # Estimate cost (DeepSeek pricing: ~$0.0003/1K tokens)
     total_tokens = data.get('usage', {}).get('total_tokens', 500)
@@ -362,15 +377,14 @@ def call_deepseek_api(prompt: str) -> Dict[str, Any]:
     }
 
 
-def format_telegram_post(signal: Dict[str, Any], prophecy: Dict[str, Any], accuracy_30d: float) -> str:
+def format_telegram_post(signal: Dict[str, Any], prophecy: Dict[str, Any], accuracy_30d: Optional[float]) -> str:
     """
-    Форматирует итоговый Telegram пост.
+    Format the Pythia Capital desk call post (English, quant-desk style).
     """
     pythia_prob_pct = signal['pythia_prob'] * 100
     market_prob_pct = signal['market_prob'] * 100
+    edge_pp = signal['edge'] * 100
     bet_direction = 'YES' if signal['pythia_prob'] > 0.5 else 'NO'
-    
-    arrow = '↑' if signal['pythia_prob'] > signal['market_prob'] else '↓'
     
     # Confidence stars (1-5)
     confidence_level = min(5, max(1, int(max(signal['pythia_prob'], 1 - signal['pythia_prob']) * 6)))
@@ -379,31 +393,39 @@ def format_telegram_post(signal: Dict[str, Any], prophecy: Dict[str, Any], accur
     # Category emoji
     category_emoji = get_category_emoji(signal['category'])
     
-    # Polymarket link — look up event slug for correct URL
+    # Polymarket link
     event_slug = lookup_event_slug(signal['market_id'])
     if event_slug:
         polymarket_link = f"https://polymarket.com/event/{event_slug}"
     else:
         polymarket_link = f"https://polymarket.com/event/{signal['market_id']}"
     
-    post = f"""🔮 ПИФИЯ ГОВОРИТ
+    # Accuracy line — only show if we have real data
+    if accuracy_30d is not None:
+        accuracy_line = f"📊 30d accuracy: {accuracy_30d:.0f}%"
+    else:
+        accuracy_line = "📊 Track record: building..."
+    
+    post = f"""📊 PYTHIA CAPITAL — DESK CALL
 
 {category_emoji} {signal['question']}
 
-Polymarket: {market_prob_pct:.0f}% → Пифия: {pythia_prob_pct:.0f}% {arrow}
+Polymarket: {market_prob_pct:.0f}¢ → Pythia: {pythia_prob_pct:.0f}¢
+Edge: +{edge_pp:.0f}pp | Direction: {bet_direction}
 
 {prophecy['reasoning']}
 
-⚠️ Риск: {prophecy['key_risk']}
+⚠️ Risk: {prophecy['key_risk']}
 
-Ставка: {bet_direction}
-Уверенность: {confidence_stars} ({pythia_prob_pct:.0f}%)
-Срок рынка: {signal['days_until_close']} дней
+Confidence: {confidence_stars}
+Closes in: {signal['days_until_close']}d | Volume: ${signal['volume']:,.0f}
 
-⚡️ [Сделать ставку на Polymarket]({polymarket_link})
-📊 Точность Пифии за 30 дней: {accuracy_30d:.1f}%
+⚡️ {polymarket_link}
+{accuracy_line}
 
-#polymarket #pythia #prediction"""
+⚠️ Not financial advice. Prediction markets carry risk of loss.
+
+#polymarket #pythiacapital"""
 
     return post
 
@@ -501,8 +523,8 @@ def save_prophecy_record(signal: Dict[str, Any], prophecy: Dict[str, Any], teleg
     return prophecy_id
 
 
-def get_accuracy_30d() -> float:
-    """Вычисляет win rate за последние 30 дней."""
+def get_accuracy_30d() -> Optional[float]:
+    """Compute win rate over last 30 days. Returns None if no data (no fabrication)."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -518,13 +540,10 @@ def get_accuracy_30d() -> float:
     ''', (cutoff,))
     
     row = cursor.fetchone()
-    conn.close()
+    total, wins = row
     
-    if row[0] == 0:
+    if not total or total == 0:
         # Fallback to predictions table if no oracle_prophecies yet
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
         cursor.execute('''
             SELECT 
                 COUNT(*) as total,
@@ -536,20 +555,36 @@ def get_accuracy_30d() -> float:
             WHERE resolved_at >= ?
               AND outcome IS NOT NULL
         ''', (cutoff,))
-        
         row = cursor.fetchone()
-        conn.close()
+        total, wins = row
     
-    total, wins = row
-    return (wins / total * 100) if total > 0 else 67.0  # Default to overall
+    conn.close()
+    
+    if not total or total == 0:
+        return None  # No fabrication — return None when no data
+    return (wins / total * 100) if wins else 0.0
+
+
+def get_published_market_ids_today() -> set:
+    """Get market IDs already published today to avoid duplicates."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    today_start = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cursor.execute('''
+        SELECT market_id FROM oracle_prophecies
+        WHERE published_at >= ? AND is_backfilled = 0
+    ''', (today_start,))
+    ids = {row[0] for row in cursor.fetchall()}
+    conn.close()
+    return ids
 
 
 def publish_daily_prophecy(dry_run: bool = False):
     """
-    Main function: публикует ежедневное пророчество.
+    Main function: publishes daily desk calls (multi-item).
     """
     log_message("=" * 80)
-    log_message("ORACLE PUBLISHER - Daily Prophecy")
+    log_message("PYTHIA CAPITAL PUBLISHER - Daily Desk Calls")
     log_message("=" * 80)
     
     # 1. Get recent signals
@@ -566,38 +601,50 @@ def publish_daily_prophecy(dry_run: bool = False):
         log_message("No suitable signals after filtering, skipping publication", "WARN")
         return
     
-    # 3. Select top signal
-    top_signal = select_top_signal(filtered)
+    # 3. Deduplicate against today's published
+    published_today = get_published_market_ids_today()
+    fresh = [s for s in filtered if s['market_id'] not in published_today]
+    if len(fresh) < len(filtered):
+        log_message(f"Dedup: {len(filtered) - len(fresh)} already published today, {len(fresh)} fresh")
     
-    if not top_signal:
-        log_message("No top signal selected, skipping publication", "WARN")
+    if not fresh:
+        log_message("All suitable signals already published today, skipping", "WARN")
         return
     
-    # 4. Generate prophecy via LLM
-    prophecy = generate_prophecy_llm(top_signal)
-    log_message(f"LLM cost: ${prophecy['cost']:.4f}")
+    # 4. Select top-N signals
+    top_signals = select_top_signals(fresh, n=ORACLE_PICKS_PER_PUBLISH)
     
-    # 5. Get current accuracy
+    # 5. Get accuracy
     accuracy_30d = get_accuracy_30d()
-    log_message(f"Current 30d accuracy: {accuracy_30d:.1f}%")
+    log_message(f"30d accuracy: {accuracy_30d}")
     
-    # 6. Format telegram post
-    post_text = format_telegram_post(top_signal, prophecy, accuracy_30d)
+    # 6. Publish each signal as separate post
+    published = 0
+    for signal in top_signals:
+        prophecy = generate_prophecy_llm(signal)
+        log_message(f"LLM cost: ${prophecy['cost']:.4f}")
+        
+        post_text = format_telegram_post(signal, prophecy, accuracy_30d)
+        
+        if dry_run:
+            log_message("DRY RUN - would publish:", "INFO")
+            print("\n" + post_text + "\n")
+            telegram_message_id = None
+        else:
+            telegram_message_id = send_to_channel(post_text)
+        
+        if not dry_run or telegram_message_id:
+            save_prophecy_record(signal, prophecy, telegram_message_id)
+            published += 1
+        
+        # Rate limit: 2s between posts
+        if not dry_run and signal != top_signals[-1]:
+            import time
+            time.sleep(2)
     
-    # 7. Publish to channel
-    if dry_run:
-        log_message("DRY RUN - would publish:", "INFO")
-        print("\n" + post_text + "\n")
-        telegram_message_id = None
-    else:
-        telegram_message_id = send_to_channel(post_text)
-    
-    # 8. Save record
-    if not dry_run or telegram_message_id:
-        save_prophecy_record(top_signal, prophecy, telegram_message_id)
-    
+    log_message(f"Published {published}/{len(top_signals)} desk calls")
     log_message("=" * 80)
-    log_message("ORACLE PUBLISHER - Complete")
+    log_message("PYTHIA CAPITAL PUBLISHER - Complete")
     log_message("=" * 80)
 
 
