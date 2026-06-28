@@ -36,7 +36,7 @@ const isUsingOpenRouter = !process.env.DEEPSEEK_API_KEY && Boolean(process.env.O
 
 export const CONFIG = {
   deepseek: {
-    apiKey: requireOneOf(['DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY']),
+    apiKey: process.env[isUsingOpenRouter ? 'OPENROUTER_API_KEY' : 'DEEPSEEK_API_KEY'] || '',
     baseUrl: isUsingOpenRouter
       ? env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
       : env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'),
@@ -80,6 +80,3 @@ export const CONFIG = {
 } as const;
 
 export type AppConfig = typeof CONFIG;
-
-// Force early validation of the primary API key at module load.
-requireEnv(isUsingOpenRouter ? 'OPENROUTER_API_KEY' : 'DEEPSEEK_API_KEY');

@@ -158,51 +158,23 @@ export async function predictDualLLM(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<DualPrediction | null> {
-  const [dsResult, mistralResult] = await Promise.allSettled([
-    callDeepSeek(market, researchBrief),
-    callMistral(market, researchBrief),
-  ]);
+  // Forecast: Mistral only (free tier). DeepSeek V4 Pro reserved for oracle prophecy.
+  const mistralResult = await callMistral(market, researchBrief);
 
-  const ds = dsResult.status === 'fulfilled' ? dsResult.value : null;
-  const mistral = mistralResult.status === 'fulfilled' ? mistralResult.value : null;
-
-  if (!ds && !mistral) {
+  if (!mistralResult) {
     return null;
   }
 
-  const ds_p = ds?.probability ?? 0;
-  const mistral_p = mistral?.probability ?? 0;
-
-  let ensemble_p: number;
-  let disagreement: number;
-  let confidence: 'low' | 'medium' | 'high';
-
-  if (ds && mistral) {
-    const w_ds = CONFIG.ensemble.weightDeepseek;
-    const w_mistral = CONFIG.ensemble.weightMistral;
-    const total_w = w_ds + w_mistral;
-    ensemble_p = (ds_p * w_ds + mistral_p * w_mistral) / total_w;
-    disagreement = Math.abs(ds_p - mistral_p) / 100;
-    const threshold = CONFIG.ensemble.disagreementThreshold;
-    confidence = disagreement > threshold ? 'low' : disagreement > threshold / 2 ? 'medium' : 'high';
-  } else if (ds) {
-    ensemble_p = ds_p;
-    disagreement = 0;
-    confidence = 'medium';
-  } else {
-    ensemble_p = mistral_p;
-    disagreement = 0;
-    confidence = 'medium';
-  }
+  const mistral_p = mistralResult.probability;
 
   return {
-    deepseek_p: ds_p,
-    deepseek_reasoning: ds?.reasoning ?? '',
+    deepseek_p: 0,
+    deepseek_reasoning: '',
     mistral_p,
-    mistral_reasoning: mistral?.reasoning ?? '',
-    ensemble_p: Math.round(ensemble_p),
-    disagreement: Math.round(disagreement * 100) / 100,
-    confidence,
-    cost_usd: (ds?.cost ?? 0) + (mistral?.cost ?? 0),
+    mistral_reasoning: mistralResult.reasoning,
+    ensemble_p: mistral_p,
+    disagreement: 0,
+    confidence: 'medium',
+    cost_usd: mistralResult.cost,
   };
 }

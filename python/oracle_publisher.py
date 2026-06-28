@@ -30,9 +30,9 @@ ORACLE_BOT_TOKEN = os.getenv("ORACLE_TELEGRAM_BOT_TOKEN", "")
 ORACLE_CHANNEL_ID = os.getenv("ORACLE_TELEGRAM_CHANNEL_ID", "")
 ORACLE_CHANNEL_USERNAME = os.getenv("ORACLE_CHANNEL_USERNAME", "@pythia_oracle")
 
-# LLM configuration
-ORACLE_LLM_PROVIDER = os.getenv("ORACLE_LLM_PROVIDER", "mistral")
-ORACLE_LLM_MODEL = os.getenv("ORACLE_LLM_MODEL_REASONING", "mistral-small-2503")
+# LLM configuration — DeepSeek V4 Pro for prophecy (higher quality), Mistral for forecast (free)
+ORACLE_LLM_PROVIDER = os.getenv("ORACLE_LLM_PROVIDER", "deepseek")
+ORACLE_LLM_MODEL = os.getenv("ORACLE_LLM_MODEL_REASONING", "deepseek-v4-pro")
 
 # Publishing thresholds
 MIN_EDGE = float(os.getenv("ORACLE_MIN_EDGE", "0.08"))
@@ -370,9 +370,9 @@ def call_deepseek_api(prompt: str) -> Dict[str, Any]:
     except json.JSONDecodeError:
         parsed = {'reasoning': content[:250], 'key_risk': 'Unexpected events.'}
     
-    # Estimate cost (DeepSeek pricing: ~$0.0003/1K tokens)
+    # DeepSeek V4 Pro pricing: ~$0.0027/1K input, $0.007/1K output (est. $0.005/1K avg)
     total_tokens = data.get('usage', {}).get('total_tokens', 500)
-    cost = total_tokens / 1000 * 0.0003
+    cost = total_tokens / 1000 * 0.005
     
     return {
         'reasoning': parsed.get('reasoning', '')[:250],

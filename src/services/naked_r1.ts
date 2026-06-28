@@ -35,9 +35,14 @@ export async function nakedR1Predict(
   newsSnippets: string[],
   costTracker: CostTracker,
 ): Promise<NakedPrediction | null> {
+  // Forecast naked predict: Mistral only (free tier). DeepSeek V4 Pro reserved for oracle prophecy.
+  if (!CONFIG.mistral.apiKey) {
+    return null;
+  }
+
   const client = new OpenAI({
-    apiKey: CONFIG.deepseek.apiKey,
-    baseURL: CONFIG.deepseek.baseUrl,
+    apiKey: CONFIG.mistral.apiKey,
+    baseURL: CONFIG.mistral.baseUrl,
     timeout: 30_000,
     maxRetries: 2,
   });
@@ -68,7 +73,7 @@ ${newsSnippets.join('\n') || 'Свежих новостей не найдено.
 }`;
 
   const completion = await client.chat.completions.create({
-    model: CONFIG.deepseek.modelSynthesis,
+    model: CONFIG.mistral.smallModel,
     temperature: 0.2,
     messages: [
       {
@@ -89,7 +94,7 @@ ${newsSnippets.join('\n') || 'Свежих новостей не найдено.
   try {
     const parsed = responseSchema.parse(JSON.parse(jsonText));
     const cost = costTracker.trackCall(
-      CONFIG.deepseek.modelSynthesis,
+      CONFIG.mistral.smallModel,
       completion.usage?.prompt_tokens ?? 0,
       completion.usage?.completion_tokens ?? 0,
     );
