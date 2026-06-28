@@ -72,24 +72,24 @@ ANSWER STRICTLY JSON, NO TEXT OUTSIDE JSON:
 }`;
 }
 
-async function callDeepSeek(
+async function callLLM7(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<{ probability: number; reasoning: string; cost: number } | null> {
-  if (!CONFIG.deepseek.apiKey) {
+  if (!CONFIG.llm7.apiKey) {
     return null;
   }
 
   const client = new OpenAI({
-    apiKey: CONFIG.deepseek.apiKey,
-    baseURL: CONFIG.deepseek.baseUrl,
+    apiKey: CONFIG.llm7.apiKey,
+    baseURL: CONFIG.llm7.baseUrl,
     timeout: 30_000,
     maxRetries: 2,
   });
 
   const prompt = buildPredictionPrompt(market, researchBrief);
   const completion = await client.chat.completions.create({
-    model: CONFIG.deepseek.v4ProModel,
+    model: CONFIG.llm7.forecastModel,
     temperature: 0.2,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -102,7 +102,8 @@ async function callDeepSeek(
 
   try {
     const parsed = predictionSchema.parse(JSON.parse(jsonText));
-    const cost = (completion.usage?.total_tokens ?? 500) / 1000 * 0.0006;
+    // minimax-m2.7 pricing: $0.05 input, $0.13 output per 1M tokens
+    const cost = (completion.usage?.total_tokens ?? 500) / 1000 * 0.00009;
     return {
       probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
       reasoning: parsed.reasoning.trim(),
@@ -113,7 +114,7 @@ async function callDeepSeek(
   }
 }
 
-async function callMistral(
+async function callMistralFallback(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<{ probability: number; reasoning: string; cost: number } | null> {
@@ -158,23 +159,27 @@ export async function predictDualLLM(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<DualPrediction | null> {
-  // Forecast: Mistral only (free tier). DeepSeek V4 Pro reserved for oracle prophecy.
-  const mistralResult = await callMistral(market, researchBrief);
+  // Primary: LLM7 minimax-m2.7. Fallback: Mistral Small.
+  let result = await callLLM7(market, researchBrief);
+  let model = 'minimax-m2.7';
 
-  if (!mistralResult) {
-    return null;
+  if (!result) {
+    result = await callMistralFallback(market, researchBrief);
+    model = 'mistral-small';
   }
 
-  const mistral_p = mistralResult.probability;
+  if (!result) {
+    return null;
+  }
 
   return {
     deepseek_p: 0,
     deepseek_reasoning: '',
-    mistral_p,
-    mistral_reasoning: mistralResult.reasoning,
-    ensemble_p: mistral_p,
+    mistral_p: result.probability,
+    mistral_reasoning: `[${model}] ${result.reasoning}`,
+    ensemble_p: result.probability,
     disagreement: 0,
     confidence: 'medium',
-    cost_usd: mistralResult.cost,
+    cost_usd: result.cost,
   };
 }

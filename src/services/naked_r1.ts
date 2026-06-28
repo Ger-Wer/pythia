@@ -35,17 +35,13 @@ export async function nakedR1Predict(
   newsSnippets: string[],
   costTracker: CostTracker,
 ): Promise<NakedPrediction | null> {
-  // Forecast naked predict: Mistral only (free tier). DeepSeek V4 Pro reserved for oracle prophecy.
-  if (!CONFIG.mistral.apiKey) {
+  // Primary: LLM7 minimax-m2.7. Fallback: Mistral Small.
+  const hasLLM7 = Boolean(CONFIG.llm7.apiKey);
+  const hasMistral = Boolean(CONFIG.mistral.apiKey);
+
+  if (!hasLLM7 && !hasMistral) {
     return null;
   }
-
-  const client = new OpenAI({
-    apiKey: CONFIG.mistral.apiKey,
-    baseURL: CONFIG.mistral.baseUrl,
-    timeout: 30_000,
-    maxRetries: 2,
-  });
 
   const marketPrice = market.outcomePrices[0] * 100;
   const daysRemaining = Math.max(
@@ -72,40 +68,81 @@ ${newsSnippets.join('\n') || 'Свежих новостей не найдено.
   "reasoning": "1-2 предложения на русском"
 }`;
 
-  const completion = await client.chat.completions.create({
-    model: CONFIG.mistral.smallModel,
-    temperature: 0.2,
-    messages: [
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
-  });
+  // Try LLM7 first
+  if (hasLLM7) {
+    try {
+      const client = new OpenAI({
+        apiKey: CONFIG.llm7.apiKey,
+        baseURL: CONFIG.llm7.baseUrl,
+        timeout: 30_000,
+        maxRetries: 2,
+      });
 
-  const raw = completion.choices[0]?.message?.content ?? '';
-  const jsonText = extractJson(raw);
+      const completion = await client.chat.completions.create({
+        model: CONFIG.llm7.forecastModel,
+        temperature: 0.2,
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-  if (!jsonText) {
-    console.error(`Failed to extract Naked R1 JSON for market ${market.id}`);
-    return null;
+      const raw = completion.choices[0]?.message?.content ?? '';
+      const jsonText = extractJson(raw);
+
+      if (jsonText) {
+        const parsed = responseSchema.parse(JSON.parse(jsonText));
+        const cost = costTracker.trackCall(
+          CONFIG.llm7.forecastModel,
+          completion.usage?.prompt_tokens ?? 0,
+          completion.usage?.completion_tokens ?? 0,
+        );
+
+        return {
+          probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
+          reasoning: parsed.reasoning.trim(),
+          cost_usd: cost,
+        };
+      }
+    } catch (error) {
+      console.error(`LLM7 naked predict failed for market ${market.id}, trying Mistral:`, error);
+    }
   }
 
-  try {
-    const parsed = responseSchema.parse(JSON.parse(jsonText));
-    const cost = costTracker.trackCall(
-      CONFIG.mistral.smallModel,
-      completion.usage?.prompt_tokens ?? 0,
-      completion.usage?.completion_tokens ?? 0,
-    );
+  // Fallback to Mistral
+  if (hasMistral) {
+    try {
+      const client = new OpenAI({
+        apiKey: CONFIG.mistral.apiKey,
+        baseURL: CONFIG.mistral.baseUrl,
+        timeout: 30_000,
+        maxRetries: 2,
+      });
 
-    return {
-      probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
-      reasoning: parsed.reasoning.trim(),
-      cost_usd: cost,
-    };
-  } catch (error) {
-    console.error(`Failed to parse Naked R1 response for market ${market.id}:`, error);
-    return null;
+      const completion = await client.chat.completions.create({
+        model: CONFIG.mistral.smallModel,
+        temperature: 0.2,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? '';
+      const jsonText = extractJson(raw);
+
+      if (jsonText) {
+        const parsed = responseSchema.parse(JSON.parse(jsonText));
+        const cost = costTracker.trackCall(
+          CONFIG.mistral.smallModel,
+          completion.usage?.prompt_tokens ?? 0,
+          completion.usage?.completion_tokens ?? 0,
+        );
+
+        return {
+          probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
+          reasoning: parsed.reasoning.trim(),
+          cost_usd: cost,
+        };
+      }
+    } catch (error) {
+      console.error(`Failed to parse Naked R1 response for market ${market.id}:`, error);
+    }
   }
+
+  return null;
 }
