@@ -44,11 +44,6 @@ export const CONFIG = {
     modelSynthesis: env('MODEL_SYNTHESIS', 'deepseek-reasoner'),
     v4ProModel: env('DEEPSEEK_V4_PRO_MODEL', 'deepseek-v4-pro'),
   },
-  llm7: {
-    apiKey: env('LLM7_API_KEY', ''),
-    baseUrl: env('LLM7_BASE_URL', 'https://api.llm7.io/v1'),
-    forecastModel: env('LLM7_FORECAST_MODEL', 'minimax-m2.7'),
-  },
   mistral: {
     apiKey: env('MISTRAL_API_KEY', ''),
     baseUrl: env('MISTRAL_BASE_URL', 'https://api.mistral.ai/v1'),
