@@ -207,20 +207,6 @@ async function processMarket(
       llm_disagreement: dualPrediction?.disagreement ?? null,
     });
 
-    const synthesisEdge = synthesis ? Math.abs(synthesis.probability - marketPrice) : 0;
-    const nakedEdge = naked ? Math.abs(naked.probability - marketPrice) : 0;
-    if (synthesisEdge > 15 || nakedEdge > 15) {
-      await sendTelegramAlert(
-        [
-          '*Pythia Capital: strong market divergence*',
-          `Маркет: ${escapeMarkdown(market.question)}`,
-          `Рыночная цена: ${marketPrice.toFixed(1)}%`,
-          synthesis ? `Research\\+R1: ${synthesis.probability}%` : 'Research\\+R1: N/A',
-          naked ? `Naked R1: ${naked.probability}%` : 'Naked R1: N/A',
-        ].join('\n'),
-      );
-    }
-
     return { saved: true, hadError };
   } catch (error) {
     if (error instanceof CostLimitError) {
@@ -245,7 +231,7 @@ async function main(): Promise<void> {
 
   const markets = await selectMarkets();
   if (markets.length === 0) {
-    await sendTelegramAlert('*Pythia Capital: no markets selected today.*');
+    log('No markets selected today.');
     process.exit(1);
   }
 
@@ -259,12 +245,6 @@ async function main(): Promise<void> {
     log(
       `⚠️  Cost burn rate alert: Hourly=$${burnProjection.hourlyRate.toFixed(4)}, ` +
       `Projected daily=$${burnProjection.projectedDailyTotal.toFixed(4)} (limit=$${CONFIG.limits.dailyCostUsd})`,
-    );
-    await sendTelegramAlert(
-      `*Pythia Capital: cost burn warning*\n` +
-      `Hourly burn rate: $${burnProjection.hourlyRate.toFixed(4)}\n` +
-      `Projected daily: $${burnProjection.projectedDailyTotal.toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
-      `Risk of exceeding limit. Reducing markets.`,
     );
   }
 
@@ -284,9 +264,7 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       if (error instanceof CostLimitError) {
-        await sendTelegramAlert(
-          `*Pythia Capital: cost limit reached after ${processed} markets: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`,
-        );
+        log(`Cost limit reached after ${processed} markets: $${error.spent.toFixed(4)} / $${error.limit.toFixed(2)}`);
         process.exit(1);
       }
 
@@ -305,19 +283,15 @@ async function main(): Promise<void> {
   );
 
   if (finalBurnProjection.isWarning) {
-    await sendTelegramAlert(
-      `*Pythia: cost approaching limit*\n` +
-      `Spent today: $${(sessionCost + getTodayCost(db)).toFixed(4)} / $${CONFIG.limits.dailyCostUsd}\n` +
-      `Remaining today: ${Math.round(CONFIG.limits.dailyCostUsd - (sessionCost + getTodayCost(db))) * 100}% of limit`,
-    );
+    log(`Cost approaching limit: $${(sessionCost + getTodayCost(db)).toFixed(4)} / $${CONFIG.limits.dailyCostUsd}`);
   }
 
   if (errors > 0) {
-    await sendTelegramAlert(`*Pythia Capital: forecast run completed with ${errors} market-level errors.`);
+    log(`Forecast run completed with ${errors} market-level errors.`);
   }
 
   if (processed === 0) {
-    await sendTelegramAlert('*Pythia Capital: no markets were processed during the run.*');
+    log('No markets were processed during the run.');
     process.exit(1);
   }
 }
