@@ -72,49 +72,7 @@ ANSWER STRICTLY JSON, NO TEXT OUTSIDE JSON:
 }`;
 }
 
-async function callLLM7(
-  market: PolymarketMarket,
-  researchBrief: string,
-): Promise<{ probability: number; reasoning: string; cost: number } | null> {
-  if (!CONFIG.llm7.apiKey) {
-    return null;
-  }
-
-  const client = new OpenAI({
-    apiKey: CONFIG.llm7.apiKey,
-    baseURL: CONFIG.llm7.baseUrl,
-    timeout: 30_000,
-    maxRetries: 2,
-  });
-
-  const prompt = buildPredictionPrompt(market, researchBrief);
-  const completion = await client.chat.completions.create({
-    model: CONFIG.llm7.forecastModel,
-    temperature: 0.2,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const raw = completion.choices[0]?.message?.content ?? '';
-  const jsonText = extractJson(raw);
-  if (!jsonText) {
-    return null;
-  }
-
-  try {
-    const parsed = predictionSchema.parse(JSON.parse(jsonText));
-    // minimax-m2.7 pricing: $0.05 input, $0.13 output per 1M tokens
-    const cost = (completion.usage?.total_tokens ?? 500) / 1000 * 0.00009;
-    return {
-      probability: Math.max(0, Math.min(100, Math.round(parsed.probability))),
-      reasoning: parsed.reasoning.trim(),
-      cost,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function callMistralFallback(
+async function callMistral(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<{ probability: number; reasoning: string; cost: number } | null> {
@@ -159,14 +117,8 @@ export async function predictDualLLM(
   market: PolymarketMarket,
   researchBrief: string,
 ): Promise<DualPrediction | null> {
-  // Primary: LLM7 minimax-m2.7. Fallback: Mistral Small.
-  let result = await callLLM7(market, researchBrief);
-  let model = 'minimax-m2.7';
-
-  if (!result) {
-    result = await callMistralFallback(market, researchBrief);
-    model = 'mistral-small';
-  }
+  // Forecast: Mistral only (free). DeepSeek V4 Pro reserved for oracle prophecy.
+  const result = await callMistral(market, researchBrief);
 
   if (!result) {
     return null;
@@ -176,7 +128,7 @@ export async function predictDualLLM(
     deepseek_p: 0,
     deepseek_reasoning: '',
     mistral_p: result.probability,
-    mistral_reasoning: `[${model}] ${result.reasoning}`,
+    mistral_reasoning: result.reasoning,
     ensemble_p: result.probability,
     disagreement: 0,
     confidence: 'medium',
