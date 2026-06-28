@@ -85,8 +85,8 @@ def handle_command(chat_id: int, user_id: int, text: str):
     cmd = parts[0].lower()
     args = parts[1:]
 
-    if cmd == "/stats":
-        days = 30
+    if cmd in ("/stats", "/weekly"):
+        days = 7 if cmd == "/weekly" else 30
         if args:
             try:
                 days = int(args[0])
@@ -103,13 +103,22 @@ def handle_command(chat_id: int, user_id: int, text: str):
         except Exception as e:
             send_message(chat_id, f"❌ Error: {e}")
 
-    elif cmd == "/start":
+    elif cmd == "/help":
         send_message(chat_id,
-            "🤖 *Pythia Stats Bot*\n\n"
-            "Commands:\n"
+            "📊 *Pythia — LLM Stats*\n\n"
             "/stats — LLM comparison (30d)\n"
             "/stats 7 — last 7 days\n"
             "/stats 90 — last 90 days\n"
+            "/weekly — shortcut for /stats 7"
+        )
+
+    elif cmd == "/start":
+        send_message(chat_id,
+            "📊 *Pythia — LLM Stats*\n\n"
+            "/stats — LLM comparison (30d)\n"
+            "/stats 7 — last 7 days\n"
+            "/stats 90 — last 90 days\n"
+            "/weekly — shortcut for /stats 7"
         )
 
 
