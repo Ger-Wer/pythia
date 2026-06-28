@@ -8,31 +8,37 @@ Publishes daily data-driven calls to a public Telegram channel with a transparen
 ## What it does
 
 1. **Forecast pipeline** — scans active Polymarket markets, runs multi-search (Brave/SearXNG/DuckDuckGo), generates research briefs via LLM, produces probability estimates
-2. **Dual-LLM ensemble** — DeepSeek V4-Pro + Mistral Small in parallel, weighted ensemble with disagreement-based confidence
-3. **Virtual portfolio** — every published pick opens a virtual position with Kelly stake sizing, tracks ROI on resolution
-4. **Telegram channel** — 5 daily publishing slots, English quant-desk format, pinned portfolio summary
-5. **Score tracking** — automatic resolution detection, Brier score calculation, weekly scorecard
+2. **Forecast: Mistral Small** — free LLM for naked R1, synthesis, ensemble
+3. **Prophecy: DeepSeek V4 Pro** — paid LLM for final oracle picks (resolving old markets)
+4. **Virtual portfolio** — every published pick opens a virtual position with Kelly stake sizing, tracks ROI on resolution
+5. **Telegram channel** — 5 daily publishing slots, English quant-desk format, pinned portfolio summary
+6. **Score tracking** — automatic resolution detection, Brier score calculation, weekly scorecard
 
 ---
 
 ## Architecture
 
 ```
-Forecast Pipeline (TypeScript/Bun)
+Forecast Pipeline (TypeScript/Bun) — Mistral only (free)
 ├── market_selector.ts     — select active markets
 ├── research_runner.ts     — multi-search (Brave/SearXNG/DDG)
 ├── naked_r1.ts            — baseline probability estimate
-├── ensemble_predictor.ts  — dual-LLM (DeepSeek + Mistral)
+├── ensemble_predictor.ts  — weighted ensemble
 ├── synthesis.ts           — research + R1 synthesis
 └── main.ts                — orchestrates pipeline
 
-Oracle Layer (Python)
+Oracle Layer (Python) — DeepSeek V4 Pro
 ├── oracle_publisher.py    — selects top-N picks, formats & publishes
 ├── portfolio_manager.py   — Kelly sizing, ROI tracking, pinned message
 ├── oracle_score_updater.py— resolution tracking, position closing
 ├── oracle_scorecard.py    — weekly performance report
 ├── oracle_backfill.py     — historic archive creation
-└── market_categorizer.py  — sports subcategories (NBA, NFL, soccer, etc.)
+├── market_categorizer.py  — sports subcategories (NBA, NFL, soccer, etc.)
+├── llm_stats.py           — Brier score per LLM (internal)
+└── llm_stats_publisher.py — stats publisher (internal)
+
+Stats Bot (Python)
+├── telegram_stats_bot.py  — /stats, /weekly commands
 
 Infrastructure
 ├── Docker Compose         — scheduler, telegram bot, dashboard, searxng
@@ -52,8 +58,8 @@ Infrastructure
 ```bash
 cp .env.example .env
 # Edit .env with your keys:
-# - DEEPSEEK_API_KEY (required, for forecast pipeline)
-# - MISTRAL_API_KEY (required, for dual-LLM ensemble)
+# - MISTRAL_API_KEY (required, forecast pipeline — free)
+# - DEEPSEEK_API_KEY (required, oracle prophecy — paid)
 # - ORACLE_TELEGRAM_BOT_TOKEN (required, for channel publishing)
 # - ORACLE_TELEGRAM_CHANNEL_ID (required, channel ID)
 # - BRAVE_SEARCH_API_KEY (optional, free 2k req/month)
@@ -104,15 +110,12 @@ docker compose up -d --force-recreate
 
 ## LLM Configuration
 
-| Stage | Model | Cost (15 picks/day) |
-|-------|-------|---------------------|
-| Research brief | DeepSeek V4-Flash (`deepseek-chat`) | ~$0.19/mo |
-| Prediction A | DeepSeek V4-Pro (`deepseek-v4-pro`) | ~$0.59/mo |
-| Prediction B | Mistral Small 4 (`mistral-small-latest`) | ~$0.27/mo |
-| Post formatting | Mistral Small 4 | included |
-| **Total** | | **~$1.05/mo** |
+| Stage | Model | Cost |
+|-------|-------|------|
+| Forecast (naked R1, synthesis, ensemble) | Mistral Small (`mistral-small-latest`) | Free |
+| Oracle Prophecy | DeepSeek V4 Pro (`deepseek-v4-pro`) | ~$0.005/day |
 
-Ensemble weights: 60% DeepSeek + 40% Mistral (configurable via `ENSEMBLE_WEIGHT_*`).
+Forecast pipeline uses Mistral only (free tier). DeepSeek V4 Pro is reserved for oracle prophecy generation (resolving old markets). No operator alerts in forecast — channel is for prophecies only.
 
 ---
 
@@ -122,19 +125,22 @@ Ensemble weights: 60% DeepSeek + 40% Mistral (configurable via `ENSEMBLE_WEIGHT_
 pythia/
 ├── src/                    # TypeScript forecast pipeline
 │   ├── services/
-│   │   ├── ensemble_predictor.ts  # Dual-LLM ensemble
+│   │   ├── ensemble_predictor.ts  # Weighted ensemble
 │   │   ├── research_runner.ts      # Multi-search (Brave/SearXNG/DDG)
 │   │   ├── naked_r1.ts            # Baseline prediction
 │   │   └── db.ts                  # SQLite + PredictionRow
 │   ├── prompts/synthesis.ts       # Synthesis prompt
 │   └── main.ts                    # Pipeline orchestrator
 ├── python/                 # Oracle layer
-│   ├── oracle_publisher.py        # Pick selection & publishing
+│   ├── oracle_publisher.py        # Pick selection & publishing (DeepSeek V4 Pro)
 │   ├── portfolio_manager.py       # Kelly sizing & ROI
 │   ├── oracle_score_updater.py    # Resolution tracking
 │   ├── oracle_scorecard.py        # Weekly report
 │   ├── oracle_backfill.py         # Historic archive
-│   └── market_categorizer.py      # Sports subcategories
+│   ├── market_categorizer.py      # Sports subcategories
+│   ├── llm_stats.py               # Brier score per LLM (internal)
+│   ├── llm_stats_publisher.py     # Stats publisher (internal)
+│   └── telegram_stats_bot.py      # /stats, /weekly commands
 ├── dashboard/              # React operator dashboard
 ├── sql/migrations/         # Database migrations
 ├── searxng/                # SearXNG config
