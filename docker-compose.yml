@@ -99,3 +99,31 @@ networks:
   pythia_internal:
     name: pythia_internal
     driver: bridge
+
+  pythia-stats-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pythia:latest
+    container_name: pythia-stats-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      DB_PATH: /app/data/pythia.db
+      LOG_DIR: /app/logs
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: [stats-bot]
+    networks:
+      - pythia_internal
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: 3

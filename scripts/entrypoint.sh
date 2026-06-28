@@ -44,12 +44,25 @@ case "${1:-}" in
     /app/python/venv/bin/python python/oracle_scorecard.py 2>&1 | tee -a "$LOG_DIR/oracle_scorecard_${TODAY}.log"
     ;;
 
+  llm-stats)
+    cd /app
+    /app/python/venv/bin/python python/llm_stats.py --json 2>&1 | tee -a "$LOG_DIR/llm_stats_${TODAY}.log"
+    ;;
+  stats-bot)
+    cd /app
+    exec /app/python/venv/bin/python python/telegram_stats_bot.py
+    ;;
+
   oracle-backfill)
     cd /app
     # ONE-TIME command: backfill archive
     /app/python/venv/bin/python python/oracle_backfill.py --limit 25 --sleep 3 2>&1 | tee -a "$LOG_DIR/oracle_backfill_${TODAY}.log"
     ;;
 
+  llm-stats-publish)
+    cd /app
+    /app/python/venv/bin/python python/llm_stats_publisher.py 2>&1 | tee -a "$LOG_DIR/llm_stats_publish_${TODAY}.log"
+    ;;
   portfolio-update)
     cd /app
     /app/python/venv/bin/python python/portfolio_manager.py --update-pinned 2>&1 | tee -a "$LOG_DIR/portfolio_${TODAY}.log"
