@@ -1,5 +1,11 @@
 # Pythia Capital — Architecture
 
+> ⚠️ **DIRECTION REVISED (2026-07-01).** The project is pivoting away from the broad
+> LLM-driven signal channel described below to a narrow, quantitatively-grounded
+> macro/economic forecasting tracker with an on-chain-verifiable track record.
+> **Read [`docs/PYTHIA_V2_STRATEGY.md`](PYTHIA_V2_STRATEGY.md) first.** This document describes
+> v1 (Pythia Capital oracle channel), which is being decommissioned.
+
 ## Overview
 
 Pythia Capital is a prediction market research desk that publishes daily AI-generated calls on Polymarket markets to a public Telegram channel. Each call is tracked in a virtual portfolio with transparent ROI reporting.

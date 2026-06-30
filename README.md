@@ -1,5 +1,11 @@
 # Pythia Capital
 
+> ⚠️ **DIRECTION REVISED (2026-07-01).** The project is pivoting away from the broad
+> LLM-driven signal channel described below to a narrow, quantitatively-grounded
+> macro/economic forecasting tracker with an on-chain-verifiable track record.
+> **Read [`docs/PYTHIA_V2_STRATEGY.md`](docs/PYTHIA_V2_STRATEGY.md) first.** This document describes
+> v1 (Pythia Capital oracle channel), which is being decommissioned.
+
 **Prediction market research desk for Polymarket.**
 Publishes daily data-driven calls to a public Telegram channel with a transparent virtual portfolio.
 
