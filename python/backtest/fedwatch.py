@@ -8,6 +8,8 @@ Upgrade: integrate CME FedWatch official probabilities when available via API.
 from datetime import datetime
 from typing import Optional
 
+from python.backtest.fred_data import get_latest_fed_funds
+
 
 FOMC_MEETINGS_2026 = [
     "2026-01-28",
@@ -20,8 +22,12 @@ FOMC_MEETINGS_2026 = [
     "2026-12-16",
 ]
 
-FED_FUNDS_TARGET_CURRENT = 5.50
 BASIS_POINTS_PER_CUT = 0.25
+
+
+def get_current_rate() -> float:
+    rate = get_latest_fed_funds()
+    return rate if rate is not None else 3.63
 
 
 def meeting_index(date_str: str) -> int:
@@ -70,7 +76,8 @@ def days_to_meeting(meeting_date_str: str, from_date: datetime) -> int:
 
 if __name__ == "__main__":
     print("FedWatch calculator for FOMC 2026 meetings")
-    print(f"Current fed funds target: {FED_FUNDS_TARGET_CURRENT}%")
+    current_rate = get_current_rate()
+    print(f"Current fed funds target: {current_rate}%")
     print()
     print("Meetings:")
     for m in FOMC_MEETINGS_2026:
@@ -78,5 +85,5 @@ if __name__ == "__main__":
     print()
     example_zq = 94.60
     implied = zq_price_to_rate(example_zq)
-    p_cut = probability_of_cut(FED_FUNDS_TARGET_CURRENT, implied)
+    p_cut = probability_of_cut(current_rate, implied)
     print(f"Example: ZQ={example_zq} -> implied rate={implied:.2f}% -> P(cut)={p_cut:.1%}")

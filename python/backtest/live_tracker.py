@@ -14,9 +14,11 @@ from pathlib import Path
 
 import requests
 
+from python.backtest.fred_data import get_latest_fed_funds, get_all_indicators
+from python.backtest.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
+
 GAMMA_API = "https://gamma-api.polymarket.com"
 CLOB_API = "https://clob.polymarket.com"
-
 FOMC_KEYWORDS = ["fed", "rate cut", "rate hike", "fomc", "interest rate", "fed funds"]
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 BACKOFF = [1, 3, 9]
@@ -121,6 +123,13 @@ def snapshot_market(m):
 def main():
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
+    log("Fetching current fed funds rate from FRED...")
+    fed_funds_rate = get_current_rate()
+    if fed_funds_rate:
+        log(f"  Current fed funds rate: {fed_funds_rate}%")
+    else:
+        log("  WARNING: Could not fetch fed funds rate from FRED")
+
     log("Fetching active FOMC markets...")
     markets = fetch_active_fomc_markets()
 
@@ -128,6 +137,8 @@ def main():
     for m in markets:
         snap = snapshot_market(m)
         if snap:
+            if fed_funds_rate:
+                snap["fed_funds_rate"] = fed_funds_rate
             snapshots.append(snap)
 
     log(f"Captured {len(snapshots)} market snapshots")
@@ -138,6 +149,7 @@ def main():
 
     daily_data = {
         "date": now.isoformat(),
+        "fed_funds_rate": fed_funds_rate,
         "markets": snapshots,
         "total_markets": len(snapshots),
     }
@@ -152,6 +164,7 @@ def main():
         log(f"  {s['question'][:70]} | P(YES)={price_str} | vol={s['volume']:.0f}")
 
     log(f"\n=== STAGE 1 STATUS ===")
+    log(f"Current fed funds rate: {fed_funds_rate}%")
     log(f"Active FOMC markets tracked: {len(snapshots)}")
     log(f"Next: run daily to build longitudinal dataset")
     log(f"Analyze after 30+ days for edge signal")
