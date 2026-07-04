@@ -144,7 +144,7 @@ def main():
     log(f"Captured {len(snapshots)} market snapshots")
 
     now = datetime.now(timezone.utc)
-    filename = f"fomc_{now.strftime('%Y%m%d')}.json"
+    filename = f"fomc_{now.strftime('%Y%m%d_%H%M')}.json"
     output_file = SNAPSHOT_DIR / filename
 
     daily_data = {
