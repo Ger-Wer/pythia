@@ -19,7 +19,7 @@ from python.backtest.fedwatch import get_current_rate, probability_of_cut, zq_pr
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 CLOB_API = "https://clob.polymarket.com"
-FOMC_KEYWORDS = ["fed", "rate cut", "rate hike", "fomc", "interest rate", "fed funds"]
+FOMC_KEYWORDS = ["rate cut", "rate hike", "fomc", "interest rate", "fed rate", "fed funds"]
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 BACKOFF = [1, 3, 9]
 
