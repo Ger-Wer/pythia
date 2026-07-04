@@ -8,3 +8,4 @@
 0 18 * * * /app/scripts/entrypoint.sh resolve
 0 10 * * 0 /app/scripts/entrypoint.sh oracle-scorecard
 30 0 * * * /app/scripts/entrypoint.sh portfolio-update
+0 8 * * * cd /home/pythia/pythia && python3 python/backtest/live_tracker.py >> /home/pythia/pythia/python/backtest/snapshots/tracker.log 2>&1
