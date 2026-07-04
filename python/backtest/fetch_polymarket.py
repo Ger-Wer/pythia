@@ -20,7 +20,8 @@ CLOB_API = "https://clob.polymarket.com"
 MACRO_KEYWORDS = [
     "fed", "fomc", "interest rate", "rate cut", "rate hike",
     "federal funds", "inflation", "cpi", "gdp", "recession",
-    "unemployment", "nonfarm", "payroll",
+    "unemployment", "nonfarm", "payroll", "fed funds",
+    "rate decision", "powell", "fed chair",
 ]
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "data"
@@ -66,6 +67,20 @@ def fetch_all_events(limit: int = 100, max_pages: int = 50) -> list:
             break
         time.sleep(0.5)
     log(f"Fetched {len(all_events)} closed events total")
+
+    active_events = []
+    for offset in range(0, 1000, 100):
+        data = _get(f"{GAMMA_API}/events", {
+            "limit": 100, "offset": offset, "active": "true", "closed": "false"
+        })
+        if not data or not isinstance(data, list) or len(data) == 0:
+            break
+        active_events.extend(data)
+        if len(data) < 100:
+            break
+        time.sleep(0.5)
+    log(f"Fetched {len(active_events)} active events")
+    all_events.extend(active_events)
     return all_events
 
 
