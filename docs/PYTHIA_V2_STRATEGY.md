@@ -1,7 +1,7 @@
 # Pythia v2 — Strategy, Audit & Roadmap
 
-**Status:** ACTIVE — adopted direction (pre-implementation, awaiting Stage 0 result)
-**Date:** 2026-07-01
+**Status:** ACTIVE — Stage 1 running, Stage 2 legal path confirmed (OÜ)
+**Date:** 2026-07-05
 **Author:** Engineering review session
 **Supersedes direction of:** `docs/ORACLE_PUBLIC_CHANNEL.md`, `docs/ARCHITECTURE.md` (Pythia Capital LLM-signal channel)
 

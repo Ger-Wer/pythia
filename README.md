@@ -14,8 +14,8 @@ Staged go/no-go (each stage is a gate):
 | Stage | What | Status |
 |---|---|---|
 | 0 | Backtest FOMC/ZQ edge | ✅ done — `python/backtest/run_backtest.py` |
-| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🟡 running — `live_tracker.py`, `analyze_snapshots.py` |
-| 2 | Real on-chain wallet (Estonia legal/tax unresolved) | ⏸ pending |
+| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py` |
+| 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
 | 3 | Audience & ads on top of a proven record | ⏸ pending |
 
 ## What's in this repo
@@ -33,6 +33,22 @@ docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
 ```
 
 Only runtime dependency: `requests`. No database, no LLM, no dashboard.
+
+## Security
+
+- Container runs as **non-root user** (`pythia`, UID 1002)
+- **Read-only filesystem** with tmpfs `/tmp`
+- `.env` protected: `chmod 600`, owned by `pythia:pythia`
+- Resource limits: `mem_limit: 512m`, `cpus: 0.5`, `pids_limit: 128`
+- OWASP Secure Coding Practices audit passed (commit `21a86c1`)
+
+## Legal (Stage 2)
+
+Trading via **Estonian OÜ** is the confirmed legal path (legal opinion obtained 2026-07-05):
+- 0% corporate tax on undistributed profit; losses are deductible
+- Individual trading = 22% gross-gain tax without loss offset — **not viable**
+- Red lines: no third-party funds, no affiliate links
+- Details: `docs/ESTONIA_LEGAL_OPINION.md`
 
 ## Run locally
 
@@ -60,5 +76,5 @@ Both are bind-mounted volumes, so state survives container rebuilds.
 ## v1 decommission
 
 The previous Pythia Capital oracle channel (LLM-driven Polymarket "desk calls" to
-Telegram) was retired on 2025-07-04. Its code is preserved on the `archive/v1-final`
+Telegram) was retired on 2026-07-04. Its code is preserved on the `archive/v1-final`
 git branch. Do not revive it — see the strategy doc for why.
