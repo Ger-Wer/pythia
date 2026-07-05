@@ -21,7 +21,7 @@
 - The current product (AI-generated daily Polymarket "desk calls" to a Telegram channel,
   monetized via ads) is **technically fixable but strategically weak**: no real edge,
   broken track-record reporting, saturated/commoditized niche, and the most natural
-  audience (RU/CIS) is geoblocked by Polymarket.
+  the most natural audience is geoblocked by Polymarket.
 - A **viable** version exists, but it is a **different, narrower product**: a
   quantitatively-grounded tracker for **macro/economic markets** (FOMC rates, GDP, CPI)
   whose edge comes from arbitraging the gap between **professional nowcast models /
@@ -97,14 +97,14 @@ publisher; we redesign the core. See "Disposition of current code".
 
 Sourced web research (competitors, demand, mechanics, monetization, regulation) produced a
 clear picture for the **original** product idea (broad signal channel + ad revenue,
-RU/CIS audience):
+geoblocked audience):
 
 | Factor | Finding |
 |---|---|
 | Market exists & growing | ✅ Prediction markets ~$63.5B notional 2025 (~4× 2024); Polymarket+Kalshi ≈ 97.5% |
 | Audience demand | ⚠️ Real but smaller than headline — ~200–480k active traders, weak retention, volume partly wash/airdrop-driven |
 | Competition | 🔴 Saturated & commoditized — dozens of free/open-source bots (PolyWatch, PolyAlpha, PolyMate, …), multiple "best-of" lists |
-| RU/CIS audience fit | 🔴 Polymarket geoblocks Russia/Belarus/Ukraine — the natural audience cannot legally bet |
+| Geoblocked audience fit | 🔴 Polymarket geoblocks multiple countries — the natural audience cannot legally bet |
 | Onboarding friction | 🔴 Wallet + USDC + Polygon, or KYC — large subscriber→bettor drop-off |
 | Ad monetization | ⚠️ Viable; finance is the top Telegram niche (€15–20 CPM CIS) but needs scale (≈5–10k+ engaged subs) |
 | Polymarket affiliate | ⚠️ Gated ($10k volume for 30%/180d; else $10 CPA) and excludes geoblocked CIS users |
@@ -127,7 +127,7 @@ regulation is tightening. A defensible version must: (a) target a **supported** 
 | Edge source | LLM paraphrasing search results | **Quantitative nowcast-vs-price gap** (fed funds futures, Fed nowcasts) |
 | Cadence | 5 posts/day | Few, high-quality posts (event-driven) |
 | Track record | Virtual, broken/empty metrics | **Real on-chain wallet** (strongest moat), deterministic, verifiable |
-| Audience geo | RU/CIS (geoblocked) | English, Polymarket-supported geos; likely X/Twitter-first |
+| Audience geo | Geoblocked regions | English, Polymarket-supported geos; likely X/Twitter-first |
 | Monetization | Ads (but no trust base) | Ads **on top of** a proven public record |
 
 **Why this can have an edge where v1 cannot:** Polymarket's price is already an aggregate of
