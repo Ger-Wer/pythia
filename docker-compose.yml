@@ -1,28 +1,28 @@
 name: pythia
 
 services:
-  pythia-scheduler:
+  pythia-v2:
     build:
       context: .
       dockerfile: Dockerfile
-    image: pythia:latest
-    container_name: pythia-scheduler
+    image: pythia-v2:latest
+    container_name: pythia-v2
     restart: unless-stopped
     env_file:
       - .env
     environment:
       TZ: UTC
-      DB_PATH: ${DB_PATH:-/app/data/pythia.db}
-      LOG_DIR: ${LOG_DIR:-/app/logs}
+      LOG_DIR: /app/logs
     volumes:
-      - ./data:/app/data
+      # Stage 1 persistent state — snapshots and edge-analysis reports
+      - ./python/backtest/snapshots:/app/python/backtest/snapshots
+      - ./python/backtest/reports:/app/python/backtest/reports
+      - ./python/backtest/data:/app/python/backtest/data
       - ./logs:/app/logs
     command: ["scheduler"]
-    networks:
-      - pythia_internal
-    mem_limit: 2g
-    cpus: 1.0
-    pids_limit: 256
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 128
     logging:
       driver: json-file
       options:
@@ -33,97 +33,3 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-
-  pythia-dashboard:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: pythia:latest
-    container_name: pythia-dashboard
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      TZ: UTC
-      DB_PATH: ${DB_PATH:-/app/data/pythia.db}
-      LOG_DIR: ${LOG_DIR:-/app/logs}
-      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-operator}
-      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:-plain:change-me}
-      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-change-me-session-secret}
-      DASHBOARD_PUBLIC_BASE_URL: ${DASHBOARD_PUBLIC_BASE_URL:-https://b1w.duckdns.org}
-      DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-true}
-      DASHBOARD_STATIC_DIR: /app/dashboard_dist
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    command: ["dashboard"]
-    ports:
-      - "127.0.0.1:8787:8080"
-    networks:
-      - pythia_internal
-    mem_limit: 768m
-    cpus: 0.5
-    pids_limit: 128
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/auth/me >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  searxng:
-    image: searxng/searxng:latest
-    container_name: pythia-searxng
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8888:8080"
-    volumes:
-      - ./searxng:/etc/searxng:rw
-    environment:
-      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY:-changeme}
-    networks:
-      - pythia_internal
-    mem_limit: 256m
-    cpus: 0.25
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "3"
-
-networks:
-  pythia_internal:
-    name: pythia_internal
-    driver: bridge
-
-  pythia-stats-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: pythia:latest
-    container_name: pythia-stats-bot
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      TZ: UTC
-      DB_PATH: /app/data/pythia.db
-      LOG_DIR: /app/logs
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    command: [stats-bot]
-    networks:
-      - pythia_internal
-    mem_limit: 256m
-    cpus: 0.25
-    pids_limit: 64
-    logging:
-      driver: json-file
-      options:
-        max-size: 5m
-        max-file: 3

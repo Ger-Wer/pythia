@@ -1,5 +1,0 @@
-# Bun configuration for gateway-api.
-# Tests live in src/__tests__/, use Bun's built-in `bun:test`.
-
-[test]
-timeout = 30000

@@ -1,12 +1,4 @@
-0 6 * * * /app/scripts/entrypoint.sh forecast
-0 7 * * * /app/scripts/entrypoint.sh oracle-publish
-0 11 * * * /app/scripts/entrypoint.sh oracle-publish
-0 15 * * * /app/scripts/entrypoint.sh oracle-publish
-0 19 * * * /app/scripts/entrypoint.sh oracle-publish
-0 19 * * * /app/scripts/entrypoint.sh oracle-update-scores
-0 23 * * * /app/scripts/entrypoint.sh oracle-publish
-0 18 * * * /app/scripts/entrypoint.sh resolve
-0 10 * * 0 /app/scripts/entrypoint.sh oracle-scorecard
-30 0 * * * /app/scripts/entrypoint.sh portfolio-update
-0 8 * * * cd /home/pythia/pythia && python3 python/backtest/live_tracker.py >> /home/pythia/pythia/python/backtest/snapshots/tracker.log 2>&1
-0 9 * * 0 cd /home/pythia/pythia && python3 python/backtest/analyze_snapshots.py >> /home/pythia/pythia/python/backtest/reports/analysis.log 2>&1
+# Pythia v2 crontab. Two jobs: daily FOMC snapshot, weekly edge analysis.
+# Stage 1 live paper track. Paths inside the container (/app).
+0 8 * * * /app/scripts/entrypoint.sh snapshot >> /app/logs/tracker.log 2>&1
+0 9 * * 0 /app/scripts/entrypoint.sh analyze >> /app/logs/analysis.log 2>&1

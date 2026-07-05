@@ -1,33 +1,17 @@
-FROM node:22-slim AS dashboard-builder
-
-WORKDIR /frontend
-COPY dashboard/package*.json /frontend/
-RUN npm install
-COPY dashboard/ /frontend/
-RUN npm run build
-
+# Pythia v2 — minimal single-container image.
+# Only Python + requests + supercronic. No node/bun/dashboard/db.
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    BUN_INSTALL=/root/.bun \
-    PATH=/root/.bun/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    PYTHONPATH=/app \
+    DB_PATH=/app/data/pythia.db \
+    LOG_DIR=/app/logs
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       bash \
-       build-essential \
-       ca-certificates \
-       curl \
-       jq \
-       libpq-dev \
-       pkg-config \
-       procps \
-       sqlite3 \
-       unzip \
+       bash ca-certificates curl jq procps sqlite3 \
     && rm -rf /var/lib/apt/lists/*
-
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"
 
 ARG TARGETARCH
 RUN set -eux; \
@@ -41,24 +25,17 @@ RUN set -eux; \
 
 WORKDIR /app
 
-COPY package.json tsconfig.json bunfig.toml /app/
-RUN bun install
-
 COPY python/requirements.txt /app/python/requirements.txt
-RUN python -m venv /app/python/venv \
-    && /app/python/venv/bin/pip install --no-cache-dir -r /app/python/requirements.txt
+RUN pip install --no-cache-dir -r /app/python/requirements.txt
 
-COPY src /app/src
-COPY sql /app/sql
 COPY python /app/python
-COPY scripts /app/scripts
-COPY --from=dashboard-builder /frontend/dist /app/dashboard_dist
+COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
 COPY supercronic.crontab /app/supercronic.crontab
-COPY .env.example /app/.env.example
-COPY README.md LICENSE /app/
 
-RUN chmod +x /app/scripts/*.sh \
-    && mkdir -p /app/data /app/logs
+RUN chmod +x /app/scripts/entrypoint.sh \
+    && mkdir -p /app/data /app/logs \
+              /app/python/backtest/snapshots \
+              /app/python/backtest/reports
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["scheduler"]
