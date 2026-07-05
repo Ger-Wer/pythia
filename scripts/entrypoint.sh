@@ -4,7 +4,7 @@ set -euo pipefail
 
 export PYTHONPATH="${PYTHONPATH:-/app}"
 export LOG_DIR="${LOG_DIR:-/app/logs}"
-mkdir -p "$LOG_DIR" /app/data
+mkdir -p "$LOG_DIR" /app/data 2>/dev/null || true
 
 case "${1:-scheduler}" in
   scheduler)

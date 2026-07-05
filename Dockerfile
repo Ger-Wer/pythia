@@ -35,7 +35,14 @@ COPY supercronic.crontab /app/supercronic.crontab
 RUN chmod +x /app/scripts/entrypoint.sh \
     && mkdir -p /app/data /app/logs \
               /app/python/backtest/snapshots \
+              /app/python/backtest/reports \
+    && groupadd -g 1002 pythia \
+    && useradd -u 1002 -g 1002 -m -s /bin/bash pythia \
+    && chown -R pythia:pythia /app/data /app/logs \
+              /app/python/backtest/snapshots \
               /app/python/backtest/reports
+
+USER pythia
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["scheduler"]

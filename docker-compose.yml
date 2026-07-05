@@ -13,8 +13,10 @@ services:
     environment:
       TZ: UTC
       LOG_DIR: /app/logs
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
     volumes:
-      # Stage 1 persistent state — snapshots and edge-analysis reports
       - ./python/backtest/snapshots:/app/python/backtest/snapshots
       - ./python/backtest/reports:/app/python/backtest/reports
       - ./python/backtest/data:/app/python/backtest/data
