@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pythia v2 entrypoint. Three modes: scheduler (default), snapshot, analyze.
+# Pythia v2 entrypoint. Modes: scheduler (default), snapshot, analyze, healthcheck.
 set -euo pipefail
 
 export PYTHONPATH="${PYTHONPATH:-/app}"
@@ -18,12 +18,16 @@ case "${1:-scheduler}" in
     cd /app
     python3 python/backtest/analyze_snapshots.py 2>&1 | tee -a "$LOG_DIR/analysis.log"
     ;;
+  healthcheck)
+    cd /app
+    python3 python/backtest/healthcheck.py 2>&1 | tee -a "$LOG_DIR/healthcheck.log"
+    ;;
   shell)
     exec /bin/bash
     ;;
   *)
     echo "Unknown command: $1" >&2
-    echo "Usage: entrypoint.sh [scheduler|snapshot|analyze|shell]" >&2
+    echo "Usage: entrypoint.sh [scheduler|snapshot|analyze|healthcheck|shell]" >&2
     exit 1
     ;;
 esac
