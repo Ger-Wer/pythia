@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Stage 1: Daily snapshot of active FOMC markets.
-Compares Polymarket prices vs ZQ-implied probabilities (baseline).
+Stage 1: Daily snapshot of active macro markets (FOMC + GDP/recession).
+Compares Polymarket prices vs FRED baselines (fed funds rate, GDP growth).
 Stores daily snapshots for longitudinal analysis.
 """
 
@@ -14,14 +14,19 @@ from pathlib import Path
 
 import requests
 
-from python.backtest.fred_data import get_latest_fed_funds, get_all_indicators
+from python.backtest.fred_data import get_latest_fed_funds, get_latest_gdp_growth
 from python.backtest.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 CLOB_API = "https://clob.polymarket.com"
-FOMC_KEYWORDS = ["rate cut", "rate hike", "fomc", "interest rate", "fed rate", "fed funds"]
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 BACKOFF = [1, 3, 9]
+
+# Each bucket: keywords to match + tag stored in snapshot.
+MARKET_BUCKETS = {
+    "fomc": ["rate cut", "rate hike", "fomc", "interest rate", "fed rate", "fed funds"],
+    "gdp":  ["gdp", "recession", "economic growth", "gross domestic", "negative gdp"],
+}
 
 
 def log(msg: str):
@@ -48,7 +53,11 @@ def _get(url: str, params: dict = None, retries: int = 3):
                 return None
 
 
-def fetch_active_fomc_markets():
+def fetch_active_markets():
+    """Fetch all active Polymarket events and bucket markets by keyword match.
+
+    Returns list of dicts: {market fields... + "category": bucket_name}.
+    """
     events = []
     for offset in range(0, 1000, 100):
         data = _get(f"{GAMMA_API}/events", {
@@ -63,23 +72,21 @@ def fetch_active_fomc_markets():
 
     log(f"Fetched {len(events)} active events")
 
-    fomc_markets = []
+    bucketed = {cat: [] for cat in MARKET_BUCKETS}
     for e in events:
-        title = (e.get("title") or "").lower()
         mkts = e.get("markets") or []
-        qs = " ".join((m.get("question") or "").lower() for m in mkts)
-        text = title + " " + qs
-
-        if not any(kw in text for kw in FOMC_KEYWORDS):
-            continue
-
         for m in mkts:
             q = (m.get("question") or "").lower()
-            if any(kw in q for kw in FOMC_KEYWORDS):
-                fomc_markets.append(m)
+            for cat, keywords in MARKET_BUCKETS.items():
+                if any(kw in q for kw in keywords):
+                    m_copy = dict(m)
+                    m_copy["_category"] = cat
+                    bucketed[cat].append(m_copy)
+                    break  # assign to first matching bucket only
 
-    log(f"Found {len(fomc_markets)} active FOMC/rate markets")
-    return fomc_markets
+    for cat, mkts in bucketed.items():
+        log(f"  {cat}: {len(mkts)} markets")
+    return bucketed
 
 
 def snapshot_market(m):
@@ -123,35 +130,48 @@ def snapshot_market(m):
 def main():
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-    log("Fetching current fed funds rate from FRED...")
+    log("Fetching baselines from FRED...")
     fed_funds_rate = get_current_rate()
     if fed_funds_rate:
-        log(f"  Current fed funds rate: {fed_funds_rate}%")
+        log(f"  Fed funds rate: {fed_funds_rate}%")
     else:
         log("  WARNING: Could not fetch fed funds rate from FRED")
 
-    log("Fetching active FOMC markets...")
-    markets = fetch_active_fomc_markets()
+    gdp_growth = get_latest_gdp_growth()
+    if gdp_growth:
+        log(f"  GDP growth: {gdp_growth['value']}% ({gdp_growth['date']})")
+    else:
+        log("  WARNING: Could not fetch GDP growth from FRED")
+
+    log("Fetching active macro markets...")
+    buckets = fetch_active_markets()
 
     snapshots = []
-    for m in markets:
-        snap = snapshot_market(m)
-        if snap:
-            if fed_funds_rate:
-                snap["fed_funds_rate"] = fed_funds_rate
-            snapshots.append(snap)
+    for cat, markets in buckets.items():
+        for m in markets:
+            snap = snapshot_market(m)
+            if snap:
+                snap["category"] = cat
+                if fed_funds_rate:
+                    snap["fed_funds_rate"] = fed_funds_rate
+                if gdp_growth:
+                    snap["gdp_growth"] = gdp_growth["value"]
+                snapshots.append(snap)
 
-    log(f"Captured {len(snapshots)} market snapshots")
+    log(f"Captured {len(snapshots)} market snapshots across {len(buckets)} categories")
 
     now = datetime.now(timezone.utc)
-    filename = f"fomc_{now.strftime('%Y%m%d_%H%M')}.json"
+    filename = f"macro_{now.strftime('%Y%m%d_%H%M')}.json"
     output_file = SNAPSHOT_DIR / filename
 
     daily_data = {
         "date": now.isoformat(),
         "fed_funds_rate": fed_funds_rate,
+        "gdp_growth": gdp_growth["value"] if gdp_growth else None,
+        "gdp_growth_date": gdp_growth["date"] if gdp_growth else None,
         "markets": snapshots,
         "total_markets": len(snapshots),
+        "categories": {cat: len(mkts) for cat, mkts in buckets.items()},
     }
 
     with open(output_file, "w") as f:
@@ -161,11 +181,11 @@ def main():
 
     for s in snapshots[:10]:
         price_str = f"{s['yes_price']:.3f}" if s['yes_price'] is not None else "N/A"
-        log(f"  {s['question'][:70]} | P(YES)={price_str} | vol={s['volume']:.0f}")
+        log(f"  [{s['category']:6s}] {s['question'][:60]} | P(YES)={price_str} | vol={s['volume']:.0f}")
 
     log(f"\n=== STAGE 1 STATUS ===")
-    log(f"Current fed funds rate: {fed_funds_rate}%")
-    log(f"Active FOMC markets tracked: {len(snapshots)}")
+    log(f"Fed funds rate: {fed_funds_rate}% | GDP growth: {gdp_growth['value'] if gdp_growth else 'N/A'}%")
+    log(f"Markets tracked: {len(snapshots)} ({', '.join(f'{c}={len(m)}' for c, m in buckets.items())})")
     log(f"Next: run daily to build longitudinal dataset")
     log(f"Analyze after 30+ days for edge signal")
 

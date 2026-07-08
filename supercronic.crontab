@@ -1,4 +1,5 @@
-# Pythia v2 crontab. Two jobs: daily FOMC snapshot, weekly edge analysis.
-# Stage 1 live paper track. Paths inside the container (/app).
+# Pythia v2 crontab. Two jobs: daily macro snapshot, weekly edge analysis.
+# Stage 1 live paper track (FOMC + GDP/recession markets).
+# Paths inside the container (/app).
 0 8 * * * /app/scripts/entrypoint.sh snapshot >> /app/logs/tracker.log 2>&1
 0 9 * * 0 /app/scripts/entrypoint.sh analyze >> /app/logs/analysis.log 2>&1

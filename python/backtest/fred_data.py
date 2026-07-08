@@ -13,6 +13,7 @@ SERIES = {
     "fed_funds": "FEDFUNDS",
     "cpi_yoy": "CPIAUCSL",
     "gdp": "GDP",
+    "gdp_growth": "A191RL1Q225SBEA",  # Real GDP growth rate, quarterly %
     "unemployment": "UNRATE",
     "core_cpi": "CPILFESL",
 }
@@ -67,6 +68,24 @@ def get_latest_fed_funds():
                 cache["fed_funds"] = {"value": rate, "date": o["date"], "ts": datetime.now(timezone.utc).timestamp()}
                 _save_cache(cache)
                 return rate
+    return None
+
+
+def get_latest_gdp_growth():
+    """Latest quarterly Real GDP growth rate (annualized %), with cache."""
+    cache = _load_cache()
+    cached = cache.get("gdp_growth")
+    if cached and (datetime.now(timezone.utc).timestamp() - cached.get("ts", 0)) < CACHE_TTL:
+        return cached
+    obs = get_series("A191RL1Q225SBEA", limit=5)
+    if obs:
+        for o in obs:
+            val = o.get("value", ".")
+            if val != ".":
+                entry = {"value": float(val), "date": o["date"], "ts": datetime.now(timezone.utc).timestamp()}
+                cache["gdp_growth"] = entry
+                _save_cache(cache)
+                return entry
     return None
 
 

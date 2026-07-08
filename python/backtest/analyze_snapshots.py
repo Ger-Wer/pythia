@@ -16,7 +16,8 @@ REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
 
 def load_snapshots():
-    files = sorted(SNAPSHOT_DIR.glob("fomc_*.json"))
+    # Backward compat: read both legacy fomc_*.json and new macro_*.json.
+    files = sorted(SNAPSHOT_DIR.glob("fomc_*.json")) + sorted(SNAPSHOT_DIR.glob("macro_*.json"))
     snapshots = []
     for f in files:
         with open(f) as fh:
