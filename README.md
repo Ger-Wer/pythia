@@ -22,17 +22,23 @@ Staged go/no-go (each stage is a gate):
 
 ```
 python/backtest/
-├── live_tracker.py        # daily FOMC snapshot + FRED baseline (cron: 08:00 UTC)
+├── live_tracker.py        # daily snapshot: FOMC + GDP + CPI + ZQ futures (cron: 08:00 UTC)
 ├── analyze_snapshots.py   # weekly edge detection: drift/volatility/spread
-├── fred_data.py           # FRED API loader (fed funds rate)
-├── fedwatch.py            # ZQ futures → implied probabilities
+├── fred_data.py           # FRED API loader (fed funds rate, GDP growth)
+├── fedwatch.py            # ZQ futures → implied probabilities + get_live_implied_rate()
+├── gdpnow.py              # Atlanta Fed GDPNow RSS parser (feedparser)
+├── cpi_nowcast.py         # Cleveland Fed CPI/PCE nowcast JSON parser
+├── zq_futures.py          # Yahoo Finance ZQ=F + Barchart fallback
 ├── fetch_polymarket.py    # Gamma API market fetcher
 ├── run_backtest.py        # Stage 0 backtest on resolved markets
-└── data/macro_markets.json
+├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count (cron: 20:00 UTC)
+├── tests/                 # pytest suite: 12 tests across gdpnow, cpi_nowcast, zq_futures
+└── data/                  # runtime caches (gitignored)
 docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
 ```
 
-Only runtime dependency: `requests`. No database, no LLM, no dashboard.
+Runtime dependencies: `requests`, `feedparser`, `beautifulsoup4`.
+Dev dependencies: `pytest>=8.0` (see `python/requirements-dev.txt`).
 
 ## Security
 
@@ -58,6 +64,13 @@ export FRED_API_KEY=...        # optional but recommended; get one free from FRE
 python3 python/backtest/live_tracker.py
 ```
 
+Run tests:
+
+```bash
+pip install -r python/requirements-dev.txt
+pytest python/backtest/tests/ -v
+```
+
 ## Run in Docker (production, on `amper`)
 
 ```bash
@@ -67,8 +80,9 @@ docker compose logs -f pythia-v2
 ```
 
 One container (`pythia-v2`) runs `supercronic`, which fires:
-- `0 8 * * *`  — daily snapshot
+- `0 8 * * *`  — daily snapshot (FOMC + GDP + CPI + ZQ futures)
 - `0 9 * * 0`  — weekly edge analysis (Sundays 09:00 UTC)
+- `0 20 * * *` — daily health check (snapshot freshness, FRED baselines, market count)
 
 Snapshots land in `python/backtest/snapshots/`, reports in `python/backtest/reports/`.
 Both are bind-mounted volumes, so state survives container rebuilds.
