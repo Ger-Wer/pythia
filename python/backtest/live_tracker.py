@@ -16,6 +16,9 @@ import requests
 
 from python.backtest.fred_data import get_latest_fed_funds, get_latest_gdp_growth
 from python.backtest.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
+from python.backtest.gdpnow import get_latest_gdpnow
+from python.backtest.cpi_nowcast import get_latest_cpi_nowcast
+from python.backtest.zq_futures import get_zq_price
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 CLOB_API = "https://clob.polymarket.com"
@@ -143,6 +146,25 @@ def main():
     else:
         log("  WARNING: Could not fetch GDP growth from FRED")
 
+    log("Fetching new data sources...")
+    gdpnow = get_latest_gdpnow()
+    if gdpnow:
+        log(f"  GDPNow: {gdpnow['value']}% ({gdpnow['date']})")
+    else:
+        log("  WARNING: Could not fetch GDPNow estimate")
+
+    cpi_nowcast = get_latest_cpi_nowcast()
+    if cpi_nowcast:
+        log(f"  CPI nowcast: {cpi_nowcast['date']}")
+    else:
+        log("  WARNING: Could not fetch CPI nowcast")
+
+    zq_price = get_zq_price()
+    if zq_price:
+        log(f"  ZQ price: {zq_price['price']} (implied rate: {zq_price['implied_rate']:.3f}%)")
+    else:
+        log("  WARNING: Could not fetch ZQ futures price")
+
     log("Fetching active macro markets...")
     buckets = fetch_active_markets()
 
@@ -169,6 +191,15 @@ def main():
         "fed_funds_rate": fed_funds_rate,
         "gdp_growth": gdp_growth["value"] if gdp_growth else None,
         "gdp_growth_date": gdp_growth["date"] if gdp_growth else None,
+        "gdpnow": gdpnow["value"] if gdpnow else None,
+        "gdpnow_date": gdpnow["date"] if gdpnow else None,
+        "cpi_nowcast": cpi_nowcast["data"] if cpi_nowcast else None,
+        "cpi_nowcast_date": cpi_nowcast["date"] if cpi_nowcast else None,
+        "zq_futures": {
+            "price": zq_price["price"],
+            "implied_rate": zq_price["implied_rate"],
+            "source": zq_price["source"],
+        } if zq_price else None,
         "markets": snapshots,
         "total_markets": len(snapshots),
         "categories": {cat: len(mkts) for cat, mkts in buckets.items()},

@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from python.backtest.fred_data import get_latest_fed_funds
+from python.backtest.zq_futures import get_zq_price
 
 
 FOMC_MEETINGS_2026 = [
@@ -74,6 +75,14 @@ def days_to_meeting(meeting_date_str: str, from_date: datetime) -> int:
     return (meeting - from_date).days
 
 
+def get_live_implied_rate():
+    """Get current implied rate from live ZQ futures price. Returns float or None."""
+    zq = get_zq_price()
+    if zq is not None:
+        return zq["implied_rate"]
+    return None
+
+
 if __name__ == "__main__":
     print("FedWatch calculator for FOMC 2026 meetings")
     current_rate = get_current_rate()
@@ -83,7 +92,15 @@ if __name__ == "__main__":
     for m in FOMC_MEETINGS_2026:
         print(f"  {m}")
     print()
-    example_zq = 94.60
-    implied = zq_price_to_rate(example_zq)
-    p_cut = probability_of_cut(current_rate, implied)
-    print(f"Example: ZQ={example_zq} -> implied rate={implied:.2f}% -> P(cut)={p_cut:.1%}")
+    live_rate = get_live_implied_rate()
+    if live_rate is not None:
+        print(f"Live ZQ implied rate: {live_rate:.3f}%")
+        p_cut = probability_of_cut(current_rate, live_rate)
+        p_hike = probability_of_hike(current_rate, live_rate)
+        print(f"P(cut): {p_cut:.1%} | P(hike): {p_hike:.1%}")
+    else:
+        print("Live ZQ price not available")
+        example_zq = 94.60
+        implied = zq_price_to_rate(example_zq)
+        p_cut = probability_of_cut(current_rate, implied)
+        print(f"Example: ZQ={example_zq} -> implied rate={implied:.2f}% -> P(cut)={p_cut:.1%}")
