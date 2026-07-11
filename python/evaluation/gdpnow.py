@@ -22,8 +22,10 @@ def _load_cache():
         try:
             with open(CACHE_FILE) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except json.JSONDecodeError as exc:
+            logger.warning("Ignoring invalid GDPNow cache %s: %s", CACHE_FILE, exc)
+        except OSError as exc:
+            logger.warning("Could not read GDPNow cache %s: %s", CACHE_FILE, exc)
     return {}
 
 

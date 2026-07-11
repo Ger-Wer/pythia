@@ -43,8 +43,8 @@ def alert(msg: str):
                 json={"chat_id": TELEGRAM_CHAT_ID, "text": f"⚠️ Pythia v2: {msg}"},
                 timeout=10,
             )
-        except requests.RequestException:
-            pass  # best-effort; healthcheck must not fail on alert delivery
+        except requests.RequestException as exc:
+            log(f"WARNING: Telegram alert delivery failed: {exc}")
 
 
 def latest_snapshot():

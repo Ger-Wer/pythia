@@ -6,22 +6,19 @@ Stores daily snapshots for longitudinal analysis.
 """
 
 import json
-import os
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
-from python.evaluation.fred_data import get_latest_fed_funds, get_latest_gdp_growth
-from python.evaluation.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
+from python.evaluation.fred_data import get_latest_gdp_growth
+from python.evaluation.fedwatch import get_current_rate
 from python.evaluation.gdpnow import get_latest_gdpnow
 from python.evaluation.cpi_nowcast import get_latest_cpi_nowcast
 from python.evaluation.zq_futures import get_zq_price
 
 GAMMA_API = "https://gamma-api.polymarket.com"
-CLOB_API = "https://clob.polymarket.com"
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 BACKOFF = [1, 3, 9]
 
@@ -110,8 +107,8 @@ def snapshot_market(m):
         if o.lower() == "yes" and i < len(prices):
             try:
                 yes_price = float(prices[i])
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                log(f"  Could not parse YES price for sector {m.obtain('id')}: {exc}")
             break
 
     clob_ids_raw = m.get("clobTokenIds", "[]")
