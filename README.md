@@ -13,7 +13,7 @@ Staged go/no-go (each stage is a gate):
 
 | Stage | What | Status |
 |---|---|---|
-| 0 | Backtest FOMC/ZQ edge | ✅ done — `python/backtest/run_backtest.py` |
+| 0 | Backtest FOMC/ZQ edge | ✅ done — `python/evaluation/run_backtest.py` |
 | 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py` |
 | 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
 | 3 | Audience & ads on top of a proven record | ⏸ pending |
@@ -21,7 +21,7 @@ Staged go/no-go (each stage is a gate):
 ## What's in this repo
 
 ```
-python/backtest/
+python/evaluation/
 ├── live_tracker.py        # daily snapshot: FOMC + GDP + CPI + ZQ futures (cron: 08:00 UTC)
 ├── analyze_snapshots.py   # weekly edge detection: drift/volatility/spread
 ├── fred_data.py           # FRED API loader (fed funds rate, GDP growth)
@@ -61,14 +61,14 @@ Trading via **Estonian OÜ** is the confirmed legal path (legal opinion obtained
 ```bash
 pip install -r python/requirements.txt
 export FRED_API_KEY=...        # optional but recommended; get one free from FRED
-python3 python/backtest/live_tracker.py
+python3 python/evaluation/live_tracker.py
 ```
 
 Run tests:
 
 ```bash
 pip install -r python/requirements-dev.txt
-pytest python/backtest/tests/ -v
+pytest python/evaluation/tests/ -v
 ```
 
 ## Run in Docker (production, on `amper`)
@@ -84,7 +84,7 @@ One container (`pythia-v2`) runs `supercronic`, which fires:
 - `0 9 * * 0`  — weekly edge analysis (Sundays 09:00 UTC)
 - `0 20 * * *` — daily health check (snapshot freshness, FRED baselines, market count)
 
-Snapshots land in `python/backtest/snapshots/`, reports in `python/backtest/reports/`.
+Snapshots land in `python/evaluation/snapshots/`, reports in `python/evaluation/reports/`.
 Both are bind-mounted volumes, so state survives container rebuilds.
 
 ## v1 decommission

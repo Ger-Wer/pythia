@@ -12,15 +12,15 @@ case "${1:-scheduler}" in
     ;;
   snapshot)
     cd /app
-    python3 python/backtest/live_tracker.py 2>&1 | tee -a "$LOG_DIR/tracker.log"
+    python3 python/evaluation/live_tracker.py 2>&1 | tee -a "$LOG_DIR/tracker.log"
     ;;
   analyze)
     cd /app
-    python3 python/backtest/analyze_snapshots.py 2>&1 | tee -a "$LOG_DIR/analysis.log"
+    python3 python/evaluation/analyze_snapshots.py 2>&1 | tee -a "$LOG_DIR/analysis.log"
     ;;
   healthcheck)
     cd /app
-    python3 python/backtest/healthcheck.py 2>&1 | tee -a "$LOG_DIR/healthcheck.log"
+    python3 python/evaluation/healthcheck.py 2>&1 | tee -a "$LOG_DIR/healthcheck.log"
     ;;
   shell)
     exec /bin/bash

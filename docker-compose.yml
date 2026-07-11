@@ -17,9 +17,9 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
     volumes:
-      - ./python/backtest/snapshots:/app/python/backtest/snapshots
-      - ./python/backtest/reports:/app/python/backtest/reports
-      - ./python/backtest/data:/app/python/backtest/data
+      - ./python/evaluation/snapshots:/app/python/evaluation/snapshots
+      - ./python/evaluation/reports:/app/python/evaluation/reports
+      - ./python/evaluation/data:/app/python/evaluation/data
       - ./logs:/app/logs
     command: ["scheduler"]
     mem_limit: 512m

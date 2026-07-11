@@ -14,11 +14,11 @@ from pathlib import Path
 
 import requests
 
-from python.backtest.fred_data import get_latest_fed_funds, get_latest_gdp_growth
-from python.backtest.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
-from python.backtest.gdpnow import get_latest_gdpnow
-from python.backtest.cpi_nowcast import get_latest_cpi_nowcast
-from python.backtest.zq_futures import get_zq_price
+from python.evaluation.fred_data import get_latest_fed_funds, get_latest_gdp_growth
+from python.evaluation.fedwatch import get_current_rate, probability_of_cut, zq_price_to_rate
+from python.evaluation.gdpnow import get_latest_gdpnow
+from python.evaluation.cpi_nowcast import get_latest_cpi_nowcast
+from python.evaluation.zq_futures import get_zq_price
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 CLOB_API = "https://clob.polymarket.com"

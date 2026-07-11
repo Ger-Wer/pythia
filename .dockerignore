@@ -12,9 +12,9 @@ __pycache__/
 *.py[cod]
 logs/*
 !logs/.gitkeep
-python/backtest/snapshots/*.json
-python/backtest/reports/*.json
-python/backtest/data/fred_cache.json
+python/evaluation/snapshots/*.json
+python/evaluation/reports/*.json
+python/evaluation/data/fred_cache.json
 *.db
 *.sqlite*
 .DS_Store

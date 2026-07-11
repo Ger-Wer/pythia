@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from python.backtest.zq_futures import zq_price_to_rate, get_zq_price, _fetch_yahoo
+from python.evaluation.zq_futures import zq_price_to_rate, get_zq_price, _fetch_yahoo
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -29,7 +29,7 @@ def test_fetch_yahoo_from_fixture():
         mock_response.raise_for_status = MagicMock()
         mock_response.ok = True
 
-    with patch("python.backtest.zq_futures.requests.get", return_value=mock_response):
+    with patch("python.evaluation.zq_futures.requests.get", return_value=mock_response):
         result = _fetch_yahoo()
         assert result is not None
         assert result["source"] == "yahoo"
@@ -50,7 +50,7 @@ def test_get_zq_price_with_fixture():
         mock_response.raise_for_status = MagicMock()
         mock_response.ok = True
 
-    with patch("python.backtest.zq_futures.requests.get", return_value=mock_response):
+    with patch("python.evaluation.zq_futures.requests.get", return_value=mock_response):
         result = get_zq_price()
         assert result is not None
         assert result["price"] == 96.375
@@ -67,7 +67,7 @@ def test_all_fail_returns_none():
     if cache_file.exists():
         cache_file.unlink()
     
-    with patch("python.backtest.zq_futures._fetch_yahoo", return_value=None), \
-         patch("python.backtest.zq_futures._fetch_barchart", return_value=None):
+    with patch("python.evaluation.zq_futures._fetch_yahoo", return_value=None), \
+         patch("python.evaluation.zq_futures._fetch_barchart", return_value=None):
         result = get_zq_price()
         assert result is None

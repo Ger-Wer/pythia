@@ -10,7 +10,7 @@ Alerts via Telegram if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set.
 Designed to run from the host via cron (NOT inside the container) so it can
 detect a crashed container.
 
-Usage: python3 python/backtest/healthcheck.py
+Usage: python3 python/evaluation/healthcheck.py
 Exit codes: 0 healthy, 1 degraded, 2 critical.
 """
 
