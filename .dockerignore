@@ -4,6 +4,7 @@
 **/.env
 **/.env.local
 python/__pycache__/
+node_modules/
 python/.pytest_cache/
 python/.mypy_cache/
 python/venv/
