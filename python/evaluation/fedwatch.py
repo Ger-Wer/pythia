@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 FedWatch-style probability calculator from ZQ (fed funds futures).
-ponytail: uses simplified FedWatch formula — assumes fixed meeting dates, no path dependency.
-Upgrade: integrate CME FedWatch official probabilities when available via API.
+ponytail: P0 nearest-meeting ceiling: binary 25bp only.
+Upgrade: replace with an expanding multi-meeting probability tree when later meetings matter.
 """
 
 from datetime import datetime
