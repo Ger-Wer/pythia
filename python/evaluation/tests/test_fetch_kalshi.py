@@ -29,9 +29,9 @@ def test_parse_strike_info_cut():
 
 
 def test_parse_strike_info_invalid():
-    """Parse invalid suffix → empty dict."""
+    """Parse invalid suffix → dict with raw_suffix."""
     result = _parse_strike_info("INVALID-TICKER")
-    assert result == {}
+    assert result == {"raw_suffix": "TICKER"}
 
 
 def test_get_kalshi_markets_from_fixture():
@@ -59,6 +59,10 @@ def test_get_kalshi_markets_from_fixture():
 
 def test_get_kalshi_markets_empty_response():
     """Handle empty API response gracefully."""
+    cache_file = Path(__file__).parent.parent / "data" / "kalshi_cache.json"
+    if cache_file.exists():
+        cache_file.unlink()
+
     mock_response = MagicMock()
     mock_response.json.return_value = {"markets": [], "cursor": ""}
     mock_response.raise_for_status = MagicMock()
@@ -73,6 +77,10 @@ def test_get_kalshi_markets_empty_response():
 
 def test_get_kalshi_markets_api_error():
     """Handle API error gracefully."""
+    cache_file = Path(__file__).parent.parent / "data" / "kalshi_cache.json"
+    if cache_file.exists():
+        cache_file.unlink()
+
     import requests
     mock_response = MagicMock()
     mock_response.raise_for_status.side_effect = requests.RequestException("API error")
