@@ -171,7 +171,7 @@ def main():
     log("Fetching new data sources...")
     gdpnow = get_latest_gdpnow()
     if gdpnow:
-        log(f"  GDPNow: {gdpnow['value']}% ({gdpnow['date']})")
+        log(f"  GDPNow: {gdpnow['data']}% ({gdpnow['date']})")
     else:
         log("  WARNING: Could not fetch GDPNow estimate")
 
@@ -222,7 +222,7 @@ def main():
         "fed_funds_rate": fed_funds_rate,
         "gdp_growth": gdp_growth["value"] if gdp_growth else None,
         "gdp_growth_date": gdp_growth["date"] if gdp_growth else None,
-        "gdpnow": gdpnow["value"] if gdpnow else None,
+        "gdpnow": gdpnow["data"] if gdpnow else None,
         "gdpnow_date": gdpnow["date"] if gdpnow else None,
         "cpi_nowcast": cpi_nowcast["data"] if cpi_nowcast else None,
         "cpi_nowcast_date": cpi_nowcast["date"] if cpi_nowcast else None,
