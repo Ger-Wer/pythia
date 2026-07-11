@@ -52,7 +52,7 @@ def get_latest_gdpnow() -> dict | None:
     for entry in feed.entries:
         estimate = _parse_entry(entry.get("description", ""))
         if estimate is not None:
-            start = {"value": estimate, "date": entry.get("published", ""), "ts": datetime.now(timezone.utc).timestamp()}
+            start = {"data": estimate, "date": entry.get("published", ""), "ts": datetime.now(timezone.utc).timestamp()}
             cache["gdpnow"] = start
             _save_cache(cache)
             return start
