@@ -17,6 +17,7 @@ from python.evaluation.fedwatch import get_current_rate
 from python.evaluation.gdpnow import get_latest_gdpnow
 from python.evaluation.cpi_nowcast import get_latest_cpi_nowcast
 from python.evaluation.zq_futures import get_zq_price
+from python.evaluation.fetch_kalshi import get_kalshi_fomc_markets
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
@@ -89,7 +90,31 @@ def fetch_active_markets():
     return bucketed
 
 
-def snapshot_market(m):
+def snapshot_market(m, source="polymarket"):
+    if source == "kalshi":
+        return snapshot_kalshi_market(m)
+    return snapshot_polymarket_market(m)
+
+
+def snapshot_kalshi_market(m):
+    q = m.get("question", "")
+    yes_price = m.get("yes_price")
+    vol = m.get("volume", 0)
+    end = m.get("end_date", "")
+    market_id = m.get("market_id", "")
+
+    return {
+        "question": q,
+        "market_id": market_id,
+        "yes_price": yes_price,
+        "volume": vol,
+        "end_date": end,
+        "clob_token_id": None,
+        "source": "kalshi",
+    }
+
+
+def snapshot_polymarket_market(m):
     q = m.get("question", "")
     outcomes_raw = m.get("outcomes", "[]")
     prices_raw = m.get("outcomePrices", "[]")
@@ -165,10 +190,19 @@ def main():
     log("Fetching active macro markets...")
     buckets = fetch_active_markets()
 
+    log("Fetching Kalshi FOMC markets...")
+    kalshi_markets = get_kalshi_fomc_markets()
+    if kalshi_markets:
+        buckets["kalshi_fomc"] = kalshi_markets
+        log(f"  Kalshi: {len(kalshi_markets)} meeting-specific markets")
+    else:
+        log("  WARNING: Could not fetch Kalshi FOMC markets")
+
     snapshots = []
     for cat, markets in buckets.items():
+        source = "kalshi" if cat == "kalshi_fomc" else "polymarket"
         for m in markets:
-            snap = snapshot_market(m)
+            snap = snapshot_market(m, source=source)
             if snap:
                 snap["category"] = cat
                 if fed_funds_rate:

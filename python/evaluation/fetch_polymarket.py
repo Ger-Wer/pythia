@@ -24,6 +24,21 @@ MACRO_KEYWORDS = [
     "rate decision", "powell", "fed chair",
 ]
 
+FOMC_SLUGS = [
+    "fed-decision-in-january",
+    "fed-decision-in-february",
+    "fed-decision-in-march",
+    "fed-decision-in-april",
+    "fed-decision-in-may",
+    "fed-decision-in-june",
+    "fed-decision-in-july",
+    "fed-decision-in-august",
+    "fed-decision-in-september",
+    "fed-decision-in-october",
+    "fed-decision-in-november",
+    "fed-decision-in-december",
+]
+
 OUTPUT_DIR = Path(__file__).resolve().parent / "data"
 BACKOFF = [1, 3, 9]
 
@@ -97,6 +112,52 @@ def filter_macro_events(events: list) -> list:
             matched.append(e)
     log(f"Filtered {len(matched)} macro events from {len(events)}")
     return matched
+
+
+def fetch_fomc_by_slug() -> list[dict]:
+    """Fetch FOMC events by slug pattern (fallback for keyword search).
+
+    Returns list of dicts with standardized fields:
+    - source: "polymarket_slug"
+    - market_id: condition_id
+    - question: market question
+    - yes_price: float (0-1)
+    - end_date: str (YYYY-MM-DD)
+    - volume: float
+    - event_slug: str
+    """
+    results = []
+    for slug in FOMC_SLUGS:
+        data = _get(f"{GAMMA_API}/events", {"slug": slug})
+        if not data:
+            continue
+        events = data if isinstance(data, list) else [data]
+        for event in events:
+            for market in event.get("markets", []):
+                outcome_prices = market.get("outcomePrices")
+                yes_price = None
+                if outcome_prices:
+                    try:
+                        prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+                        yes_price = float(prices[0]) if prices else None
+                    except (json.JSONDecodeError, IndexError, ValueError):
+                        yes_price = None
+
+                end_date_raw = market.get("endDate") or event.get("endDate") or ""
+                end_date = end_date_raw[:10] if end_date_raw else ""
+
+                results.append({
+                    "source": "polymarket_slug",
+                    "market_id": market.get("conditionId", ""),
+                    "question": market.get("question", ""),
+                    "yes_price": yes_price,
+                    "end_date": end_date,
+                    "volume": float(market.get("volume") or 0),
+                    "event_slug": slug,
+                })
+        time.sleep(0.3)
+    log(f"Fetched {len(results)} FOMC markets via slug fallback")
+    return results
 
 
 def fetch_prices_history(token_id: str, fidelity: int = 60) -> list | None:
@@ -189,6 +250,30 @@ def main():
 
     log("Filtering macro/economic events...")
     macro_events = filter_macro_events(events)
+
+    # Fallback: if keyword search found 0 FOMC-related events, try slug discovery
+    fomc_count = sum(
+        1 for e in macro_events
+        if any(kw in (e.get("title") or "").lower() for kw in ["fomc", "fed", "rate decision"])
+    )
+    if fomc_count == 0:
+        log("No FOMC events found via keywords, trying slug fallback...")
+        slug_markets = fetch_fomc_by_slug()
+        if slug_markets:
+            for sm in slug_markets:
+                macro_events.append({
+                    "title": sm["question"],
+                    "slug": sm["event_slug"],
+                    "markets": [{
+                        "question": sm["question"],
+                        "conditionId": sm["market_id"],
+                        "outcomePrices": json.dumps([str(sm["yes_price"] or 0), str(1 - (sm["yes_price"] or 0))]),
+                        "outcomes": '["Yes","No"]',
+                        "endDate": sm["end_date"],
+                        "volume": sm["volume"],
+                    }],
+                })
+            log(f"Added {len(slug_markets)} slug-based FOMC markets to dataset")
 
     for e in macro_events[:10]:
         title = e.get("title", "")

@@ -1,0 +1,41 @@
+{
+  "markets": [
+    {
+      "ticker": "KXFEDDECISION-26JUL-H0",
+      "event_ticker": "KXFEDDECISION-26JUL",
+      "title": "Will the Federal Reserve Hike rates by 0bps at their July 2026 meeting?",
+      "subtitle": "Hike 0bps",
+      "yes_sub_title": "Fed maintains rate",
+      "no_sub_title": "Fed maintains rate",
+      "custom_strike": {"Hike": "0"},
+      "market_type": "binary",
+      "status": "active",
+      "last_price_dollars": 0.64,
+      "yes_bid_dollars": 0.58,
+      "yes_ask_dollars": 0.61,
+      "volume_fp": "1377.00",
+      "open_interest_fp": "373.98",
+      "close_time": "2026-07-29T18:59:00Z",
+      "expected_expiration_time": "2026-07-29T19:05:00Z"
+    },
+    {
+      "ticker": "KXFEDDECISION-26JUL-C25",
+      "event_ticker": "KXFEDDECISION-26JUL",
+      "title": "Will the Federal Reserve Cut rates by 25bps at their July 2026 meeting?",
+      "subtitle": "Cut 25bps",
+      "yes_sub_title": "Fed cuts 25bps",
+      "no_sub_title": "Fed cuts 25bps",
+      "custom_strike": {"Cut": "25"},
+      "market_type": "binary",
+      "status": "active",
+      "last_price_dollars": 0.32,
+      "yes_bid_dollars": 0.30,
+      "yes_ask_dollars": 0.35,
+      "volume_fp": "892.00",
+      "open_interest_fp": "215.50",
+      "close_time": "2026-07-29T18:59:00Z",
+      "expected_expiration_time": "2026-07-29T19:05:00Z"
+    }
+  ],
+  "cursor": ""
+}
