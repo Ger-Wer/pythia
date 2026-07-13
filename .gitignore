@@ -16,6 +16,9 @@ python/venv/
 python/evaluation/snapshots/*.json
 python/evaluation/reports/*.json
 python/evaluation/data/fred_cache.json
+python/evaluation/data/zq_cache.json
+python/evaluation/data/cpi_nowcast_cache.json
+python/evaluation/data/kalshi_cache.json
 
 # OS
 .DS_Store

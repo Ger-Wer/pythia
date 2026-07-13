@@ -22,20 +22,34 @@ Staged go/no-go (each stage is a gate):
 
 ```
 python/evaluation/
-├── live_tracker.py        # daily snapshot: FOMC + GDP + CPI + ZQ futures (cron: 08:00 UTC)
+├── live_tracker.py        # daily snapshot: Polymarket + Kalshi + FRED + ZQ futures
 ├── analyze_snapshots.py   # weekly edge detection: drift/volatility/spread
 ├── fred_data.py           # FRED API loader (fed funds rate, GDP growth)
 ├── fedwatch.py            # ZQ futures → implied probabilities + get_live_implied_rate()
 ├── gdpnow.py              # Atlanta Fed GDPNow RSS parser (feedparser)
 ├── cpi_nowcast.py         # Cleveland Fed CPI/PCE nowcast JSON parser
 ├── zq_futures.py          # Yahoo Finance ZQ=F + Barchart fallback
-├── fetch_polymarket.py    # Gamma API market fetcher
+├── fetch_polymarket.py    # Polymarket Gamma API (keyword + slug fallback for FOMC)
+├── fetch_kalshi.py        # Kalshi KXFEDDECISION meeting-specific FOMC markets
 ├── run_backtest.py        # Stage 0 backtest on resolved markets
-├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count (cron: 20:00 UTC)
-├── tests/                 # pytest suite: 12 tests across gdpnow, cpi_nowcast, zq_futures
+├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count
+├── tests/                 # pytest suite: 18 tests (gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
+│   └── fixtures/          # committed test fixtures (yahoo_zq.json, kalshi_markets.json, ...)
 └── data/                  # runtime caches (gitignored)
 docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
 ```
+
+### Data sources (current snapshot: ~132 markets)
+
+| Bucket | Source | Type | Count |
+|---|---|---|---|
+| `fomc` | Polymarket Gamma (keyword search) | cumulative/general ("Will X cuts happen in 2026?") | ~24 |
+| `gdp` | Polymarket Gamma (keyword search) | GDP / recession | ~43 |
+| `kalshi_fomc` | **Kalshi KXFEDDECISION** | **meeting-specific binary strikes** ("Fed Hike 0bps at July 2026?") | ~65 |
+
+Kalshi is the meeting-specific source that satisfies the corpus gate (Polymarket only offers
+cumulative "Will X cuts happen in 2026?" markets, not per-meeting markets). With Kalshi
+included, T2–T4 edge-diff / FedWatch / ZQ quotes are unblocked.
 
 Runtime dependencies: `requests`, `feedparser`, `beautifulsoup4`.
 Dev dependencies: `pytest>=8.0` (see `python/requirements-dev.txt`).
