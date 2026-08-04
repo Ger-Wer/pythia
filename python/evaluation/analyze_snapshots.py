@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Stage 1 analysis: reads daily FOMC snapshots, computes price drift,
-volatility, and edge signal per market.
-Run weekly via cron. Meaningful after 30+ days of data.
+Stage 1 analysis: reads daily snapshots. Primary hypothesis test:
+edge_diff (ZQ-implied probabilities vs Kalshi meeting prices).
+Per-market drift/volatility signals are informational only.
+Run weekly via cron. Meaningful after 20+ days of data.
 """
 
 import json
@@ -10,6 +11,8 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+
+from python.evaluation.edge_diff import analyze_edge_diff
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
@@ -113,7 +116,7 @@ def main():
     print(f"=== Pythia Stage 1 Analysis ===")
     print(f"Period: {first} -> {last} ({n_days} days)")
     print(f"Markets tracked: {n_markets}")
-    print(f"Markets with edge signal: {len(edges)}")
+    print(f"Markets with volatility/drift signal (informational): {len(edges)}")
     print(f"Markets with <2 data points: {no_data}")
     print()
 
@@ -145,13 +148,21 @@ def main():
             q = m["question"][:65]
             print(f"  P={price:.3f} vol=${vol/1e6:.1f}M | {q}")
 
-    if n_days >= 30:
-        print()
-        print("=== STAGE 1 VERDICT ===")
-        if len(edges) >= 3:
-            print(f"EDGE DETECTED in {len(edges)} markets. Proceed to Stage 2.")
-        else:
-            print("Insufficient edge. Extend observation or pivot targets.")
+    edge_diff = analyze_edge_diff(snapshots)
+    print()
+    print("=== STAGE 1 VERDICT: ZQ-implied vs Kalshi prices ===")
+    if edge_diff is None:
+        print("No ZQ+Kalshi data in snapshots — edge-diff unavailable.")
+    else:
+        for key, s in edge_diff["stats"].items():
+            print(
+                f"  {key}: mean={s['mean']:+.4f} std={s['std']:.4f} "
+                f"pos_ratio={s['pos_ratio']:.2f} n={s['n']}"
+            )
+        print(
+            f"Verdict: {edge_diff['verdict']} "
+            f"({edge_diff['days_with_diff']} days with ZQ+Kalshi data)"
+        )
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report = {
@@ -167,6 +178,7 @@ def main():
             }
             for e in edges
         ],
+        "edge_diff": edge_diff,
     }
     report_file = REPORT_DIR / f"analysis_{last}.json"
     with open(report_file, "w") as f:
