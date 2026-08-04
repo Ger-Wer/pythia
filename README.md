@@ -14,7 +14,7 @@ Staged go/no-go (each stage is a gate):
 | Stage | What | Status |
 |---|---|---|
 | 0 | Backtest FOMC/ZQ edge | ✅ done — `python/evaluation/run_backtest.py` |
-| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py` |
+| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` |
 | 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
 | 3 | Audience & ads on top of a proven record | ⏸ pending |
 
@@ -23,7 +23,8 @@ Staged go/no-go (each stage is a gate):
 ```
 python/evaluation/
 ├── live_tracker.py        # daily snapshot: Polymarket + Kalshi + FRED + ZQ futures
-├── analyze_snapshots.py   # weekly edge detection: drift/volatility/spread
+├── analyze_snapshots.py   # weekly analysis: edge-diff verdict + informational drift/volatility
+├── edge_diff.py           # the real Stage 1 test: ZQ-implied probs vs Kalshi meeting buckets
 ├── fred_data.py           # FRED API loader (fed funds rate, GDP growth)
 ├── fedwatch.py            # ZQ futures → implied probabilities + get_live_implied_rate()
 ├── gdpnow.py              # Atlanta Fed GDPNow RSS parser (feedparser)
@@ -33,7 +34,7 @@ python/evaluation/
 ├── fetch_kalshi.py        # Kalshi KXFEDDECISION meeting-specific FOMC markets
 ├── run_backtest.py        # Stage 0 backtest on resolved markets
 ├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count
-├── tests/                 # pytest suite: 18 tests (gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
+├── tests/                 # pytest suite: 25 tests (edge_diff, gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
 │   └── fixtures/          # committed test fixtures (yahoo_zq.json, kalshi_markets.json, ...)
 └── data/                  # runtime caches (gitignored)
 docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
@@ -48,8 +49,10 @@ docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
 | `kalshi_fomc` | **Kalshi KXFEDDECISION** | **meeting-specific binary strikes** ("Fed Hike 0bps at July 2026?") | ~65 |
 
 Kalshi is the meeting-specific source that satisfies the corpus gate (Polymarket only offers
-cumulative "Will X cuts happen in 2026?" markets, not per-meeting markets). With Kalshi
-included, T2–T4 edge-diff / FedWatch / ZQ quotes are unblocked.
+cumulative "Will X cuts happen in 2026?" markets, not per-meeting markets). The real Stage 1
+hypothesis test is `edge_diff.py` (commit `9f1af85`): it compares ZQ-implied cut/hike/hold
+probabilities against Kalshi bucket prices of the nearest upcoming FOMC meeting, day by day.
+Per-market drift/volatility signals in the weekly report are informational only.
 
 Runtime dependencies: `requests`, `feedparser`, `beautifulsoup4`.
 Dev dependencies: `pytest>=8.0` (see `python/requirements-dev.txt`).
