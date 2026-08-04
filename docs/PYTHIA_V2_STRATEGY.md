@@ -269,5 +269,10 @@ Each stage is a **gate**. Do not proceed without passing the prior one.
 
 ---
 
-**Status:** ACTIVE (adopted direction) — awaiting Stage 0 result before any v2
-implementation or v1 decommissioning.
+**Status:** ACTIVE — Stage 1 running (since 2026-07-05), v1 decommissioned.
+2026-08-04 addendum: the Stage 1 hypothesis test is now `python/evaluation/edge_diff.py`
+(ZQ-implied cut/hike/hold probabilities vs Kalshi meeting bucket prices, commit `9f1af85`).
+The earlier volatility/drift-only verdict in `analyze_snapshots.py` was a false gate and has
+been replaced; drift/volatility signals are informational only. Stage 2 remains blocked until
+the edge-diff divergence is confirmed persistent (~30 more days) — see
+`project/SESSION_20260804_pythia_edge_diff_verdict.md` in MemPalace.
