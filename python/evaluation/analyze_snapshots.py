@@ -13,9 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from python.evaluation.edge_diff import analyze_edge_diff
+from python.evaluation.edge_diff_v2 import reconstruct as reconstruct_v2
+from python.evaluation.zq_contracts import load_fixture
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
+# Historical per-month ZQ closes for the v2 reconstruction (past data is fixed).
+V2_FIXTURE = Path(__file__).resolve().parent / "tests" / "fixtures" / "zq_monthly_sep2026.json"
 
 
 def load_snapshots():
@@ -150,7 +154,7 @@ def main():
 
     edge_diff = analyze_edge_diff(snapshots)
     print()
-    print("=== STAGE 1 VERDICT: ZQ-implied vs Kalshi prices ===")
+    print("=== STAGE 1 VERDICT v1 (DEPRECATED, informational only) ===")
     if edge_diff is None:
         print("No ZQ+Kalshi data in snapshots — edge-diff unavailable.")
     else:
@@ -160,9 +164,32 @@ def main():
                 f"pos_ratio={s['pos_ratio']:.2f} n={s['n']}"
             )
         print(
-            f"Verdict: {edge_diff['verdict']} "
+            f"Verdict v1: {edge_diff['verdict']} "
             f"({edge_diff['days_with_diff']} days with ZQ+Kalshi data)"
         )
+
+    edge_diff_v2 = None
+    print()
+    print("=== STAGE 1 VERDICT v2 (AUTHORITATIVE, per-meeting ZQ) ===")
+    if V2_FIXTURE.exists():
+        closes = load_fixture(V2_FIXTURE)
+        edge_diff_v2, skipped = reconstruct_v2(snapshots, closes)
+        if edge_diff_v2 is None:
+            print("No per-meeting ZQ+Kalshi overlap — v2 unavailable.")
+        else:
+            for key, s in edge_diff_v2["stats"].items():
+                print(
+                    f"  {key}: mean={s['mean']:+.4f} std={s['std']:.4f} "
+                    f"pos_ratio={s['pos_ratio']:.2f} n={s['n']}"
+                )
+            print(f"Meetings: {', '.join(edge_diff_v2['meetings'])}")
+            print(f"Skipped days: {len(skipped)}")
+            print(
+                f"Verdict v2: {edge_diff_v2['verdict']} "
+                f"({edge_diff_v2['days_with_diff']} days with per-meeting data)"
+            )
+    else:
+        print(f"v2 fixture missing ({V2_FIXTURE.name}) — v2 skipped.")
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report = {
@@ -179,6 +206,7 @@ def main():
             for e in edges
         ],
         "edge_diff": edge_diff,
+        "edge_diff_v2": edge_diff_v2,
     }
     report_file = REPORT_DIR / f"analysis_{last}.json"
     with open(report_file, "w") as f:

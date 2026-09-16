@@ -14,7 +14,7 @@ Staged go/no-go (each stage is a gate):
 | Stage | What | Status |
 |---|---|---|
 | 0 | Backtest FOMC/ZQ edge | ✅ done — `python/evaluation/run_backtest.py` |
-| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` |
+| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` (v1, deprecated) + `edge_diff_v2.py` (**authoritative** since 2026-09-16: per-meeting ZQ contract with CME day-weighting; v1 cut leg saturated 68/68, measures structural mismatch) |
 | 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
 | 3 | Audience & ads on top of a proven record | ⏸ pending |
 
@@ -23,9 +23,11 @@ Staged go/no-go (each stage is a gate):
 ```
 python/evaluation/
 ├── live_tracker.py        # daily snapshot: Polymarket + Kalshi + FRED + ZQ futures
-├── analyze_snapshots.py   # weekly analysis: edge-diff verdict + informational drift/volatility
-├── edge_diff.py           # the real Stage 1 test: ZQ-implied probs vs Kalshi meeting buckets
-├── fred_data.py           # FRED API loader (fed funds rate, GDP growth)
+├── analyze_snapshots.py   # weekly analysis: edge-diff v2 verdict (authoritative) + v1 (deprecated, informational) + drift/volatility
+├── edge_diff.py           # v1 test: front-month ZQ vs Kalshi (DEPRECATED 2026-09-16: cut leg saturates 68/68)
+├── edge_diff_v2.py        # v2 test: per-meeting ZQ contract vs Kalshi (authoritative; Sep-2026 verdict SYSTEMATIC_DIVERGENCE, n=49)
+├── edge_diff_diag.py      # Step-A diagnostic: saturation + front-month roll analysis behind the v1 verdict
+├── zq_contracts.py        # per-month ZQ contracts (Yahoo .CBT, free): symbols, CME day-weighted rate extraction, fixture loader + live fetch
 ├── fedwatch.py            # ZQ futures → implied probabilities + get_live_implied_rate()
 ├── gdpnow.py              # Atlanta Fed GDPNow RSS parser (feedparser)
 ├── cpi_nowcast.py         # Cleveland Fed CPI/PCE nowcast JSON parser
@@ -34,8 +36,8 @@ python/evaluation/
 ├── fetch_kalshi.py        # Kalshi KXFEDDECISION meeting-specific FOMC markets
 ├── run_backtest.py        # Stage 0 backtest on resolved markets
 ├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count
-├── tests/                 # pytest suite: 25 tests (edge_diff, gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
-│   └── fixtures/          # committed test fixtures (yahoo_zq.json, kalshi_markets.json, ...)
+├── tests/                 # pytest suite: 37 tests (edge_diff, edge_diff_v2, zq_contracts, gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
+│   └── fixtures/          # committed test fixtures (yahoo_zq.json, kalshi_markets.json, zq_monthly_sep2026.json, ...)
 └── data/                  # runtime caches (gitignored)
 docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
 ```

@@ -3,6 +3,11 @@
 Stage 1 real edge test: ZQ-implied move probabilities vs Kalshi meeting-specific prices.
 For each snapshot compares futures-implied P(cut)/P(hike) with market bucket prices
 of the nearest upcoming FOMC meeting; the longitudinal mean gap is the hypothesis test.
+DEPRECATED: Step-A diagnostic (edge_diff_diag.py) showed the cut leg saturates at
+0.0 in 68/68 snapshots (front-month rate is structurally above the current fed
+rate), so this module measures a structural mismatch, not a market signal. Kept
+for history; the authoritative test is edge_diff_v2.py (per-meeting ZQ contract
+with CME day-weighting).
 ponytail: nearest-meeting only, binary-25bp ZQ approximation (same ceiling as fedwatch),
 single front-month ZQ used for all meetings. Upgrade: contract-month ZQ per meeting +
 full probability tree + Brier scoring.
