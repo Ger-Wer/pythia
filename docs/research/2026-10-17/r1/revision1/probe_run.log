@@ -1,0 +1,18 @@
+
+=== Pythia R1.1 Source Probe Summary ===
+Total Sources: 8
+Status Counts: {'valid': 5, 'blocked': 2, 'invalid_content': 0, 'network_error': 0, 'unverified': 1}
+Summary Status: PARTIAL_REACHABLE (all_healthy=False)
+
+| source_id                   | HTTP | Recv    | Stored  | ms  | Status     | Level     | Items | Reason                                    |
+| ----------------------------|------|---------|---------|-----|------------|-----------|-------|------------------------------------------ |
+| nyfed_effr                  | 200  | 1433    | 1433    | 478 | valid      | content   | 5     | Successfully validated 5 EFFR reference … |
+| fed_monetary_rss            | 200  | 9687    | 9687    | 103 | valid      | content   | 15    | Valid Federal Reserve Monetary Policy fe… |
+| fed_speeches_rss            | 200  | 9610    | 9610    | 20  | valid      | content   | 15    | Valid Federal Reserve Speeches feed with… |
+| bls_cpi_rss                 | 403  | 1325    | 1325    | 332 | blocked    | transport | —     | HTTP 403 client access restricted by rem… |
+| atlanta_gdpnow              | 200  | 1242487 | 1242487 | 469 | unverified | envelope  | —     | HTML document received (transport and en… |
+| github_deepseek_v3_releases | 200  | 2171    | 2171    | 290 | valid      | content   | 1     | Valid GitHub releases array for deepseek… |
+| hf_deepseek_models          | 200  | 1507    | 1507    | 168 | valid      | content   | 3     | Valid Hugging Face models array for deep… |
+| arena_text_overall          | 403  | 5702    | 5702    | 258 | blocked    | transport | —     | HTTP 403 client access restricted by rem… |
+
+Detailed JSON results written to docs/research/2026-10-17/r1/revision1/probe_results.json
