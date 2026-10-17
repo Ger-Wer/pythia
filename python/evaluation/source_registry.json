@@ -1,0 +1,213 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-10-17T00:00:00Z",
+  "policy_status": "r1_proposed_policy",
+  "description": "Pythia R1 Source Registry: canonical allowlist of 8 public data sources for evidence collection.",
+  "usable_for_forecast_all": false,
+  "sources": [
+    {
+      "source_id": "nyfed_effr",
+      "platform": "Federal Reserve Bank of New York",
+      "family": "macro",
+      "url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
+      "expected_format": "json",
+      "language": "en",
+      "primacy_level": "primary",
+      "primacy_context": "Official publisher of Effective Federal Funds Rate (EFFR) daily benchmark reference rates.",
+      "processing_mode": "structured_api",
+      "proposed_cadence": "Business days around 09:00 ET following publication.",
+      "freshness_definition": "Latest rate observation published on preceding business day (max age 24h on business days, 96h over weekends/holidays).",
+      "role": "mandatory",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 3600,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "json_object",
+        "required_keys": ["refRates"],
+        "rate_type": "EFFR",
+        "min_items": 1
+      }
+    },
+    {
+      "source_id": "fed_monetary_rss",
+      "platform": "Federal Reserve Board of Governors",
+      "family": "macro",
+      "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+      "expected_format": "rss_xml",
+      "language": "en",
+      "primacy_level": "primary",
+      "primacy_context": "Official publisher of FOMC monetary policy statements, discount rate votes, and implementation notes.",
+      "processing_mode": "feed_parser",
+      "proposed_cadence": "Scheduled FOMC release days at ~14:00 ET and unscheduled emergency release windows.",
+      "freshness_definition": "Feed item publication timestamp matching official statement release time.",
+      "role": "mandatory",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 900,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "rss_xml",
+        "feed_marker": "monetary",
+        "min_items": 1
+      }
+    },
+    {
+      "source_id": "fed_speeches_rss",
+      "platform": "Federal Reserve Board of Governors",
+      "family": "macro",
+      "url": "https://www.federalreserve.gov/feeds/speeches.xml",
+      "expected_format": "rss_xml",
+      "language": "en",
+      "primacy_level": "primary",
+      "primacy_context": "Official verbatim transcripts and remarks delivered by Federal Reserve Board governors and regional bank presidents.",
+      "processing_mode": "feed_parser",
+      "proposed_cadence": "Continuous polling on business days during US working hours (embargo lift windows).",
+      "freshness_definition": "Feed item publication timestamp reflecting speech delivery / embargo lift.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 7200,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "rss_xml",
+        "feed_marker": "speeches",
+        "min_items": 1
+      }
+    },
+    {
+      "source_id": "bls_cpi_rss",
+      "platform": "Bureau of Labor Statistics (U.S. Department of Labor)",
+      "family": "macro",
+      "url": "https://www.bls.gov/feed/cpi.rss",
+      "expected_format": "rss_xml",
+      "language": "en",
+      "primacy_level": "primary",
+      "primacy_context": "Official publisher of monthly Consumer Price Index (CPI) summary press releases.",
+      "processing_mode": "feed_parser",
+      "proposed_cadence": "Monthly scheduled release dates at 08:30 ET.",
+      "freshness_definition": "Feed item publication timestamp matching scheduled BLS CPI release.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 300,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "rss_xml",
+        "feed_marker": "cpi",
+        "min_items": 1,
+        "known_limitation": "Endpoint historically returned HTTP 403 Forbidden due to automated access protections. Retained as canonical target without bypassing protections."
+      }
+    },
+    {
+      "source_id": "atlanta_gdpnow",
+      "platform": "Federal Reserve Bank of Atlanta",
+      "family": "macro",
+      "url": "https://www.atlantafed.org/research-and-data/data/gdpnow",
+      "expected_format": "html",
+      "language": "en",
+      "primacy_level": "primary",
+      "primacy_context": "Official model tracking estimate for real GDP growth produced by Federal Reserve Bank of Atlanta researchers.",
+      "processing_mode": "html_document",
+      "proposed_cadence": "5-7 times per month according to official GDPNow release calendar following source data releases.",
+      "freshness_definition": "Latest model forecast date indicated on official web page.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 14400,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "html",
+        "extraction_verified": false,
+        "known_limitation": "HTML transport verified; substantive content extraction and numerical table parser unverified in R1."
+      }
+    },
+    {
+      "source_id": "github_deepseek_v3_releases",
+      "platform": "GitHub API / deepseek-ai",
+      "family": "ai",
+      "url": "https://api.github.com/repos/deepseek-ai/DeepSeek-V3/releases?per_page=2",
+      "expected_format": "json",
+      "language": "multilingual",
+      "primacy_level": "primary",
+      "primacy_context": "Official software code repository releases and tags for DeepSeek-V3 repository (technical sample for AI lab activity).",
+      "processing_mode": "structured_api",
+      "proposed_cadence": "Periodic polling every 1-4 hours.",
+      "freshness_definition": "Release publication timestamp published_at from GitHub API.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 3600,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "json_array",
+        "empty_allowed": true,
+        "expected_repo": "deepseek-ai/DeepSeek-V3",
+        "known_limitation": "Technical sample of a specific repository, not a comprehensive AI watchlist. Unauthenticated requests subject to GitHub 60 req/hour rate limits."
+      }
+    },
+    {
+      "source_id": "hf_deepseek_models",
+      "platform": "Hugging Face API / deepseek-ai",
+      "family": "ai",
+      "url": "https://huggingface.co/api/models?author=deepseek-ai&sort=lastModified&direction=-1&limit=3",
+      "expected_format": "json",
+      "language": "unknown",
+      "primacy_level": "primary",
+      "primacy_context": "Official model hub repository entries and weights published under the deepseek-ai namespace (technical sample for AI lab activity).",
+      "processing_mode": "structured_api",
+      "proposed_cadence": "Periodic polling every 1-4 hours.",
+      "freshness_definition": "lastModified timestamp from Hugging Face model metadata.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 3600,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "json_array",
+        "empty_allowed": true,
+        "expected_author": "deepseek-ai",
+        "known_limitation": "Technical sample of author namespace, not a comprehensive AI watchlist."
+      }
+    },
+    {
+      "source_id": "arena_text_overall",
+      "platform": "LMSYS Chatbot Arena (arena.ai)",
+      "family": "ai",
+      "url": "https://arena.ai/leaderboard/text/overall-no-style-control",
+      "expected_format": "html",
+      "language": "en",
+      "primacy_level": "secondary",
+      "primacy_context": "Third-party community benchmark evaluation / Elo leaderboard for LLM models under overall no-style-control category.",
+      "processing_mode": "html_document",
+      "proposed_cadence": "Daily or periodic leaderboard scrape.",
+      "freshness_definition": "Timestamp of latest leaderboard leaderboard update as stated on page.",
+      "role": "experimental",
+      "usable_for_forecast": false,
+      "sla_policy": {
+        "status": "proposed_policy_only",
+        "target_max_latency_seconds": 86400,
+        "measured_freshness": "not_measured"
+      },
+      "validation_rules": {
+        "response_type": "html",
+        "extraction_verified": false,
+        "known_limitation": "Endpoint historically returned HTTP 403 Forbidden under Cloudflare automated protection. Retained as canonical target without bypassing protections; extraction unverified."
+      }
+    }
+  ]
+}

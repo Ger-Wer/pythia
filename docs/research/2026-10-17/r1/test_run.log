@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+rootdir: /home/pythia/pythia-evidence-r1
+collected 129 items
+
+python/evaluation/tests/test_cpi_nowcast.py ....                         [  3%]
+python/evaluation/tests/test_edge_diff.py .......                        [  8%]
+python/evaluation/tests/test_edge_diff_v2.py ............                [ 17%]
+python/evaluation/tests/test_fetch_kalshi.py ......                      [ 22%]
+python/evaluation/tests/test_gdpnow.py ....                              [ 25%]
+python/evaluation/tests/test_kalshi_freshness.py ........                [ 31%]
+python/evaluation/tests/test_paper_cycle.py ........                     [ 37%]
+python/evaluation/tests/test_paper_data_guards.py .......                [ 43%]
+python/evaluation/tests/test_paper_healthcheck.py .......                [ 48%]
+python/evaluation/tests/test_paper_ledger.py .........                   [ 55%]
+python/evaluation/tests/test_paper_market.py .........                   [ 62%]
+python/evaluation/tests/test_paper_sources.py ..........                 [ 70%]
+python/evaluation/tests/test_paper_telegram.py ...................       [ 85%]
+python/evaluation/tests/test_source_probe.py ...............             [ 96%]
+python/evaluation/tests/test_zq_futures.py ....                          [100%]
+
+============================= 129 passed in 3.40s ==============================
