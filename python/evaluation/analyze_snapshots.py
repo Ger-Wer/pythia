@@ -6,20 +6,97 @@ Per-market drift/volatility signals are informational only.
 Run weekly via cron. Meaningful after 20+ days of data.
 """
 
+import argparse
 import json
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from python.evaluation.edge_diff import analyze_edge_diff
-from python.evaluation.edge_diff_v2 import reconstruct as reconstruct_v2
+from python.evaluation.edge_diff_v2 import analyze_edge_diff_v2, snapshot_diff_v2
+from python.evaluation.edge_diff import group_meeting_buckets, market_probs
+from python.evaluation.paper_sources import SourceError, finite_number, utc_time, validate_model_inputs
 from python.evaluation.zq_contracts import load_fixture
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
-# Historical per-month ZQ closes for the v2 reconstruction (past data is fixed).
-V2_FIXTURE = Path(__file__).resolve().parent / "tests" / "fixtures" / "zq_monthly_sep2026.json"
+
+
+def validated_diffs(snapshots, historical_fixture=None):
+    """Never silently join historical prices to newly collected snapshots.
+
+    Default analysis uses only timestamped sources saved in the same snapshot.
+    Explicit fixture mode additionally requires an explicitly identified daily
+    EFFR observation; legacy FEDFUNDS is not a substitute. Daily fixture closes
+    are only admitted on the following UTC date to prevent same-day hindsight.
+    """
+    closes = load_fixture(historical_fixture) if historical_fixture else None
+    diffs, skipped = [], []
+    for snap in snapshots:
+        try:
+            as_of = utc_time(snap["date"])
+            if closes is None:
+                inputs = snap.get("model_inputs")
+                if not inputs:
+                    raise SourceError("No timestamped EFFR/contract inputs in snapshot")
+                validate_model_inputs(inputs, as_of)
+                meeting = inputs["meeting"]
+                buckets = group_meeting_buckets(snap.get("markets", []))
+                if meeting not in buckets:
+                    raise SourceError("No corresponding Kalshi meeting")
+                required = {"H0", "C25", "C26", "H25", "H26"}
+                if not required.issubset(buckets[meeting]):
+                    raise SourceError("Incomplete Kalshi outcome buckets")
+                quotes = [m for m in snap.get("markets", [])
+                          if m.get("source") == "kalshi" and m.get("end_date") == meeting]
+                if any(not m.get("fetched_at") for m in quotes):
+                    raise SourceError("Kalshi snapshot lacks provider-fetch timestamps")
+                if any(not timedelta(0) <= as_of - utc_time(m["fetched_at"]) <= timedelta(seconds=60)
+                       for m in quotes):
+                    raise SourceError("Future/stale Kalshi provider fetch")
+                market = market_probs(buckets[meeting])
+                if (any(not isinstance(value, (int, float)) or not 0 <= value <= 1
+                        for value in market.values()) or abs(sum(market.values()) - 1) > 0.10):
+                    raise SourceError("Invalid/incomplete Kalshi probability mass")
+                probs = inputs["probabilities"]
+                diff = {"date": as_of.date().isoformat(), "meeting": meeting,
+                        "contract": inputs["zq"]["symbol"],
+                        "contract_price": inputs["zq"]["price"],
+                        "rate_before": inputs["effr"]["rate"], "rate_after": inputs["rate_after"]}
+                for outcome in ("cut", "hold", "hike"):
+                    diff[f"market_{outcome}"] = market[outcome]
+                    diff[f"zq_{outcome}"] = probs[outcome]
+                    diff[f"diff_{outcome}"] = market[outcome] - probs[outcome]
+                diffs.append(diff)
+            else:
+                effr = snap.get("effr")
+                if (not effr or not effr.get("source") or "effective_date" not in effr
+                        or effr.get("series") != "EFFR"):
+                    raise SourceError("Historical snapshot has no identified daily EFFR baseline")
+                effective = datetime.fromisoformat(effr["effective_date"]).replace(tzinfo=timezone.utc)
+                if not timedelta(0) <= as_of - effective <= timedelta(hours=96):
+                    raise SourceError("Future/stale historical EFFR")
+                cutoff = (as_of.date() - timedelta(days=1)).isoformat()
+                safe_closes = {}
+                for symbol, series in closes.items():
+                    safe_closes[symbol] = {
+                        day: value for day, value in series.items()
+                        if day <= cutoff and (as_of.date() - datetime.fromisoformat(day).date()).days <= 4
+                    }
+                historical_snap = dict(snap, fed_funds_rate=finite_number(effr["rate"], "historical EFFR"))
+                diff, reason = snapshot_diff_v2(historical_snap, safe_closes)
+                if diff is None:
+                    raise SourceError(reason)
+                diffs.append(diff)
+        except (SourceError, KeyError, TypeError, ValueError) as exc:
+            skipped.append({"date": snap.get("date"), "reason": str(exc)})
+    result = analyze_edge_diff_v2(diffs)
+    if result is not None:
+        result["skipped"] = skipped
+        result["mode"] = "HISTORICAL_FIXTURE_ONLY" if closes is not None else "RECORDED_LIVE_INPUTS"
+        result["interpretation"] = "Price divergence diagnostic; no proof of forecasting edge or profit."
+    return result, skipped
 
 
 def load_snapshots():
@@ -93,13 +170,26 @@ def detect_edge(mid, series, threshold=0.05):
     }
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Analyze recorded Pythia snapshots without fixture fallback")
+    parser.add_argument("--historical-fixture", type=Path,
+                        help="Explicit offline historical reconstruction only; never a live forecast")
+    args = parser.parse_args(argv)
     snapshots = load_snapshots()
     if not snapshots:
         print("No snapshots found.")
-        sys.exit(0)
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(timezone.utc)
+        report_file = REPORT_DIR / f"analysis_{now.date().isoformat()}.json"
+        report_file.write_text(json.dumps({
+            "generated": now.isoformat(), "status": "UNAVAILABLE",
+            "reason": "No snapshots found", "edge_diff_v2": None,
+            "analysis_mode": "HISTORICAL_FIXTURE_ONLY" if args.historical_fixture else "RECORDED_LIVE_INPUTS",
+        }, indent=2))
+        return 2
 
     n_days = len(snapshots)
+    snapshots.sort(key=lambda snapshot: snapshot["date"])
     first = snapshots[0]["date"][:10]
     last = snapshots[-1]["date"][:10]
 
@@ -150,7 +240,8 @@ def main():
             price = m["yes_price"]
             vol = m["volume"]
             q = m["question"][:65]
-            print(f"  P={price:.3f} vol=${vol/1e6:.1f}M | {q}")
+            price_text = f"{price:.3f}" if price is not None else "N/A"
+            print(f"  P={price_text} vol=${vol/1e6:.1f}M | {q}")
 
     edge_diff = analyze_edge_diff(snapshots)
     print()
@@ -171,9 +262,10 @@ def main():
     edge_diff_v2 = None
     print()
     print("=== STAGE 1 VERDICT v2 (AUTHORITATIVE, per-meeting ZQ) ===")
-    if V2_FIXTURE.exists():
-        closes = load_fixture(V2_FIXTURE)
-        edge_diff_v2, skipped = reconstruct_v2(snapshots, closes)
+    if args.historical_fixture is None or args.historical_fixture.exists():
+        edge_diff_v2, skipped = validated_diffs(snapshots, args.historical_fixture)
+        mode = "HISTORICAL FIXTURE ONLY" if args.historical_fixture else "RECORDED LIVE INPUTS"
+        print(f"Mode: {mode}; divergence is not proof of predictive edge.")
         if edge_diff_v2 is None:
             print("No per-meeting ZQ+Kalshi overlap — v2 unavailable.")
         else:
@@ -189,11 +281,12 @@ def main():
                 f"({edge_diff_v2['days_with_diff']} days with per-meeting data)"
             )
     else:
-        print(f"v2 fixture missing ({V2_FIXTURE.name}) — v2 skipped.")
+        print(f"Explicit historical fixture missing ({args.historical_fixture}) — v2 skipped.")
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report = {
         "generated": datetime.now(timezone.utc).isoformat(),
+        "status": "AVAILABLE" if edge_diff_v2 is not None else "UNAVAILABLE",
         "period": {"first": first, "last": last, "days": n_days},
         "markets_tracked": n_markets,
         "edges": [
@@ -207,12 +300,15 @@ def main():
         ],
         "edge_diff": edge_diff,
         "edge_diff_v2": edge_diff_v2,
+        "analysis_mode": "HISTORICAL_FIXTURE_ONLY" if args.historical_fixture else "RECORDED_LIVE_INPUTS",
+        "v2_skipped": skipped if args.historical_fixture is None or args.historical_fixture.exists() else [],
     }
     report_file = REPORT_DIR / f"analysis_{last}.json"
     with open(report_file, "w") as f:
         json.dump(report, f, indent=2)
     print(f"\nReport saved to {report_file}")
+    return 0 if edge_diff_v2 is not None else 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

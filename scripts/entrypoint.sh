@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pythia v2 entrypoint. Modes: scheduler (default), snapshot, analyze, healthcheck.
+# Pythia v2 entrypoint. All execution and tests belong on amper.
 set -euo pipefail
 
 export PYTHONPATH="${PYTHONPATH:-/app}"
@@ -22,12 +22,20 @@ case "${1:-scheduler}" in
     cd /app
     python3 python/evaluation/healthcheck.py 2>&1 | tee -a "$LOG_DIR/healthcheck.log"
     ;;
+  paper-cycle)
+    if [ "${PYTHIA_PAPER_ENABLED:-0}" != "1" ]; then
+      echo "Paper cycle disabled; no forecasts, fills or channel posts"
+      exit 0
+    fi
+    cd /app
+    python3 -m python.evaluation.paper_cycle --send
+    ;;
   shell)
     exec /bin/bash
     ;;
   *)
     echo "Unknown command: $1" >&2
-    echo "Usage: entrypoint.sh [scheduler|snapshot|analyze|healthcheck|shell]" >&2
+    echo "Usage: entrypoint.sh [scheduler|snapshot|analyze|healthcheck|paper-cycle|shell]" >&2
     exit 1
     ;;
 esac

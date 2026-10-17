@@ -18,6 +18,7 @@ from python.evaluation.gdpnow import get_latest_gdpnow
 from python.evaluation.cpi_nowcast import get_latest_cpi_nowcast
 from python.evaluation.zq_futures import get_zq_price
 from python.evaluation.fetch_kalshi import get_kalshi_fomc_markets
+from python.evaluation.paper_sources import SourceError, fetch_model_inputs, next_meeting
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
@@ -111,6 +112,9 @@ def snapshot_kalshi_market(m):
         "end_date": end,
         "clob_token_id": None,
         "source": "kalshi",
+        "fetched_at": m.get("fetched_at"),
+        "yes_bid": m.get("yes_bid"),
+        "yes_ask": m.get("yes_ask"),
     }
 
 
@@ -128,12 +132,14 @@ def snapshot_polymarket_market(m):
         return None
 
     yes_price = None
+    yes_idx = None
     for i, o in enumerate(outcomes):
         if o.lower() == "yes" and i < len(prices):
+            yes_idx = i
             try:
                 yes_price = float(prices[i])
             except (ValueError, TypeError) as exc:
-                log(f"  Could not parse YES price for sector {m.obtain('id')}: {exc}")
+                log(f"  Could not parse YES price for market {m.get('id')}: {exc}")
             break
 
     clob_ids_raw = m.get("clobTokenIds", "[]")
@@ -148,7 +154,10 @@ def snapshot_polymarket_market(m):
         "yes_price": yes_price,
         "volume": vol,
         "end_date": end[:10] if end else None,
-        "clob_token_id": clob_ids[0] if clob_ids else None,
+        "clob_token_id": clob_ids[yes_idx] if yes_idx is not None and yes_idx < len(clob_ids) else None,
+        "condition_id": m.get("conditionId"),
+        "outcomes": outcomes,
+        "clob_token_ids": clob_ids,
     }
 
 
@@ -213,6 +222,13 @@ def main():
 
     log(f"Captured {len(snapshots)} market snapshots across {len(buckets)} categories")
 
+    model_inputs = None
+    model_inputs_error = None
+    try:
+        model_inputs = fetch_model_inputs(next_meeting())
+    except (SourceError, KeyError, TypeError, ValueError) as exc:
+        model_inputs_error = str(exc)
+        log(f"  Model inputs unavailable; no paper forecast: {model_inputs_error}")
     now = datetime.now(timezone.utc)
     filename = f"macro_{now.strftime('%Y%m%d_%H%M')}.json"
     output_file = SNAPSHOT_DIR / filename
@@ -220,6 +236,10 @@ def main():
     daily_data = {
         "date": now.isoformat(),
         "fed_funds_rate": fed_funds_rate,
+        "fed_funds_rate_series": "FEDFUNDS_MONTHLY_LEGACY",
+        "model_inputs": model_inputs,
+        "model_inputs_error": model_inputs_error,
+        "effr": model_inputs["effr"] if model_inputs else None,
         "gdp_growth": gdp_growth["value"] if gdp_growth else None,
         "gdp_growth_date": gdp_growth["date"] if gdp_growth else None,
         "gdpnow": gdpnow["data"] if gdpnow else None,

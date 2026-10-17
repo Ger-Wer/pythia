@@ -7,8 +7,8 @@ Checks:
 2. Are FRED baselines non-null in the latest snapshot?
 
 Alerts via Telegram if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set.
-Designed to run from the host via cron (NOT inside the container) so it can
-detect a crashed container.
+Runs inside the project scheduler. Container health and last completed work
+are separate checks: a live scheduler alone does not prove useful work.
 
 Usage: python3 python/evaluation/healthcheck.py
 Exit codes: 0 healthy, 1 degraded, 2 critical.
@@ -38,13 +38,34 @@ def alert(msg: str):
     log(f"ALERT: {msg}")
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         try:
-            requests.post(
+            response = requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
                 json={"chat_id": TELEGRAM_CHAT_ID, "text": f"⚠️ Pythia v2: {msg}"},
                 timeout=10,
             )
-        except requests.RequestException as exc:
-            log(f"WARNING: Telegram alert delivery failed: {exc}")
+            if not response.ok or response.json().get("ok") is not True:
+                log("WARNING: Telegram alert was not confirmed")
+        except (requests.RequestException, ValueError):
+            log("WARNING: Telegram alert delivery failed (details redacted)")
+
+
+def check_paper_run(now=None, path=None):
+    if os.getenv("PYTHIA_PAPER_ENABLED") != "1":
+        return None
+    path = path or Path(__file__).resolve().parent / "data" / "paper" / "last_run.json"
+    try:
+        report = json.loads(path.read_text())
+        started = datetime.strptime(report["started_at"], "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=timezone.utc)
+        age = ((now or datetime.now(timezone.utc)) - started).total_seconds() / 3600
+        if not 0 <= age <= STALE_HOURS:
+            return "Paper cycle last completed work is stale or future-dated"
+        if report.get("mode") != "paper_only" or report.get("state") != "ok":
+            return "Paper cycle needs attention; inspect data/paper/last_run.json"
+        if "forecasts_total" not in report or "publication_states" not in report:
+            return "Paper cycle report lacks actual work counters"
+    except (OSError, ValueError, TypeError, KeyError):
+        return "Paper cycle has no valid completed-work report"
+    return None
 
 
 def latest_snapshot():
@@ -58,6 +79,10 @@ def latest_snapshot():
 
 
 def main():
+    paper_error = check_paper_run()
+    if paper_error:
+        alert(paper_error)
+        return 2
     # Check 1: snapshot freshness
     f, snap = latest_snapshot()
     if not f:

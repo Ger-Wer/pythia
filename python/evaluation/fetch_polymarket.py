@@ -6,6 +6,7 @@ Fetches historical prices via CLOB prices-history endpoint.
 """
 
 import json
+import math
 import os
 import sys
 import time
@@ -136,16 +137,20 @@ def fetch_fomc_by_slug() -> list[dict]:
             for market in event.get("markets", []):
                 outcome_prices = market.get("outcomePrices")
                 yes_price = None
-                if outcome_prices:
-                    try:
-                        prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
-                        yes_price = float(prices[0]) if prices else None
-                    except (json.JSONDecodeError, IndexError, ValueError):
-                        yes_price = None
 
                 end_date_raw = market.get("endDate") or event.get("endDate") or ""
                 end_date = end_date_raw[:10] if end_date_raw else ""
 
+                outcomes_raw = market.get("outcomes", "[]")
+                token_ids_raw = market.get("clobTokenIds", "[]")
+                try:
+                    outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+                    token_ids = json.loads(token_ids_raw) if isinstance(token_ids_raw, str) else token_ids_raw
+                    yes_idx = next(i for i, outcome in enumerate(outcomes) if str(outcome).lower() == "yes")
+                    prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+                    yes_price = float(prices[yes_idx]) if prices else None
+                except (json.JSONDecodeError, StopIteration, IndexError, TypeError, ValueError):
+                    continue
                 results.append({
                     "source": "polymarket_slug",
                     "market_id": market.get("conditionId", ""),
@@ -154,6 +159,12 @@ def fetch_fomc_by_slug() -> list[dict]:
                     "end_date": end_date,
                     "volume": float(market.get("volume") or 0),
                     "event_slug": slug,
+                    "gamma_market_id": market.get("id"),
+                    "outcomes": outcomes,
+                    "clob_token_ids": token_ids,
+                    "outcome_prices": prices,
+                    "closed": market.get("closed", False),
+                    "uma_resolution_status": market.get("umaResolutionStatus"),
                 })
         time.sleep(0.3)
     log(f"Fetched {len(results)} FOMC markets via slug fallback")
@@ -199,20 +210,37 @@ def build_dataset(events: list) -> list:
             if not clob_ids or not outcomes:
                 continue
 
-            yes_idx = 0
+            yes_idx = None
             for i, o in enumerate(outcomes):
                 if o.lower() == "yes":
                     yes_idx = i
                     break
 
+            if yes_idx is None:
+                continue
             yes_token = clob_ids[yes_idx] if yes_idx < len(clob_ids) else None
-            resolved_price = float(final_prices[yes_idx]) if yes_idx < len(final_prices) else None
+            try:
+                resolved_price = float(final_prices[yes_idx]) if yes_idx < len(final_prices) else None
+            except (ValueError, TypeError):
+                resolved_price = None
 
             resolved_outcome = None
-            if resolved_price is not None:
-                if resolved_price > 0.9:
+            # Closed is not resolved: halted/disputed markets may still trade at
+            # near-terminal prices. Only the provider's final resolution status
+            # plus an exact terminal outcome can settle a historical record.
+            try:
+                terminal_prices = [float(value) for value in final_prices]
+                terminal_pair = (len(terminal_prices) == 2 and all(math.isfinite(value) for value in terminal_prices)
+                                 and sorted(terminal_prices) == [0.0, 1.0])
+            except (ValueError, TypeError):
+                terminal_pair = False
+            final_resolution = (closed is True
+                                and str(m.get("umaResolutionStatus", "")).lower() == "resolved"
+                                and terminal_pair)
+            if final_resolution and resolved_price is not None:
+                if resolved_price == 1.0:
                     resolved_outcome = "YES"
-                elif resolved_price < 0.1:
+                elif resolved_price == 0.0:
                     resolved_outcome = "NO"
 
             price_history = None
@@ -234,6 +262,8 @@ def build_dataset(events: list) -> list:
                 "closed": closed,
                 "resolved_outcome": resolved_outcome,
                 "resolved_price": resolved_price,
+                "resolution_status": m.get("umaResolutionStatus"),
+                "condition_id": m.get("conditionId"),
                 "yes_token_id": yes_token,
                 "price_history": price_history,
                 "volume": float(m.get("volumeNum", 0) or 0),
@@ -267,10 +297,14 @@ def main():
                     "markets": [{
                         "question": sm["question"],
                         "conditionId": sm["market_id"],
-                        "outcomePrices": json.dumps([str(sm["yes_price"] or 0), str(1 - (sm["yes_price"] or 0))]),
-                        "outcomes": '["Yes","No"]',
+                        "id": sm["gamma_market_id"],
+                        "outcomePrices": json.dumps(sm["outcome_prices"]),
+                        "outcomes": json.dumps(sm["outcomes"]),
+                        "clobTokenIds": json.dumps(sm["clob_token_ids"]),
+                        "closed": sm["closed"],
+                        "umaResolutionStatus": sm["uma_resolution_status"],
                         "endDate": sm["end_date"],
-                        "volume": sm["volume"],
+                        "volumeNum": sm["volume"],
                     }],
                 })
             log(f"Added {len(slug_markets)} slug-based FOMC markets to dataset")

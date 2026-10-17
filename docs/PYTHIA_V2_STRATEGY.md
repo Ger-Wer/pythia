@@ -1,5 +1,13 @@
 # Pythia v2 — Strategy, Audit & Roadmap
 
+> **Owner decision, 2026-10-17 (supersedes the sequencing below):** build the
+> paper-trading system while testing the already-existing Telegram channel.
+> Forecasts, simulated positions and all outcomes must be explicitly PAPER.
+> Audience testing runs alongside paper validation. Live funds remain prohibited;
+> no profitable-edge or backtest gate has been passed. The original business goal
+> remains an honest Telegram forecast channel supported eventually by advertising.
+> See `PAPER_CHANNEL_PILOT.md` for the implemented pilot and its acceptance criteria.
+
 **Status:** ACTIVE — Stage 1 running, Stage 2 legal path confirmed (OÜ)
 **Date:** 2026-07-05
 **Author:** Engineering review session

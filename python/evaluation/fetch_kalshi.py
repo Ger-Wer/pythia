@@ -79,7 +79,11 @@ def _fetch_markets_page(cursor=None):
         )
         r.raise_for_status()
         data = r.json()
+        fetched_at = datetime.now(timezone.utc).isoformat()
         markets = data.get("markets", [])
+        # Stamp the successful provider response, not cache access. Cached
+        # normalized records retain this original timestamp unchanged.
+        markets = [dict(m, _fetched_at=fetched_at) for m in markets]
         next_cursor = data.get("cursor")
         return markets, next_cursor
     except (requests.RequestException, ValueError, KeyError) as e:
@@ -118,6 +122,7 @@ def _normalize_market(m: dict) -> dict:
         "end_date": _parse_date(m.get("close_time", "")),
         "volume": float(m.get("volume_fp", 0)),
         "strike_info": _parse_strike_info(m.get("ticker", "")),
+        "fetched_at": m.get("_fetched_at"),
     }
 
 

@@ -70,12 +70,17 @@ def move_probs(rate_before: float, rate_after: float, step: float = 0.25):
     return {"hold": 1.0 - p_cut - p_hike, "cut": p_cut, "hike": p_hike}
 
 
-def close_on_or_before(series: dict, date_iso: str):
+def close_on_or_before(series: dict, date_iso: str, max_age_days=None):
     """Latest available close on or before date_iso (weekends/holidays roll back)."""
     candidates = [d for d in series if d <= date_iso]
     if not candidates:
         return None
-    return series[max(candidates)]
+    latest = max(candidates)
+    if max_age_days is not None:
+        age = (datetime.fromisoformat(date_iso).date() - datetime.fromisoformat(latest).date()).days
+        if age > max_age_days:
+            return None
+    return series[latest]
 
 
 def load_fixture(path) -> dict:

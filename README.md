@@ -7,16 +7,20 @@ tradeable. The moat is a public, on-chain-verifiable track record.
 
 > **Canonical strategy & roadmap:** [`docs/PYTHIA_V2_STRATEGY.md`](docs/PYTHIA_V2_STRATEGY.md) — read first.
 
-## Status
+## Status — 2026-10-17
+
+Owner decision: **paper trading and the existing Telegram channel are tested
+together**. No real orders or funds. The complete new paper cycle and its limits
+are described in [PAPER_CHANNEL_PILOT.md](docs/PAPER_CHANNEL_PILOT.md).
 
 Staged go/no-go (each stage is a gate):
 
 | Stage | What | Status |
 |---|---|---|
-| 0 | Backtest FOMC/ZQ edge | ✅ done — `python/evaluation/run_backtest.py` |
-| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` (v1, deprecated) + `edge_diff_v2.py` (**authoritative** since 2026-09-16: per-meeting ZQ contract with CME day-weighting; v1 cut leg saturated 68/68, measures structural mismatch) |
-| 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
-| 3 | Audience & ads on top of a proven record | ⏸ pending |
+| 0 | Historical backtest | Open: the earlier empty dataset did not establish an edge |
+| 1 | Prospective paper experiment | New `paper_cycle.py`: EFFR/ZQ, immutable ledger, asks/depth/fees/risk limits, outcomes and PAPER posts |
+| 2 | Real funds | Blocked; requires a separate owner decision and current legal/tax review |
+| Channel | Existing Telegram | Tested alongside paper, explicitly labelled PAPER; no claim of profitable forecasts |
 
 ## What's in this repo
 
@@ -75,7 +79,10 @@ Trading via **Estonian OÜ** is the confirmed legal path (legal opinion obtained
 - Red lines: no third-party funds, no affiliate links
 - Details: `docs/ESTONIA_LEGAL_OPINION.md`
 
-## Run locally
+## Run and test — amper only
+
+Local project execution and testing are prohibited by `PYTHIA_CONSTITUTION.md`.
+The following commands belong in the server checkout, reached by `ssh pythia@amper`.
 
 ```bash
 pip install -r python/requirements.txt
@@ -100,11 +107,32 @@ docker compose logs -f pythia-v2
 
 One container (`pythia-v2`) runs `supercronic`, which fires:
 - `0 8 * * *`  — daily snapshot (FOMC + GDP + CPI + ZQ futures)
+- `15 8 * * *` — paper cycle + existing channel (explicit opt-in; see pilot doc)
 - `0 9 * * 0`  — weekly edge analysis (Sundays 09:00 UTC)
 - `0 20 * * *` — daily health check (snapshot freshness, FRED baselines, market count)
 
 Snapshots land in `python/evaluation/snapshots/`, reports in `python/evaluation/reports/`.
-Both are bind-mounted volumes, so state survives container rebuilds.
+Both are bind-mounted volumes, so state survives container rebuilds. Paper ledger,
+outbox and last completed-work report live in the existing data mount at
+`python/evaluation/data/paper/`; they are ignored by Git and survive rebuilds.
+
+## Paper data and accounting safeguards
+
+`paper_sources.py` uses the current effective daily EFFR, not a monthly FEDFUNDS
+average. Future/stale sources and unsupported model conditions block forecasts.
+The conditional 25bp model is a hypothesis, not an independently calibrated
+distribution. The first allowlisted event is October FOMC; adding CPI/GDP/AI
+requires its own validated model and market mapping.
+
+`paper_ledger.py` records prospective forecasts, simulated fills and outcomes
+append-only. PnL includes fees; equity for open positions is cost-based, not marked
+to market. Brier counts first forecasts and reports independent completed events.
+`paper_telegram.py` keeps a durable outbox: confirmed posts are not resent, uncertain
+delivery needs reconciliation, expired forecast windows are not published.
+
+Weekly legacy analysis no longer silently reads a September fixture. Explicit
+`--historical-fixture` is a historical-only mode; legacy snapshots lacking daily
+EFFR and provider timestamps are unavailable for current validated analysis.
 
 ## v1 decommission
 
