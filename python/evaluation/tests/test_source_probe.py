@@ -1,10 +1,15 @@
-"""Pythia R1.1: Offline unit tests for source registry and bounded source probe."""
+"""Pythia R1.2: Offline unit tests for source registry and bounded source probe."""
 
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
+import multiprocessing as mp
 import os
+import socket
 import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -588,3 +593,283 @@ def test_partial_batch_failure_and_overall_summary():
     assert failing["status"] == "network_error"
     assert "Connection timed out" in failing["reason"]
     assert "NameError" not in failing["reason"]
+
+
+def test_rss_rejects_truncated_xml(probe):
+    """RSS XML with truncated closing tags is rejected as invalid_content at envelope level."""
+    valid_feed = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        '<title>Federal Reserve Press Releases - Monetary Policy</title>'
+        '<link>https://www.federalreserve.gov/</link>'
+        '<item><title>FOMC statement</title>'
+        '<link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20261016a.htm</link>'
+        '</item></channel></rss>'
+    ).encode()
+    truncated = valid_feed.removesuffix(b"</channel></rss>")
+    status, level, reason, count = probe.validate_content(
+        source_id="fed_monetary_rss",
+        http_status=200,
+        content_type="application/rss+xml",
+        body=truncated,
+        limit_exceeded=False,
+        error_msg=None,
+    )
+    assert status == "invalid_content"
+    assert level == "envelope"
+    assert "Malformed or truncated XML" in reason
+    assert count is None
+
+
+def test_rss_rejects_fed_banking_orders_for_monetary(probe):
+    """Fed Banking Applications / orders feed is rejected for fed_monetary_rss."""
+    orders_feed = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        '<title>FRB: Press Release - Banking Applications</title>'
+        '<link>https://www.federalreserve.gov/</link>'
+        '<item><title>Banking order</title>'
+        '<link>https://www.federalreserve.gov/newsevents/pressreleases/orders20261016a.htm</link>'
+        '</item></channel></rss>'
+    ).encode()
+    status, level, reason, count = probe.validate_content(
+        source_id="fed_monetary_rss",
+        http_status=200,
+        content_type="application/rss+xml",
+        body=orders_feed,
+        limit_exceeded=False,
+        error_msg=None,
+    )
+    assert status == "invalid_content"
+    assert level == "content"
+    assert "identity mismatch" in reason.lower()
+
+
+def test_rss_rejects_bls_employment_for_cpi(probe):
+    """BLS Employment Situation feed is rejected for bls_cpi_rss."""
+    empsit_feed = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        '<title>Bureau of Labor Statistics</title>'
+        '<link>https://www.bls.gov/</link>'
+        '<item><title>Employment Situation</title>'
+        '<link>https://www.bls.gov/news.release/empsit.nr0.htm</link>'
+        '</item></channel></rss>'
+    ).encode()
+    status, level, reason, count = probe.validate_content(
+        source_id="bls_cpi_rss",
+        http_status=200,
+        content_type="application/rss+xml",
+        body=empsit_feed,
+        limit_exceeded=False,
+        error_msg=None,
+    )
+    assert status == "invalid_content"
+    assert level == "content"
+    assert "identity mismatch" in reason.lower()
+
+
+def test_rss_rejects_mixed_category_entries(probe):
+    """Feed containing a valid monetary item mixed with a non-monetary order item is rejected."""
+    mixed_feed = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        '<title>Federal Reserve Press Releases - Monetary Policy</title>'
+        '<link>https://www.federalreserve.gov/</link>'
+        '<item><title>FOMC statement</title>'
+        '<link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20261016a.htm</link></item>'
+        '<item><title>Banking order</title>'
+        '<link>https://www.federalreserve.gov/newsevents/pressreleases/orders20261016a.htm</link></item>'
+        '</channel></rss>'
+    ).encode()
+    status, level, reason, count = probe.validate_content(
+        source_id="fed_monetary_rss",
+        http_status=200,
+        content_type="application/rss+xml",
+        body=mixed_feed,
+        limit_exceeded=False,
+        error_msg=None,
+    )
+    assert status == "invalid_content"
+    assert level == "content"
+    assert "validation failed" in reason.lower()
+    assert count == 1
+
+
+def test_real_requests_loopback_drip_interrupted_by_deadline():
+    """Real slow loopback HTTP server dripping bytes is interrupted by worker process deadline."""
+    body_data = b"x" * 120
+    request_received = mp.Value("b", False)
+    bytes_sent = mp.Value("i", 0)
+
+    class DripHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            pass
+
+        def do_GET(self):
+            request_received.value = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body_data)))
+            self.end_headers()
+            try:
+                for b in body_data:
+                    self.wfile.write(bytes([b]))
+                    self.wfile.flush()
+                    bytes_sent.value += 1
+                    time.sleep(0.025)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), DripHandler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    class LoopbackSession(requests.Session):
+        def __init__(self):
+            super().__init__()
+            self.trust_env = False
+
+        def get(self, url, **kwargs):
+            return super().get(f"http://127.0.0.1:{server.server_address[1]}/drip", **kwargs)
+
+    budget = 0.25
+    sess = LoopbackSession()
+    probe = SourceProbe(timeout=budget, session=sess)
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+
+    t0 = time.monotonic()
+    try:
+        res = probe.probe_single(cfg)
+        elapsed = time.monotonic() - t0
+
+        assert res["status"] == "network_error"
+        assert res["validation_level"] == "transport"
+        assert res["body_sha256"] is None
+        assert res["bytes_received"] is None
+        assert res["bytes_stored"] is None
+        assert "deadline exceeded" in res["reason"].lower()
+
+        # Elapsed must be strictly within budget + 0.35s (and well under the 3.0s total stream)
+        assert elapsed <= budget + 0.35, f"Elapsed {elapsed:.4f}s exceeded budget ({budget}s + 0.35s)"
+        assert bool(request_received.value) is True, "Test server did not receive GET request"
+        assert bytes_sent.value > 0, "No bytes were sent before interruption"
+        assert bytes_sent.value < len(body_data), "Entire stream was sent without being interrupted"
+    finally:
+        sess.close()
+        probe.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1.0)
+
+
+def test_blocking_resolver_interrupted_by_deadline():
+    """Blocking DNS resolver inside worker process is interrupted promptly by parent deadline."""
+    resolver_entered = mp.Value("b", False)
+
+    def delayed_resolver(*args, **kwargs):
+        resolver_entered.value = True
+        time.sleep(1.0)
+        raise socket.gaierror("synthetic resolver delay")
+
+    budget = 0.20
+    probe = SourceProbe(timeout=budget)
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+
+    t0 = time.monotonic()
+    with patch("socket.getaddrinfo", delayed_resolver):
+        res = probe.probe_single(cfg)
+    elapsed = time.monotonic() - t0
+
+    assert res["status"] == "network_error"
+    assert res["validation_level"] == "transport"
+    assert res["body_sha256"] is None
+    assert res["bytes_received"] is None
+    assert res["bytes_stored"] is None
+    assert "deadline exceeded" in res["reason"].lower()
+
+    assert elapsed <= budget + 0.35, f"Elapsed {elapsed:.4f}s exceeded budget ({budget}s + 0.35s)"
+    assert bool(resolver_entered.value) is True, "Resolver was not entered"
+
+
+def test_timeout_on_first_source_does_not_block_subsequent_source():
+    """Timeout on first probed source terminates worker and leaves subsequent sources unaffected."""
+    class StallingSession(requests.Session):
+        def __init__(self):
+            super().__init__()
+            self.trust_env = False
+
+        def get(self, url, **kwargs):
+            if "last/5.json" in url:
+                time.sleep(1.5)
+                raise requests.ConnectionError("stalled")
+            resp = requests.Response()
+            resp.status_code = 200
+            resp.headers["Content-Type"] = "application/json"
+            resp._content = json.dumps([
+                {"tag_name": "v3.0.0", "html_url": "https://github.com/deepseek-ai/DeepSeek-V3/releases/tag/v3.0.0"}
+            ]).encode("utf-8")
+            resp._content_consumed = True
+            return resp
+
+    sess = StallingSession()
+    probe = SourceProbe(timeout=0.20, session=sess)
+
+    # First probe times out
+    cfg1 = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+    res1 = probe.probe_single(cfg1)
+    assert res1["status"] == "network_error"
+    assert res1["body_sha256"] is None
+
+    # Second probe succeeds normally without interference
+    cfg2 = {"source_id": "github_deepseek_v3_releases", "url": CANONICAL_SOURCES["github_deepseek_v3_releases"]}
+    res2 = probe.probe_single(cfg2)
+    assert res2["status"] == "valid"
+    assert res2["body_sha256"] is not None
+
+    # Verify no lingering zombie child processes
+    active_children = mp.active_children()
+    assert len(active_children) == 0, f"Lingering child processes detected: {active_children}"
+
+
+def test_real_oversized_stream_through_fetch_path():
+    """A real fetch exceeding 2 MiB stream limit correctly truncates buffer and invalidates SHA-256."""
+    total_chunks = 34  # 34 * 65536 = 2,228,224 bytes (> 2,097,152 bytes)
+
+    class LargeStreamAdapter(requests.adapters.BaseAdapter):
+        def send(self, request, **kwargs):
+            resp = requests.Response()
+            resp.status_code = 200
+            resp.headers = {"Content-Type": "application/json"}
+            resp.url = request.url
+
+            class LargeRaw:
+                def __init__(self):
+                    self.chunks_sent = 0
+                def stream(self, chunk_size, decode_content=True):
+                    for _ in range(total_chunks):
+                        self.chunks_sent += 1
+                        yield b"x" * 65536
+                def close(self):
+                    pass
+                def release_conn(self):
+                    pass
+
+            resp.raw = LargeRaw()
+            return resp
+
+        def close(self):
+            pass
+
+    sess = requests.Session()
+    sess.trust_env = False
+    sess.mount("https://", LargeStreamAdapter())
+
+    probe = SourceProbe(session=sess)
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+    res = probe.probe_single(cfg)
+
+    assert res["status"] == "invalid_content"
+    assert res["validation_level"] == "transport"
+    assert res["body_sha256"] is None
+    assert res["bytes_stored"] == STREAM_LIMIT_BYTES  # exactly 2 MiB
+    assert res["bytes_received"] > STREAM_LIMIT_BYTES  # exceeded boundary
+    assert "Payload exceeded maximum stream limit" in res["reason"]
+

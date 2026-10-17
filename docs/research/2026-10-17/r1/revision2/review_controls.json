@@ -1,0 +1,56 @@
+{
+  "reviewed_commit": "b0c5fa2f86b22a9753d6ad8cfa6be7c659c106b9",
+  "requests_version": "2.34.2",
+  "checks": [
+    {
+      "case": "bls_employment_feed_is_not_cpi",
+      "status": "invalid_content",
+      "validation_level": "content",
+      "reason": "Feed identity mismatch: expected BLS Consumer Price Index, got channel title 'Bureau of Labor Statistics'.",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "fed_bank_orders_are_not_monetary_policy",
+      "status": "invalid_content",
+      "validation_level": "content",
+      "reason": "Feed identity mismatch: expected Federal Reserve Monetary Policy, got channel title 'FRB: Press Release - Banking Applications'.",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "truncated_rss_xml",
+      "status": "invalid_content",
+      "validation_level": "envelope",
+      "reason": "Malformed or truncated XML: no element found: line 1, column 288",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "real_requests_loopback_drip_deadline",
+      "budget_seconds": 0.2,
+      "elapsed_seconds": 0.2087,
+      "reported_ms": 208.44,
+      "status": "network_error",
+      "body_sha256": null,
+      "bytes_received": null,
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "test_only_routing": true,
+      "external_http": false,
+      "meets_expectation": true
+    },
+    {
+      "case": "blocking_resolver_deadline",
+      "budget_seconds": 0.2,
+      "elapsed_seconds": 0.2031,
+      "status": "network_error",
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "synthetic_resolver_calls": 0,
+      "external_dns": false,
+      "meets_expectation": true
+    }
+  ]
+}

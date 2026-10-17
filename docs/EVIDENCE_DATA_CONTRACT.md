@@ -22,13 +22,15 @@
    - Translated text is strictly separated from original text and explicitly attributed to a translation engine and version.
 4. **Anonymous & Bounded Transport:**
    - All diagnostic probes and evidence collectors operate with anonymous transport: ambient environment credentials (`.netrc`, ambient proxy variables) are disabled (`trust_env = False`), cookie persistence and transmission are blocked, and TLS certificate verification is enforced.
-   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering DNS, TCP/TLS connect, redirects, and total stream read duration) and a **streaming memory buffer limit of 2 MiB** (2,097,152 bytes).
+   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, and total stream read duration) enforced strictly via an isolated short-lived worker process under parent deadline control. The parent enforces termination upon deadline expiration via a sequence of `terminate()` -> grace (0.15s) -> `kill()` (SIGKILL) -> `join()` (reap) with a documented bounded cleanup allowance of **<= 0.50 seconds** over the operational budget.
+   - Streaming memory buffer is capped at **2 MiB** (2,097,152 bytes). An oversized response is immediately truncated at 2 MiB, closing the stream and invalidating the integrity hash (`body_sha256 = null`).
+   - If a worker process is forcibly killed by timeout or terminated unexpectedly before metric transmission, actual transferred byte counters cannot be fabricated; `bytes_received`, `bytes_stored`, and `http_status` are reported as `null` with a clear explanation in `reason`.
 5. **Zero Edge Assumption:**
-   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1 and R1.1 carries `usable_for_forecast: false`.
+   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1 and R1.2 carries `usable_for_forecast: false`.
 
 ---
 
-## 2. Probe Result Contract (R1/R1.1 Diagnostic Layer)
+## 2. Probe Result Contract (R1/R1.2 Diagnostic Layer)
 
 A probe run tests whether an endpoint is reachable and conforms to expected transport and envelope schemas under strict bounds.
 
@@ -41,35 +43,35 @@ A probe run tests whether an endpoint is reachable and conforms to expected tran
 | `family` | `string` (enum) | No | Domain classification: `"macro"` or `"ai"`. |
 | `initial_url` | `string` (URI) | No | Configured canonical URL requested by the probe. |
 | `final_url` | `string` (URI) | No | Destination URL after following redirects (max 3 allowed within domain allowlist). |
-| `http_status` | `integer` | Yes | HTTP status code (e.g. `200`, `403`). `null` if network error occurred before response. |
+| `http_status` | `integer` | Yes | HTTP status code (e.g. `200`, `403`). `null` if network error occurred before response or worker was killed by timeout. |
 | `fetch_started_at` | `string` (ISO 8601 UTC) | No | UTC timestamp when request was initiated. |
 | `fetch_completed_at` | `string` (ISO 8601 UTC) | No | UTC timestamp when response stream closed or timed out. |
-| `duration_ms` | `float` | No | Elapsed request duration in milliseconds (bounded by overall 15.0s deadline). |
-| `bytes_received` | `integer` | No | Total bytes read from socket/stream up to truncation boundary. |
-| `bytes_stored` | `integer` | No | Bytes retained in buffer (strictly capped at 2 MiB / 2,097,152 bytes). |
+| `duration_ms` | `float` | No | Elapsed request duration in milliseconds (bounded by overall 15.0s deadline + cleanup margin). |
+| `bytes_received` | `integer` | Yes | Total bytes read from socket/stream up to truncation boundary, or `null` if worker process was forcibly terminated by timeout before counters could be reported. |
+| `bytes_stored` | `integer` | Yes | Bytes retained in buffer (strictly capped at 2 MiB / 2,097,152 bytes), or `null` if worker process was forcibly terminated by timeout. |
 | `content_type` | `string` | Yes | `Content-Type` header from response, or `null` if unavailable. |
 | `body_sha256` | `string` (hex 64) | Yes | SHA-256 of complete payload. **Must be `null`** if stream was truncated, interrupted, timed out, or unverified. |
 | `status` | `string` (enum) | No | Probe status (see §2.2). |
 | `validation_level` | `string` (enum) | No | Depth of check passed/attempted (see §2.3). |
 | `reason` | `string` | No | Clear, human-readable justification for the status and level. |
 | `item_count` | `integer` | Yes | Number of verified items/releases/records parsed (e.g. 5 refRates, 0 releases). `null` for unparsed HTML. |
-| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R1.1 probes. |
-| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r1.1/1.0`). |
-| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R1.1. |
+| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R1.2 probes. |
+| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r1.2/1.0`). |
+| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R1.2. |
 
 ### 2.2 Status Enumeration (`status`)
 
-- `valid`: The response satisfied all transport, envelope, and expected content structure checks for this specific endpoint (exact series match, valid calendar date, finite numeric values, verified feed identity, valid release paths).
+- `valid`: The response satisfied all transport, envelope, and expected content structure checks for this specific endpoint (exact series match, valid calendar date, finite numeric values, verified feed category identity and XML integrity, valid release paths).
 - `blocked`: Access denied by HTTP 401/403/429, WAF, Cloudflare challenge, or CAPTCHA.
-- `invalid_content`: The server returned HTTP 200, but payload structure does not match the expected contract (e.g. error HTML instead of RSS, dictionary instead of releases array, missing `refRates`, invalid series `NOT_EFFR`, non-string tag, empty model name, unrelated sports feed).
+- `invalid_content`: The server returned HTTP 200, but payload structure does not match the expected contract (e.g. error HTML instead of RSS, dictionary instead of releases array, missing `refRates`, invalid series `NOT_EFFR`, non-string tag, empty model name, unrelated sports feed, wrong feed category such as Fed Banking Orders for monetary policy or BLS Employment Situation for CPI, malformed or truncated XML).
 - `network_error`: Connection refused, DNS failure, overall deadline exceeded (> 15.0s), or redirect to an untrusted domain.
 - `unverified`: Transport and envelope succeeded, but substantive data extraction was not performed or verified in this stage (e.g. Atlanta Fed GDPNow HTML, LMSYS Arena HTML).
 
 ### 2.3 Validation Level Enumeration (`validation_level`)
 
-- `transport`: Only TCP/TLS connection, stream limit boundaries, and HTTP status code were evaluated.
-- `envelope`: Transport succeeded, and top-level format envelope was confirmed (e.g. valid JSON parsing, valid RSS `<rss>` root, valid HTML `<html>` document).
-- `content`: Substantive inner structure, required field types, and entity identifiers were confirmed (e.g. `refRates` contains numeric `percentRate` and exact `EFFR` type; GitHub releases contain repo references; RSS contains expected feed items with official domain links).
+- `transport`: Only TCP/TLS connection, stream limit boundaries, and HTTP status code were evaluated. Stream overflow truncation and process deadline termination report at this level.
+- `envelope`: Transport succeeded, and top-level format envelope was confirmed (e.g. valid JSON parsing, non-truncated XML ElementTree parse with supported `<rss>`/`<feed>` root, valid HTML `<html>` document). Truncated XML fails at this level.
+- `content`: Substantive inner structure, required field types, and entity identifiers were confirmed (e.g. `refRates` contains numeric `percentRate` and exact `EFFR` type; GitHub releases contain repo references; RSS contains expected category items with official domain links). Feed category mismatch fails at this level.
 
 ---
 

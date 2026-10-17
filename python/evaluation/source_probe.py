@@ -1,10 +1,10 @@
-"""Pythia R1.1: Bounded single-run probe for the 8 canonical evidence sources.
+"""Pythia R1.2: Bounded single-run probe for the 8 canonical evidence sources.
 
 Runs sequential diagnostic HTTP/HTTPS requests against sources specified in
 source_registry.json. Performs strict transport, envelope, and content validation
-under controlled constraints (streaming 2 MiB limit, overall 15s deadline per source,
-max 3 redirects within domain allowlists, anonymous transport with no ambient credentials
-or persistent cookies).
+under controlled constraints (streaming 2 MiB limit, overall 15s deadline per source
+enforced via short-lived worker process under parent control, max 3 redirects within
+domain allowlists, anonymous transport with no ambient credentials or persistent cookies).
 
 Usage:
     python -m python.evaluation.source_probe --output <path-to-json-output>
@@ -13,14 +13,19 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gc
 import hashlib
 import http.cookiejar
 import json
 import logging
 import math
+import multiprocessing
+import os
+import signal
 import sys
 import time
 import urllib.parse
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -28,12 +33,14 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import feedparser
 import requests
 
-PROBE_VERSION = "pythia-probe-r1.1/1.0"
+PROBE_VERSION = "pythia-probe-r1.2/1.0"
 STREAM_LIMIT_BYTES = 2 * 1024 * 1024  # 2 MiB = 2,097,152 bytes
 DEFAULT_TIMEOUT_SECONDS = 15.0
 MAX_REDIRECTS = 3
+CLEANUP_GRACE_SECONDS = 0.15
+MAX_CLEANUP_SECONDS = 0.50
 
-DEFAULT_USER_AGENT = "Pythia-source-probe/1.1 (+https://github.com/Ger-Wer/pythia)"
+DEFAULT_USER_AGENT = "Pythia-source-probe/1.2 (+https://github.com/Ger-Wer/pythia)"
 
 # Canonical 8 source IDs and their exact official URLs
 CANONICAL_SOURCES: Dict[str, str] = {
@@ -133,6 +140,241 @@ def validate_registry(sources: Any) -> List[Dict[str, Any]]:
     return sources
 
 
+def _fetch_bounded_core(
+    sess: requests.Session,
+    source_id: str,
+    initial_url: str,
+    timeout: float,
+    max_redirects: int,
+    max_bytes: int,
+    user_agent: str,
+) -> Dict[str, Any]:
+    """Inner core fetch executed inside worker process."""
+    current_url = initial_url
+    redirect_count = 0
+    allowed_domains = ALLOWED_DOMAINS.get(source_id, set())
+
+    headers = {
+        "User-Agent": user_agent,
+        "Accept": "*/*",
+    }
+
+    start_time = time.perf_counter()
+
+    while True:
+        elapsed = time.perf_counter() - start_time
+        if elapsed > timeout:
+            duration_ms = elapsed * 1000.0
+            return {
+                "status_code": None,
+                "content_type": None,
+                "body": b"",
+                "bytes_received": 0,
+                "bytes_stored": 0,
+                "limit_exceeded": False,
+                "final_url": current_url,
+                "duration_ms": duration_ms,
+                "error_msg": f"Overall source deadline exceeded ({timeout}s): elapsed {elapsed:.2f}s",
+            }
+
+        remaining_timeout = max(0.001, timeout - elapsed)
+
+        parsed = urllib.parse.urlparse(current_url)
+        if parsed.scheme.lower() != "https":
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return {
+                "status_code": None,
+                "content_type": None,
+                "body": b"",
+                "bytes_received": 0,
+                "bytes_stored": 0,
+                "limit_exceeded": False,
+                "final_url": current_url,
+                "duration_ms": duration_ms,
+                "error_msg": f"Non-HTTPS scheme rejected: {parsed.scheme}",
+            }
+
+        domain = parsed.netloc.lower()
+        if domain not in allowed_domains:
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return {
+                "status_code": None,
+                "content_type": None,
+                "body": b"",
+                "bytes_received": 0,
+                "bytes_stored": 0,
+                "limit_exceeded": False,
+                "final_url": current_url,
+                "duration_ms": duration_ms,
+                "error_msg": f"Domain {domain} not in allowlist for source {source_id}",
+            }
+
+        try:
+            resp = sess.get(
+                current_url,
+                headers=headers,
+                stream=True,
+                allow_redirects=False,
+                timeout=remaining_timeout,
+            )
+        except requests.RequestException as exc:
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return {
+                "status_code": None,
+                "content_type": None,
+                "body": b"",
+                "bytes_received": 0,
+                "bytes_stored": 0,
+                "limit_exceeded": False,
+                "final_url": current_url,
+                "duration_ms": duration_ms,
+                "error_msg": f"Network transport error: {type(exc).__name__}: {str(exc)}",
+            }
+
+        # Handle redirects manually to enforce max_redirects and domain constraints
+        if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+            redirect_count += 1
+            location = resp.headers.get("Location")
+            status_code = resp.status_code
+            content_type = resp.headers.get("Content-Type")
+            try:
+                resp.close()
+            except Exception:
+                pass
+
+            if redirect_count > max_redirects:
+                duration_ms = (time.perf_counter() - start_time) * 1000.0
+                return {
+                    "status_code": status_code,
+                    "content_type": content_type,
+                    "body": b"",
+                    "bytes_received": 0,
+                    "bytes_stored": 0,
+                    "limit_exceeded": False,
+                    "final_url": current_url,
+                    "duration_ms": duration_ms,
+                    "error_msg": f"Exceeded maximum redirect limit ({max_redirects})",
+                }
+            if not location:
+                duration_ms = (time.perf_counter() - start_time) * 1000.0
+                return {
+                    "status_code": status_code,
+                    "content_type": content_type,
+                    "body": b"",
+                    "bytes_received": 0,
+                    "bytes_stored": 0,
+                    "limit_exceeded": False,
+                    "final_url": current_url,
+                    "duration_ms": duration_ms,
+                    "error_msg": "Redirect response missing Location header",
+                }
+            current_url = urllib.parse.urljoin(current_url, location)
+            continue
+
+        # Stream body up to max_bytes + 1 byte
+        content_type = resp.headers.get("Content-Type")
+        status_code = resp.status_code
+        chunks: List[bytes] = []
+        bytes_received = 0
+        bytes_stored = 0
+        limit_exceeded = False
+        read_error: Optional[str] = None
+
+        try:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    chunk_len = len(chunk)
+                    bytes_received += chunk_len
+                    if bytes_stored + chunk_len > max_bytes:
+                        limit_exceeded = True
+                        remaining = max_bytes - bytes_stored
+                        if remaining > 0:
+                            chunks.append(chunk[:remaining])
+                            bytes_stored += remaining
+                        break
+                    else:
+                        chunks.append(chunk)
+                        bytes_stored += chunk_len
+
+                if (time.perf_counter() - start_time) > timeout:
+                    read_error = f"Overall source deadline exceeded ({timeout}s) during stream transfer"
+                    break
+        except requests.RequestException as exc:
+            read_error = f"Stream read error: {type(exc).__name__}: {str(exc)}"
+        finally:
+            try:
+                resp.close()
+            except Exception:
+                pass
+
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+        body = b"".join(chunks)
+
+        if duration_ms > (timeout * 1000.0) and not read_error:
+            read_error = f"Overall source deadline exceeded ({timeout}s): elapsed {duration_ms / 1000.0:.2f}s"
+
+        return {
+            "status_code": status_code,
+            "content_type": content_type,
+            "body": body,
+            "bytes_received": bytes_received,
+            "bytes_stored": bytes_stored,
+            "limit_exceeded": limit_exceeded,
+            "final_url": current_url,
+            "duration_ms": duration_ms,
+            "error_msg": read_error,
+        }
+
+
+def _worker_fetch_entry(
+    conn: Any,
+    source_id: str,
+    initial_url: str,
+    timeout: float,
+    max_redirects: int,
+    max_bytes: int,
+    user_agent: str,
+    session: Optional[requests.Session],
+) -> None:
+    """Entry point for isolated worker process executing a single fetch."""
+    owns_sess = False
+    sess = session
+    if sess is None:
+        sess = create_anonymous_session()
+        owns_sess = True
+
+    try:
+        res = _fetch_bounded_core(
+            sess=sess,
+            source_id=source_id,
+            initial_url=initial_url,
+            timeout=timeout,
+            max_redirects=max_redirects,
+            max_bytes=max_bytes,
+            user_agent=user_agent,
+        )
+        conn.send(res)
+    except Exception as exc:
+        conn.send({
+            "status_code": None,
+            "content_type": None,
+            "body": b"",
+            "bytes_received": 0,
+            "bytes_stored": 0,
+            "limit_exceeded": False,
+            "final_url": initial_url,
+            "duration_ms": 0.0,
+            "error_msg": f"Worker execution error: {type(exc).__name__}: {str(exc)}",
+        })
+    finally:
+        if owns_sess and sess:
+            sess.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 class SourceProbe:
     """Runs bounded diagnostic probes for configured evidence sources."""
 
@@ -178,153 +420,147 @@ class SourceProbe:
         self,
         source_id: str,
         initial_url: str,
-    ) -> Tuple[Optional[int], Optional[str], bytes, int, int, bool, str, float, Optional[str]]:
-        """Fetch URL with strict redirect, domain allowlist, deadline, and stream size bounds.
+    ) -> Tuple[Optional[int], Optional[str], bytes, Optional[int], Optional[int], bool, str, float, Optional[str]]:
+        """Fetch URL with strict redirect, domain allowlist, deadline, and stream bounds
+        enforced by an isolated short-lived worker process under parent deadline control.
 
         Returns:
             (status_code, content_type, body_bytes, bytes_received, bytes_stored, limit_exceeded, final_url, duration_ms, error_msg)
         """
-        current_url = initial_url
-        redirect_count = 0
-        allowed_domains = ALLOWED_DOMAINS.get(source_id, set())
+        start_monotonic = time.monotonic()
+        deadline = start_monotonic + self.timeout
 
-        headers = {
-            "User-Agent": self.user_agent,
-            "Accept": "*/*",
-        }
+        ctx = (
+            multiprocessing.get_context("fork")
+            if "fork" in multiprocessing.get_all_start_methods()
+            else multiprocessing.get_context()
+        )
+        parent_conn, child_conn = ctx.Pipe(duplex=False)
 
-        start_time = time.perf_counter()
+        passed_session = None if self._owns_session else self.session
 
-        while True:
-            # Check elapsed time before next hop
-            elapsed = time.perf_counter() - start_time
-            if elapsed > self.timeout:
-                duration_ms = elapsed * 1000.0
-                return (
-                    None,
-                    None,
-                    b"",
-                    0,
-                    0,
-                    False,
-                    current_url,
-                    duration_ms,
-                    f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.2f}s",
-                )
+        proc = ctx.Process(
+            target=_worker_fetch_entry,
+            args=(
+                child_conn,
+                source_id,
+                initial_url,
+                self.timeout,
+                self.max_redirects,
+                self.max_bytes,
+                self.user_agent,
+                passed_session,
+            ),
+        )
 
-            remaining_timeout = max(0.001, self.timeout - elapsed)
+        child_closed_in_parent = False
+        worker_result: Optional[Dict[str, Any]] = None
+        deadline_exceeded = False
 
-            parsed = urllib.parse.urlparse(current_url)
-            if parsed.scheme.lower() != "https":
-                duration_ms = (time.perf_counter() - start_time) * 1000.0
-                return None, None, b"", 0, 0, False, current_url, duration_ms, f"Non-HTTPS scheme rejected: {parsed.scheme}"
+        try:
+            proc.start()
+            child_conn.close()
+            child_closed_in_parent = True
 
-            domain = parsed.netloc.lower()
-            if domain not in allowed_domains:
-                duration_ms = (time.perf_counter() - start_time) * 1000.0
-                return (
-                    None,
-                    None,
-                    b"",
-                    0,
-                    0,
-                    False,
-                    current_url,
-                    duration_ms,
-                    f"Domain {domain} not in allowlist for source {source_id}",
-                )
+            rem = deadline - time.monotonic()
+            has_data = False
+            if rem > 0:
+                try:
+                    has_data = parent_conn.poll(timeout=rem)
+                except (OSError, InterruptedError):
+                    has_data = False
 
-            try:
-                resp = self.session.get(
-                    current_url,
-                    headers=headers,
-                    stream=True,
-                    allow_redirects=False,
-                    timeout=remaining_timeout,
-                )
-            except requests.RequestException as exc:
-                duration_ms = (time.perf_counter() - start_time) * 1000.0
-                return None, None, b"", 0, 0, False, current_url, duration_ms, f"Network transport error: {type(exc).__name__}: {str(exc)}"
+            if has_data:
+                try:
+                    worker_result = parent_conn.recv()
+                except (EOFError, BrokenPipeError, ConnectionResetError):
+                    worker_result = None
+            else:
+                deadline_exceeded = True
+        finally:
+            if not child_closed_in_parent:
+                try:
+                    child_conn.close()
+                except Exception:
+                    pass
 
-            # Handle redirects manually to enforce max_redirects and domain constraints
-            if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
-                redirect_count += 1
-                location = resp.headers.get("Location")
-                status_code = resp.status_code
-                content_type = resp.headers.get("Content-Type")
-                # ALWAYS close redirect response immediately to prevent descriptor leaks!
-                resp.close()
-
-                if redirect_count > self.max_redirects:
-                    duration_ms = (time.perf_counter() - start_time) * 1000.0
-                    return (
-                        status_code,
-                        content_type,
-                        b"",
-                        0,
-                        0,
-                        False,
-                        current_url,
-                        duration_ms,
-                        f"Exceeded maximum redirect limit ({self.max_redirects})",
-                    )
-                if not location:
-                    duration_ms = (time.perf_counter() - start_time) * 1000.0
-                    return (
-                        status_code,
-                        content_type,
-                        b"",
-                        0,
-                        0,
-                        False,
-                        current_url,
-                        duration_ms,
-                        "Redirect response missing Location header",
-                    )
-                current_url = urllib.parse.urljoin(current_url, location)
-                continue
-
-            # Stream body up to max_bytes + 1 byte
-            content_type = resp.headers.get("Content-Type")
-            status_code = resp.status_code
-            chunks: List[bytes] = []
-            bytes_received = 0
-            bytes_stored = 0
-            limit_exceeded = False
-            read_error: Optional[str] = None
+            # Cleanup worker process within strict bound
+            if proc.is_alive():
+                if deadline_exceeded or worker_result is None:
+                    proc.terminate()
+                    proc.join(timeout=CLEANUP_GRACE_SECONDS)
+                    if proc.is_alive():
+                        proc.kill()
+                        proc.join(timeout=CLEANUP_GRACE_SECONDS)
+                else:
+                    proc.join(timeout=CLEANUP_GRACE_SECONDS)
+                    if proc.is_alive():
+                        proc.terminate()
+                        proc.join(timeout=0.05)
+                        if proc.is_alive():
+                            proc.kill()
+                            proc.join(timeout=0.05)
+            else:
+                proc.join(timeout=0.05)
 
             try:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        chunk_len = len(chunk)
-                        bytes_received += chunk_len
-                        if bytes_stored + chunk_len > self.max_bytes:
-                            limit_exceeded = True
-                            remaining = self.max_bytes - bytes_stored
-                            if remaining > 0:
-                                chunks.append(chunk[:remaining])
-                                bytes_stored += remaining
-                            break
-                        else:
-                            chunks.append(chunk)
-                            bytes_stored += chunk_len
+                parent_conn.close()
+            except Exception:
+                pass
 
-                    if (time.perf_counter() - start_time) > self.timeout:
-                        read_error = f"Overall source deadline exceeded ({self.timeout}s) during stream transfer"
-                        break
-            except requests.RequestException as exc:
-                read_error = f"Stream read error: {type(exc).__name__}: {str(exc)}"
-            finally:
-                resp.close()
+        if passed_session is not None and hasattr(passed_session, "responses"):
+            try:
+                for ref in gc.get_referents(passed_session.responses):
+                    if isinstance(ref, (list, tuple)):
+                        for item in ref:
+                            if hasattr(item, "close"):
+                                try:
+                                    item.close()
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
 
-            duration_ms = (time.perf_counter() - start_time) * 1000.0
-            body = b"".join(chunks)
+        elapsed = time.monotonic() - start_monotonic
+        duration_ms = elapsed * 1000.0
 
-            # Check overall deadline after streaming completes
-            if duration_ms > (self.timeout * 1000.0) and not read_error:
-                read_error = f"Overall source deadline exceeded ({self.timeout}s): elapsed {duration_ms / 1000.0:.2f}s"
+        if deadline_exceeded:
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                duration_ms,
+                f"Overall source deadline exceeded ({self.timeout}s); worker process terminated.",
+            )
 
-            return status_code, content_type, body, bytes_received, bytes_stored, limit_exceeded, current_url, duration_ms, read_error
+        if worker_result is None:
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                duration_ms,
+                f"Worker process terminated unexpectedly (exit code {proc.exitcode}).",
+            )
+
+        return (
+            worker_result.get("status_code"),
+            worker_result.get("content_type"),
+            worker_result.get("body", b""),
+            worker_result.get("bytes_received"),
+            worker_result.get("bytes_stored"),
+            worker_result.get("limit_exceeded", False),
+            worker_result.get("final_url", initial_url),
+            worker_result.get("duration_ms", duration_ms),
+            worker_result.get("error_msg"),
+        )
 
     def validate_content(
         self,
@@ -351,28 +587,43 @@ class SourceProbe:
             return (
                 "invalid_content",
                 "transport",
-                f"Payload exceeded maximum stream limit of {self.max_bytes} bytes (2 MiB); full body hash not computed.",
+                f"Payload exceeded maximum stream limit ({self.max_bytes} bytes).",
                 None,
             )
 
-        # Check standard blocked statuses
+        # Check for HTTP blocked/denied status codes
         if http_status in (401, 403, 429):
+            status_desc = {
+                401: "Unauthorized",
+                403: "Forbidden",
+                429: "Too Many Requests",
+            }.get(http_status, f"HTTP {http_status}")
+            platform_name = {
+                "nyfed_effr": "NY Fed",
+                "fed_monetary_rss": "Federal Reserve Board",
+                "fed_speeches_rss": "Federal Reserve Board",
+                "bls_cpi_rss": "BLS Consumer Price Index",
+                "atlanta_gdpnow": "Atlanta Fed",
+                "github_deepseek_v3_releases": "GitHub API",
+                "hf_deepseek_models": "Hugging Face API",
+                "arena_text_overall": "LMSYS Chatbot Arena",
+            }.get(source_id, source_id)
             return (
                 "blocked",
                 "transport",
-                f"HTTP {http_status} client access restricted by remote host / automated protection.",
+                f"{platform_name} returned HTTP {http_status} {status_desc} (access blocked).",
                 None,
             )
 
-        if http_status >= 400:
+        if http_status != 200:
             return (
-                "network_error",
+                "invalid_content",
                 "transport",
-                f"HTTP error status {http_status}.",
+                f"Unexpected HTTP status {http_status} (expected 200 OK).",
                 None,
             )
 
-        # Endpoint-specific validation
+        # Dispatch content validator based on source_id
         if source_id == "nyfed_effr":
             return self._validate_nyfed_effr(body)
         elif source_id == "fed_monetary_rss":
@@ -388,64 +639,85 @@ class SourceProbe:
         elif source_id == "hf_deepseek_models":
             return self._validate_hf_models(body)
         elif source_id == "arena_text_overall":
-            return self._validate_arena_html(body, content_type)
+            return self._validate_arena_overall(body, content_type)
         else:
-            return "invalid_content", "content", f"Unknown source_id '{source_id}'", None
+            return "invalid_content", "envelope", f"Unknown source_id '{source_id}'", None
 
     def _validate_nyfed_effr(self, body: bytes) -> Tuple[str, str, str, Optional[int]]:
         try:
             payload = json.loads(body.decode("utf-8"))
         except Exception:
-            return "invalid_content", "envelope", "Failed to parse response body as JSON.", None
+            return "invalid_content", "envelope", "Failed to parse NY Fed response as JSON.", None
 
         if not isinstance(payload, dict):
-            return "invalid_content", "envelope", "JSON response is not an object.", None
+            return "invalid_content", "envelope", "Expected JSON object at top level.", None
 
-        rates = payload.get("refRates")
-        if not isinstance(rates, list) or len(rates) == 0:
-            return "invalid_content", "content", "refRates key missing or empty in JSON object.", None
+        ref_rates = payload.get("refRates")
+        if not isinstance(ref_rates, list):
+            return "invalid_content", "content", "Missing or non-array 'refRates' field in response.", None
 
-        valid_items = 0
-        for item in rates:
+        if len(ref_rates) == 0:
+            return "invalid_content", "content", "'refRates' array is empty.", 0
+
+        valid_count = 0
+        for idx, item in enumerate(ref_rates):
             if not isinstance(item, dict):
-                return "invalid_content", "content", "refRates entry is not an object.", None
+                return "invalid_content", "content", f"refRates[{idx}] is not an object.", None
 
-            # Exact series type check: must be strictly "EFFR"
-            if item.get("type") != "EFFR":
+            item_type = item.get("type")
+            if not isinstance(item_type, str) or item_type != "EFFR":
                 return (
                     "invalid_content",
                     "content",
-                    f"refRates entry has invalid series type: expected 'EFFR', got '{item.get('type')}'",
+                    f"refRates[{idx}] invalid series type: expected 'EFFR', got {item_type!r}.",
                     None,
                 )
 
-            # Strict ISO calendar date check YYYY-MM-DD
             eff_date = item.get("effectiveDate")
             if not isinstance(eff_date, str):
-                return "invalid_content", "content", f"effectiveDate must be string, got {type(eff_date).__name__}", None
-            try:
-                parsed_date = datetime.strptime(eff_date, "%Y-%m-%d").date()
-                if parsed_date.strftime("%Y-%m-%d") != eff_date:
-                    return "invalid_content", "content", f"Non-canonical date format: '{eff_date}'", None
-            except (ValueError, TypeError) as exc:
-                return "invalid_content", "content", f"Invalid calendar date '{eff_date}': {str(exc)}", None
-
-            # percentRate must be a finite number and NOT a bool
-            rate = item.get("percentRate")
-            if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not math.isfinite(rate):
                 return (
                     "invalid_content",
                     "content",
-                    f"Invalid percentRate: expected finite number, got {rate!r} ({type(rate).__name__})",
+                    f"refRates[{idx}] missing string effectiveDate.",
                     None,
                 )
-            valid_items += 1
+            try:
+                parts = eff_date.split("-")
+                if len(parts) != 3:
+                    raise ValueError("Date must have YYYY-MM-DD format")
+                year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+                datetime(year, month, day)
+            except Exception:
+                return (
+                    "invalid_content",
+                    "content",
+                    f"refRates[{idx}] contains invalid calendar date: {eff_date!r}.",
+                    None,
+                )
+
+            rate = item.get("percentRate")
+            if isinstance(rate, bool) or not isinstance(rate, (int, float)):
+                return (
+                    "invalid_content",
+                    "content",
+                    f"refRates[{idx}] contains non-numeric percentRate: {rate!r}.",
+                    None,
+                )
+            if math.isnan(rate) or math.isinf(rate):
+                return (
+                    "invalid_content",
+                    "content",
+                    f"refRates[{idx}] contains non-finite percentRate: {rate!r}.",
+                    None,
+                )
+
+            valid_count += 1
 
         return (
             "valid",
             "content",
-            f"Successfully validated {valid_items} EFFR reference rate records.",
-            valid_items,
+            f"Successfully validated {valid_count} EFFR reference rate records.",
+            valid_count,
         )
 
     def _validate_fed_monetary_rss(self, body: bytes) -> Tuple[str, str, str, Optional[int]]:
@@ -453,10 +725,11 @@ class SourceProbe:
             body=body,
             expected_feed_name="Federal Reserve Monetary Policy",
             allowed_channel_domains={"federalreserve.gov", "www.federalreserve.gov"},
-            required_title_keywords={"monetary", "fomc", "press release"},
-            forbidden_title_keywords={"speeches"},
+            required_title_keywords={"monetary", "fomc"},
+            forbidden_title_keywords={"banking", "orders", "speeches"},
             allowed_entry_domains={"federalreserve.gov", "www.federalreserve.gov"},
-            required_entry_path_markers={"monetary", "pressreleases"},
+            required_entry_path_markers={"monetary"},
+            forbidden_entry_path_markers={"/orders", "/banking"},
         )
 
     def _validate_fed_speeches_rss(self, body: bytes) -> Tuple[str, str, str, Optional[int]]:
@@ -468,6 +741,7 @@ class SourceProbe:
             forbidden_title_keywords={"monetary policy"},
             allowed_entry_domains={"federalreserve.gov", "www.federalreserve.gov"},
             required_entry_path_markers={"speech", "speeches"},
+            forbidden_entry_path_markers={"/monetary"},
         )
 
     def _validate_bls_rss(self, body: bytes) -> Tuple[str, str, str, Optional[int]]:
@@ -479,10 +753,12 @@ class SourceProbe:
             body=body,
             expected_feed_name="BLS Consumer Price Index",
             allowed_channel_domains={"bls.gov", "www.bls.gov"},
-            required_title_keywords={"cpi", "consumer price index", "bureau of labor statistics"},
-            forbidden_title_keywords=set(),
+            required_title_keywords={"cpi", "consumer price index"},
+            forbidden_title_keywords={"employment situation", "producer price index", "ppi"},
             allowed_entry_domains={"bls.gov", "www.bls.gov"},
-            required_entry_path_markers=set(),
+            required_entry_path_markers={"cpi"},
+            forbidden_entry_path_markers={"empsit", "ppi"},
+            entry_identity_keywords={"cpi", "consumer price index"},
         )
 
     def _validate_rss_feed(
@@ -494,11 +770,28 @@ class SourceProbe:
         forbidden_title_keywords: Set[str],
         allowed_entry_domains: Set[str],
         required_entry_path_markers: Set[str],
+        forbidden_entry_path_markers: Optional[Set[str]] = None,
+        entry_identity_keywords: Optional[Set[str]] = None,
     ) -> Tuple[str, str, str, Optional[int]]:
-        raw_text = body.decode("utf-8", errors="replace")
-        if "<rss" not in raw_text.lower() and "<feed" not in raw_text.lower() and "<?xml" not in raw_text:
-            return "invalid_content", "envelope", "Response does not contain XML/RSS root marker.", None
+        forbidden_entry_path_markers = forbidden_entry_path_markers or set()
+        entry_identity_keywords = entry_identity_keywords or set()
 
+        # Step 1: Strict XML integrity parsing via standard library ElementTree
+        try:
+            xml_root = ET.fromstring(body)
+        except ET.ParseError as exc:
+            raw_text = body.decode("utf-8", errors="replace").lower()
+            if "<html" in raw_text and "<rss" not in raw_text and "<feed" not in raw_text:
+                return "blocked", "envelope", f"HTTP 200 returned HTML challenge page instead of {expected_feed_name}.", None
+            return "invalid_content", "envelope", f"Malformed or truncated XML: {exc}", None
+
+        tag_lower = xml_root.tag.lower()
+        if tag_lower != "rss" and tag_lower != "feed" and not tag_lower.endswith("}feed") and not tag_lower.endswith("}rss"):
+            if "html" in tag_lower:
+                return "blocked", "envelope", f"HTTP 200 returned HTML document instead of {expected_feed_name}.", None
+            return "invalid_content", "envelope", f"Unsupported XML root element for {expected_feed_name}: '{xml_root.tag}'", None
+
+        # Step 2: Feed metadata extraction via feedparser
         feed = feedparser.parse(body)
         channel_title = getattr(feed.feed, "title", "")
         channel_link = getattr(feed.feed, "link", "")
@@ -538,6 +831,7 @@ class SourceProbe:
         if not entries:
             return "invalid_content", "content", f"RSS feed '{channel_title}' contains zero entries.", 0
 
+        # Step 3: Strict entry validation
         valid_items = 0
         for entry in entries:
             title = getattr(entry, "title", None)
@@ -552,9 +846,18 @@ class SourceProbe:
             if allowed_entry_domains and entry_domain not in allowed_entry_domains:
                 continue
 
+            path_lower = parsed_entry_link.path.lower()
+            entry_title_lower = title.lower()
+
+            if any(fpm in path_lower for fpm in forbidden_entry_path_markers):
+                continue
+
             if required_entry_path_markers:
-                path_lower = parsed_entry_link.path.lower()
                 if not any(pm in path_lower for pm in required_entry_path_markers):
+                    continue
+
+            if entry_identity_keywords:
+                if not any(ik in entry_title_lower or ik in path_lower for ik in entry_identity_keywords):
                     continue
 
             valid_items += 1
@@ -641,8 +944,12 @@ class SourceProbe:
         except Exception:
             return "invalid_content", "envelope", "Failed to parse Hugging Face response as JSON.", None
 
+        if isinstance(payload, dict):
+            error_msg = str(payload.get("error", ""))
+            return "invalid_content", "envelope", f"Hugging Face API returned error: {error_msg}", None
+
         if not isinstance(payload, list):
-            return "invalid_content", "envelope", "Expected JSON array of models.", None
+            return "invalid_content", "envelope", "Expected JSON array of models from Hugging Face API.", None
 
         if len(payload) == 0:
             return "valid", "content", "Valid empty Hugging Face models array (item_count=0).", 0
@@ -651,15 +958,24 @@ class SourceProbe:
         for item in payload:
             if not isinstance(item, dict):
                 return "invalid_content", "content", "Model entry is not a dictionary.", None
-            model_id = item.get("id") or item.get("_id")
-            if not isinstance(model_id, str):
-                return "invalid_content", "content", f"Model entry missing string id: {model_id!r}", None
+            model_id = item.get("id")
+            if not isinstance(model_id, str) or len(model_id.strip()) == 0:
+                return "invalid_content", "content", f"Model entry missing valid non-empty string id: {model_id!r}", None
             if not model_id.startswith("deepseek-ai/"):
-                return "invalid_content", "content", f"Model id '{model_id}' does not start with 'deepseek-ai/'", None
-            name = model_id[len("deepseek-ai/"):].strip()
-            if not name or "/" in name:
-                return "invalid_content", "content", f"Model id '{model_id}' has empty or invalid model name", None
-
+                return (
+                    "invalid_content",
+                    "content",
+                    f"Model id does not match expected author 'deepseek-ai/': '{model_id}'",
+                    None,
+                )
+            name_part = model_id.split("/", 1)[1]
+            if not name_part or len(name_part.strip()) == 0:
+                return (
+                    "invalid_content",
+                    "content",
+                    f"Model id has empty name after author prefix: '{model_id}'",
+                    None,
+                )
             author = item.get("author")
             if author is not None and author != "deepseek-ai":
                 return "invalid_content", "content", f"Model author '{author}' contradicts namespace 'deepseek-ai'", None
@@ -668,7 +984,7 @@ class SourceProbe:
         return (
             "valid",
             "content",
-            f"Valid Hugging Face models array for deepseek-ai with {valid_items} models.",
+            f"Valid Hugging Face models array with {valid_items} models from author deepseek-ai.",
             valid_items,
         )
 
@@ -683,6 +999,8 @@ class SourceProbe:
             "HTML document received (transport and envelope confirmed); leaderboard table extraction not verified in R1.",
             None,
         )
+
+    _validate_arena_overall = _validate_arena_html
 
     def probe_single(self, source_cfg: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a single bounded probe for a source configuration."""
@@ -738,7 +1056,7 @@ class SourceProbe:
             "validation_level": validation_level,
             "reason": reason,
             "item_count": item_count,
-            "published_at": None,  # Strictly null in R1 probe
+            "published_at": None,  # Strictly null in R1/R1.2 probe
             "checker_version": PROBE_VERSION,
             "usable_for_forecast": False,  # Strict invariant
         }
@@ -795,8 +1113,8 @@ class SourceProbe:
                     "fetch_started_at": utc_now_iso(),
                     "fetch_completed_at": utc_now_iso(),
                     "duration_ms": 0.0,
-                    "bytes_received": 0,
-                    "bytes_stored": 0,
+                    "bytes_received": None,
+                    "bytes_stored": None,
                     "content_type": None,
                     "body_sha256": None,
                     "status": "network_error",
@@ -838,8 +1156,8 @@ def format_table(results: List[Dict[str, Any]]) -> str:
         rows.append([
             r["source_id"],
             str(r["http_status"]) if r["http_status"] is not None else "ERR",
-            str(r.get("bytes_received", 0)),
-            str(r.get("bytes_stored", 0)),
+            str(r.get("bytes_received")) if r.get("bytes_received") is not None else "null",
+            str(r.get("bytes_stored")) if r.get("bytes_stored") is not None else "null",
             str(int(r["duration_ms"])),
             r["status"],
             r["validation_level"],
@@ -864,14 +1182,14 @@ def format_table(results: List[Dict[str, Any]]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Pythia R1.1 source probe")
+    parser = argparse.ArgumentParser(description="Pythia R1.2 source probe")
     parser.add_argument("--output", "-o", type=Path, help="Output path for probe JSON results", required=False)
     args = parser.parse_args()
 
     with SourceProbe() as probe:
         summary = probe.run()
 
-    print("\n=== Pythia R1.1 Source Probe Summary ===")
+    print("\n=== Pythia R1.2 Source Probe Summary ===")
     print(f"Total Sources: {summary['total_sources']}")
     print(f"Status Counts: {summary['status_counts']}")
     print(f"Summary Status: {summary['summary_status']} (all_healthy={summary['all_healthy']})")
