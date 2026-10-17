@@ -1,10 +1,11 @@
-"""Pythia R1.2: Bounded single-run probe for the 8 canonical evidence sources.
+"""Pythia R1.3: Bounded single-run probe for the 8 canonical evidence sources.
 
 Runs sequential diagnostic HTTP/HTTPS requests against sources specified in
 source_registry.json. Performs strict transport, envelope, and content validation
 under controlled constraints (streaming 2 MiB limit, overall 15s deadline per source
-enforced via short-lived worker process under parent control, max 3 redirects within
-domain allowlists, anonymous transport with no ambient credentials or persistent cookies).
+enforced via short-lived worker process under parent control via Popen + communicate,
+max 3 redirects within domain allowlists, anonymous transport with no ambient
+credentials or persistent cookies).
 
 Usage:
     python -m python.evaluation.source_probe --output <path-to-json-output>
@@ -13,15 +14,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import gc
+import base64
 import hashlib
 import http.cookiejar
 import json
 import logging
 import math
-import multiprocessing
 import os
-import signal
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -33,16 +33,15 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import feedparser
 import requests
 
-PROBE_VERSION = "pythia-probe-r1.2/1.0"
+PROBE_VERSION = "pythia-probe-r1.3/1.0"
 STREAM_LIMIT_BYTES = 2 * 1024 * 1024  # 2 MiB = 2,097,152 bytes
 DEFAULT_TIMEOUT_SECONDS = 15.0
 MAX_REDIRECTS = 3
 CLEANUP_GRACE_SECONDS = 0.15
 MAX_CLEANUP_SECONDS = 0.50
 
-DEFAULT_USER_AGENT = "Pythia-source-probe/1.2 (+https://github.com/Ger-Wer/pythia)"
+DEFAULT_USER_AGENT = "Pythia-source-probe/1.3 (+https://github.com/Ger-Wer/pythia)"
 
-# Canonical 8 source IDs and their exact official URLs
 CANONICAL_SOURCES: Dict[str, str] = {
     "nyfed_effr": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
     "fed_monetary_rss": "https://www.federalreserve.gov/feeds/press_monetary.xml",
@@ -326,55 +325,6 @@ def _fetch_bounded_core(
         }
 
 
-def _worker_fetch_entry(
-    conn: Any,
-    source_id: str,
-    initial_url: str,
-    timeout: float,
-    max_redirects: int,
-    max_bytes: int,
-    user_agent: str,
-    session: Optional[requests.Session],
-) -> None:
-    """Entry point for isolated worker process executing a single fetch."""
-    owns_sess = False
-    sess = session
-    if sess is None:
-        sess = create_anonymous_session()
-        owns_sess = True
-
-    try:
-        res = _fetch_bounded_core(
-            sess=sess,
-            source_id=source_id,
-            initial_url=initial_url,
-            timeout=timeout,
-            max_redirects=max_redirects,
-            max_bytes=max_bytes,
-            user_agent=user_agent,
-        )
-        conn.send(res)
-    except Exception as exc:
-        conn.send({
-            "status_code": None,
-            "content_type": None,
-            "body": b"",
-            "bytes_received": 0,
-            "bytes_stored": 0,
-            "limit_exceeded": False,
-            "final_url": initial_url,
-            "duration_ms": 0.0,
-            "error_msg": f"Worker execution error: {type(exc).__name__}: {str(exc)}",
-        })
-    finally:
-        if owns_sess and sess:
-            sess.close()
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-
 class SourceProbe:
     """Runs bounded diagnostic probes for configured evidence sources."""
 
@@ -385,6 +335,7 @@ class SourceProbe:
         max_redirects: int = MAX_REDIRECTS,
         max_bytes: int = STREAM_LIMIT_BYTES,
         user_agent: str = DEFAULT_USER_AGENT,
+        worker_cmd: Optional[List[str]] = None,
         session: Optional[requests.Session] = None,
     ) -> None:
         self.registry_path = registry_path or Path(__file__).parent / "source_registry.json"
@@ -392,6 +343,10 @@ class SourceProbe:
         self.max_redirects = max_redirects
         self.max_bytes = max_bytes
         self.user_agent = user_agent
+        if worker_cmd is not None:
+            self.worker_cmd = list(worker_cmd)
+        else:
+            self.worker_cmd = [sys.executable, "-m", "python.evaluation.source_probe_worker"]
         self._owns_session = session is None
         if session is not None:
             self.session = session
@@ -400,8 +355,11 @@ class SourceProbe:
 
     def close(self) -> None:
         """Close internal session if owned."""
-        if self._owns_session and self.session:
-            self.session.close()
+        if getattr(self, "_owns_session", False) and getattr(self, "session", None):
+            try:
+                self.session.close()
+            except Exception:
+                pass
 
     def __enter__(self) -> SourceProbe:
         return self
@@ -422,7 +380,7 @@ class SourceProbe:
         initial_url: str,
     ) -> Tuple[Optional[int], Optional[str], bytes, Optional[int], Optional[int], bool, str, float, Optional[str]]:
         """Fetch URL with strict redirect, domain allowlist, deadline, and stream bounds
-        enforced by an isolated short-lived worker process under parent deadline control.
+        enforced by an isolated worker process under parent deadline control via Popen + communicate.
 
         Returns:
             (status_code, content_type, body_bytes, bytes_received, bytes_stored, limit_exceeded, final_url, duration_ms, error_msg)
@@ -430,101 +388,86 @@ class SourceProbe:
         start_monotonic = time.monotonic()
         deadline = start_monotonic + self.timeout
 
-        ctx = (
-            multiprocessing.get_context("fork")
-            if "fork" in multiprocessing.get_all_start_methods()
-            else multiprocessing.get_context()
-        )
-        parent_conn, child_conn = ctx.Pipe(duplex=False)
+        worker_input = json.dumps({
+            "source_id": source_id,
+            "initial_url": initial_url,
+            "timeout": self.timeout,
+            "max_redirects": self.max_redirects,
+            "max_bytes": self.max_bytes,
+            "user_agent": self.user_agent,
+        }).encode("utf-8")
 
-        passed_session = None if self._owns_session else self.session
-
-        proc = ctx.Process(
-            target=_worker_fetch_entry,
-            args=(
-                child_conn,
-                source_id,
-                initial_url,
-                self.timeout,
-                self.max_redirects,
-                self.max_bytes,
-                self.user_agent,
-                passed_session,
-            ),
-        )
-
-        child_closed_in_parent = False
-        worker_result: Optional[Dict[str, Any]] = None
-        deadline_exceeded = False
+        proc: Optional[subprocess.Popen] = None
+        timed_out = False
+        stdout_bytes = b""
+        stderr_bytes = b""
 
         try:
-            proc.start()
-            child_conn.close()
-            child_closed_in_parent = True
-
-            rem = deadline - time.monotonic()
-            has_data = False
-            if rem > 0:
-                try:
-                    has_data = parent_conn.poll(timeout=rem)
-                except (OSError, InterruptedError):
-                    has_data = False
-
-            if has_data:
-                try:
-                    worker_result = parent_conn.recv()
-                except (EOFError, BrokenPipeError, ConnectionResetError):
-                    worker_result = None
-            else:
-                deadline_exceeded = True
+            proc = subprocess.Popen(
+                self.worker_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            remaining_timeout = max(0.0, deadline - time.monotonic())
+            stdout_bytes, stderr_bytes = proc.communicate(
+                input=worker_input,
+                timeout=remaining_timeout,
+            )
+        except subprocess.TimeoutExpired:
+            timed_out = True
+        except Exception as exc:
+            elapsed = time.monotonic() - start_monotonic
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                elapsed * 1000.0,
+                f"Worker process launch error: {type(exc).__name__}: {str(exc)}",
+            )
         finally:
-            if not child_closed_in_parent:
-                try:
-                    child_conn.close()
-                except Exception:
-                    pass
-
-            # Cleanup worker process within strict bound
-            if proc.is_alive():
-                if deadline_exceeded or worker_result is None:
-                    proc.terminate()
-                    proc.join(timeout=CLEANUP_GRACE_SECONDS)
-                    if proc.is_alive():
-                        proc.kill()
-                        proc.join(timeout=CLEANUP_GRACE_SECONDS)
-                else:
-                    proc.join(timeout=CLEANUP_GRACE_SECONDS)
-                    if proc.is_alive():
+            if proc is not None:
+                cleanup_deadline = time.monotonic() + MAX_CLEANUP_SECONDS
+                if timed_out or proc.poll() is None:
+                    try:
                         proc.terminate()
-                        proc.join(timeout=0.05)
-                        if proc.is_alive():
+                    except (ProcessLookupError, OSError):
+                        pass
+
+                    try:
+                        grace_wait = min(CLEANUP_GRACE_SECONDS, max(0.0, cleanup_deadline - time.monotonic()))
+                        proc.wait(timeout=grace_wait)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    except Exception:
+                        pass
+
+                    if proc.poll() is None:
+                        try:
                             proc.kill()
-                            proc.join(timeout=0.05)
-            else:
-                proc.join(timeout=0.05)
+                        except (ProcessLookupError, OSError):
+                            pass
+                        try:
+                            kill_wait = max(0.0, cleanup_deadline - time.monotonic())
+                            proc.wait(timeout=kill_wait)
+                        except (subprocess.TimeoutExpired, Exception):
+                            pass
 
-            try:
-                parent_conn.close()
-            except Exception:
-                pass
-
-        if passed_session is not None and hasattr(passed_session, "responses"):
-            try:
-                for ref in gc.get_referents(passed_session.responses):
-                    if isinstance(ref, (list, tuple)):
-                        for item in ref:
-                            if hasattr(item, "close"):
-                                try:
-                                    item.close()
-                                except Exception:
-                                    pass
-            except Exception:
-                pass
+                for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                    if pipe:
+                        try:
+                            pipe.close()
+                        except Exception:
+                            pass
 
         elapsed = time.monotonic() - start_monotonic
         duration_ms = elapsed * 1000.0
 
-        if deadline_exceeded:
+        if timed_out:
             return (
                 None,
                 None,
@@ -537,7 +480,8 @@ class SourceProbe:
                 f"Overall source deadline exceeded ({self.timeout}s); worker process terminated.",
             )
 
-        if worker_result is None:
+        # RE-CHECK DEADLINE: If elapsed monotonic time exceeded timeout before complete message was received
+        if elapsed > self.timeout:
             return (
                 None,
                 None,
@@ -547,18 +491,84 @@ class SourceProbe:
                 False,
                 initial_url,
                 duration_ms,
-                f"Worker process terminated unexpectedly (exit code {proc.exitcode}).",
+                f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.3f}s; response rejected.",
             )
+
+        if proc is not None and proc.returncode != 0:
+            err_text = stderr_bytes.decode("utf-8", errors="replace").strip()
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                duration_ms,
+                f"Worker process terminated unexpectedly (exit code {proc.returncode}): {err_text[:200]}",
+            )
+
+        try:
+            worker_result = json.loads(stdout_bytes.decode("utf-8"))
+        except Exception as exc:
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                duration_ms,
+                f"Failed to parse worker output as JSON: {type(exc).__name__}: {str(exc)}",
+            )
+
+        if not isinstance(worker_result, dict):
+            return (
+                None,
+                None,
+                b"",
+                None,
+                None,
+                False,
+                initial_url,
+                duration_ms,
+                "Worker output JSON must be an object.",
+            )
+
+        body_b64 = worker_result.get("body_b64")
+        if body_b64 is not None:
+            try:
+                body = base64.b64decode(body_b64)
+            except Exception as exc:
+                return (
+                    None,
+                    None,
+                    b"",
+                    None,
+                    None,
+                    False,
+                    initial_url,
+                    duration_ms,
+                    f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}",
+                )
+        else:
+            body = b""
+
+        limit_exceeded = worker_result.get("limit_exceeded", False)
+        if len(body) > self.max_bytes:
+            limit_exceeded = True
+            body = body[: self.max_bytes]
 
         return (
             worker_result.get("status_code"),
             worker_result.get("content_type"),
-            worker_result.get("body", b""),
+            body,
             worker_result.get("bytes_received"),
             worker_result.get("bytes_stored"),
-            worker_result.get("limit_exceeded", False),
+            limit_exceeded,
             worker_result.get("final_url", initial_url),
-            worker_result.get("duration_ms", duration_ms),
+            duration_ms,
             worker_result.get("error_msg"),
         )
 
@@ -1189,7 +1199,7 @@ def main() -> int:
     with SourceProbe() as probe:
         summary = probe.run()
 
-    print("\n=== Pythia R1.2 Source Probe Summary ===")
+    print("\n=== Pythia R1.3 Source Probe Summary ===")
     print(f"Total Sources: {summary['total_sources']}")
     print(f"Status Counts: {summary['status_counts']}")
     print(f"Summary Status: {summary['summary_status']} (all_healthy={summary['all_healthy']})")

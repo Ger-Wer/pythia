@@ -1,6 +1,6 @@
 # Pythia: Evidence Data Contract
 
-**Status:** R1.1 Specification (Design & Contract Only — No Storage / ORM / Migrations).  
+**Status:** R1.3 Specification (Design & Contract Only — No Storage / ORM / Migrations).  
 **Date:** 2026-10-17.  
 **Scope:** Defines the data contract for diagnostic probe runs (R1/R1.1) and future evidence records (R2+), distinguishing ephemeral probe checks, raw document captures, and extracted claims.
 
@@ -22,15 +22,17 @@
    - Translated text is strictly separated from original text and explicitly attributed to a translation engine and version.
 4. **Anonymous & Bounded Transport:**
    - All diagnostic probes and evidence collectors operate with anonymous transport: ambient environment credentials (`.netrc`, ambient proxy variables) are disabled (`trust_env = False`), cookie persistence and transmission are blocked, and TLS certificate verification is enforced.
-   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, and total stream read duration) enforced strictly via an isolated short-lived worker process under parent deadline control. The parent enforces termination upon deadline expiration via a sequence of `terminate()` -> grace (0.15s) -> `kill()` (SIGKILL) -> `join()` (reap) with a documented bounded cleanup allowance of **<= 0.50 seconds** over the operational budget.
+   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, stream read, and complete IPC transmission) enforced strictly via an isolated short-lived worker process under parent deadline control via `subprocess.Popen` and `communicate(input=..., timeout=remaining)`. The worker receives JSON on `stdin`, communicates protocol-pure JSON with base64-encoded payload on `stdout`, and writes diagnostics strictly to `stderr`.
+   - Parent calculates `deadline = monotonic() + budget` before `Popen`. After `communicate` returns, the parent validates process exit code, JSON schema, body bounds, and re-checks `elapsed <= budget` before accepting any response as valid; late responses even if well-formed are rejected as `network_error` with `null` hash and counters.
+   - On timeout, the parent enforces termination via a sequence of `terminate()` -> grace (0.15s) -> `kill()` (SIGKILL) -> `wait()` (reap) sharing a single bounded cleanup allowance of **<= 0.50 seconds** over the operational budget. All pipe handles are closed. `duration_ms` is strictly measured by parent monotonic clock covering startup, IPC, execution, and cleanup.
    - Streaming memory buffer is capped at **2 MiB** (2,097,152 bytes). An oversized response is immediately truncated at 2 MiB, closing the stream and invalidating the integrity hash (`body_sha256 = null`).
    - If a worker process is forcibly killed by timeout or terminated unexpectedly before metric transmission, actual transferred byte counters cannot be fabricated; `bytes_received`, `bytes_stored`, and `http_status` are reported as `null` with a clear explanation in `reason`.
 5. **Zero Edge Assumption:**
-   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1 and R1.2 carries `usable_for_forecast: false`.
+   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1 and R1.3 carries `usable_for_forecast: false`.
 
 ---
 
-## 2. Probe Result Contract (R1/R1.2 Diagnostic Layer)
+## 2. Probe Result Contract (R1/R1.3 Diagnostic Layer)
 
 A probe run tests whether an endpoint is reachable and conforms to expected transport and envelope schemas under strict bounds.
 
@@ -55,9 +57,9 @@ A probe run tests whether an endpoint is reachable and conforms to expected tran
 | `validation_level` | `string` (enum) | No | Depth of check passed/attempted (see §2.3). |
 | `reason` | `string` | No | Clear, human-readable justification for the status and level. |
 | `item_count` | `integer` | Yes | Number of verified items/releases/records parsed (e.g. 5 refRates, 0 releases). `null` for unparsed HTML. |
-| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R1.2 probes. |
-| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r1.2/1.0`). |
-| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R1.2. |
+| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R1.3 probes. |
+| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r1.3/1.0`). |
+| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R1.3. |
 
 ### 2.2 Status Enumeration (`status`)
 
@@ -201,7 +203,7 @@ interface EvidenceRecord {
   "reason": "Successfully validated 5 EFFR reference rate records.",
   "item_count": 5,
   "published_at": null,
-  "checker_version": "pythia-probe-r1.1/1.0",
+  "checker_version": "pythia-probe-r1.3/1.0",
   "usable_for_forecast": false
 }
 ```
@@ -228,7 +230,7 @@ interface EvidenceRecord {
   "reason": "HTTP 403 client access restricted by remote host / automated protection.",
   "item_count": null,
   "published_at": null,
-  "checker_version": "pythia-probe-r1.1/1.0",
+  "checker_version": "pythia-probe-r1.3/1.0",
   "usable_for_forecast": false
 }
 ```
@@ -255,7 +257,7 @@ interface EvidenceRecord {
   "reason": "Payload exceeded maximum stream limit of 2097152 bytes (2 MiB); full body hash not computed.",
   "item_count": null,
   "published_at": null,
-  "checker_version": "pythia-probe-r1.1/1.0",
+  "checker_version": "pythia-probe-r1.3/1.0",
   "usable_for_forecast": false
 }
 ```

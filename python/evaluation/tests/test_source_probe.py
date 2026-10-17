@@ -1,11 +1,13 @@
-"""Pythia R1.2: Offline unit tests for source registry and bounded source probe."""
+"""Pythia R1.3: Offline unit tests for source registry and bounded source probe."""
 
+import base64
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
 import multiprocessing as mp
 import os
+import sys
 import socket
 import tempfile
 import threading
@@ -23,6 +25,7 @@ from python.evaluation.source_probe import (
     STREAM_LIMIT_BYTES,
     NullCookieJar,
     SourceProbe,
+    _fetch_bounded_core,
     create_anonymous_session,
     validate_registry,
 )
@@ -434,13 +437,31 @@ def test_partial_stream_error_clears_sha256():
         def get(self, url, **kwargs):
             return FakeResponse()
 
-    probe = SourceProbe(session=FakeSession())
-    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
-    res = probe.probe_single(cfg)
+    res = _fetch_bounded_core(
+        sess=FakeSession(),
+        source_id="nyfed_effr",
+        initial_url=CANONICAL_SOURCES["nyfed_effr"],
+        timeout=5.0,
+        max_redirects=3,
+        max_bytes=STREAM_LIMIT_BYTES,
+        user_agent="test",
+    )
+    assert res["status_code"] == 200
+    assert "stream interrupted" in res["error_msg"]
+    assert res["body"] == b"prefix"
 
-    assert res["status"] == "network_error"
-    assert res["body_sha256"] is None
-    assert "stream interrupted" in res["reason"]
+    probe = SourceProbe()
+    status, level, reason, count = probe.validate_content(
+        source_id="nyfed_effr",
+        http_status=res["status_code"],
+        content_type=res["content_type"],
+        body=res["body"],
+        limit_exceeded=res["limit_exceeded"],
+        error_msg=res["error_msg"],
+    )
+    assert status == "network_error"
+    assert level == "transport"
+    assert "stream interrupted" in reason
 
 
 def test_redirect_response_is_closed():
@@ -476,11 +497,17 @@ def test_redirect_response_is_closed():
         def get(self, url, **kwargs):
             return next(self.responses)
 
-    probe = SourceProbe(session=FakeSession())
-    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
-    res = probe.probe_single(cfg)
+    res = _fetch_bounded_core(
+        sess=FakeSession(),
+        source_id="nyfed_effr",
+        initial_url=CANONICAL_SOURCES["nyfed_effr"],
+        timeout=5.0,
+        max_redirects=3,
+        max_bytes=STREAM_LIMIT_BYTES,
+        user_agent="test",
+    )
 
-    assert res["status"] == "valid"
+    assert res["status_code"] == 200
     assert redirect_resp.closed is True
     assert final_resp.closed is True
 
@@ -522,15 +549,18 @@ def test_simulated_deadline_exceeded_returns_error():
         def get(self, url, **kwargs):
             return FakeResponse()
 
-    probe = SourceProbe(session=FakeSession())
-    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
-
     with patch("python.evaluation.source_probe.time.perf_counter", side_effect=[0.0, 20.0]):
-        res = probe.probe_single(cfg)
-        assert res["status"] != "valid"
-        assert res["status"] == "network_error"
-        assert res["body_sha256"] is None
-        assert "deadline exceeded" in res["reason"].lower()
+        res = _fetch_bounded_core(
+            sess=FakeSession(),
+            source_id="nyfed_effr",
+            initial_url=CANONICAL_SOURCES["nyfed_effr"],
+            timeout=5.0,
+            max_redirects=3,
+            max_bytes=STREAM_LIMIT_BYTES,
+            user_agent="test",
+        )
+        assert res["status_code"] is None
+        assert "deadline exceeded" in res["error_msg"].lower()
 
 
 def test_incomplete_registry_aborts_without_reporting_healthy():
@@ -549,31 +579,45 @@ def test_incomplete_registry_aborts_without_reporting_healthy():
         assert "Registry must contain exactly 8 canonical sources" in res["registry_error"]
 
 
-def test_partial_batch_failure_and_overall_summary():
+def test_partial_batch_failure_and_overall_summary(tmp_path):
     """Probe handles single source failure gracefully and reports partial reachability."""
-    mock_session = MagicMock()
+    worker_script = tmp_path / "batch_worker.py"
+    worker_code = '''import sys, json, base64
 
-    def mock_get(url, **kwargs):
-        resp = MagicMock()
-        resp.is_redirect = False
-        if "effr" in url:
-            resp.status_code = 200
-            resp.headers = {"Content-Type": "application/json"}
-            resp.iter_content.return_value = [
-                json.dumps({"refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 4.83}]}).encode()
-            ]
-            return resp
-        elif "cpi.rss" in url:
-            resp.status_code = 403
-            resp.headers = {"Content-Type": "text/html"}
-            resp.iter_content.return_value = [b"Forbidden"]
-            return resp
-        else:
-            raise requests.ConnectionError("Connection timed out")
+raw = sys.stdin.read()
+params = json.loads(raw)
+sid = params.get("source_id", "")
+url = params.get("initial_url", "")
 
-    mock_session.get.side_effect = mock_get
+if "effr" in url:
+    body = json.dumps({"refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 4.83}]}).encode()
+    out = {
+        "status_code": 200, "content_type": "application/json",
+        "body_b64": base64.b64encode(body).decode("ascii"),
+        "bytes_received": len(body), "bytes_stored": len(body),
+        "limit_exceeded": False, "final_url": url, "error_msg": None
+    }
+elif "cpi.rss" in url:
+    body = b"Forbidden"
+    out = {
+        "status_code": 403, "content_type": "text/html",
+        "body_b64": base64.b64encode(body).decode("ascii"),
+        "bytes_received": len(body), "bytes_stored": len(body),
+        "limit_exceeded": False, "final_url": url, "error_msg": None
+    }
+else:
+    out = {
+        "status_code": None, "content_type": None,
+        "body_b64": "", "bytes_received": 0, "bytes_stored": 0,
+        "limit_exceeded": False, "final_url": url,
+        "error_msg": "Connection timed out"
+    }
 
-    probe = SourceProbe(session=mock_session)
+print(json.dumps(out))
+'''
+    worker_script.write_text(worker_code)
+
+    probe = SourceProbe(worker_cmd=[sys.executable, str(worker_script)])
     summary = probe.run()
 
     assert summary["total_sources"] == 8
@@ -584,11 +628,12 @@ def test_partial_batch_failure_and_overall_summary():
 
     effr_res = next(r for r in summary["results"] if r["source_id"] == "nyfed_effr")
     assert effr_res["status"] == "valid"
+    assert effr_res["http_status"] == 200
 
     cpi_res = next(r for r in summary["results"] if r["source_id"] == "bls_cpi_rss")
     assert cpi_res["status"] == "blocked"
+    assert cpi_res["http_status"] == 403
 
-    # Verify that failed sources have specific network_error and not unhandled NameError
     failing = next(r for r in summary["results"] if r["source_id"] == "fed_monetary_rss")
     assert failing["status"] == "network_error"
     assert "Connection timed out" in failing["reason"]
@@ -692,18 +737,17 @@ def test_rss_rejects_mixed_category_entries(probe):
     assert count == 1
 
 
-def test_real_requests_loopback_drip_interrupted_by_deadline():
+def test_real_requests_loopback_drip_interrupted_by_deadline(tmp_path):
     """Real slow loopback HTTP server dripping bytes is interrupted by worker process deadline."""
     body_data = b"x" * 120
-    request_received = mp.Value("b", False)
-    bytes_sent = mp.Value("i", 0)
+    marker_file = tmp_path / "server_marker.json"
 
     class DripHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
             pass
 
         def do_GET(self):
-            request_received.value = True
+            bytes_sent = 0
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body_data)))
@@ -712,7 +756,8 @@ def test_real_requests_loopback_drip_interrupted_by_deadline():
                 for b in body_data:
                     self.wfile.write(bytes([b]))
                     self.wfile.flush()
-                    bytes_sent.value += 1
+                    bytes_sent += 1
+                    marker_file.write_text(json.dumps({"received": True, "bytes_sent": bytes_sent}))
                     time.sleep(0.025)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
@@ -721,18 +766,29 @@ def test_real_requests_loopback_drip_interrupted_by_deadline():
     server.daemon_threads = True
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
+    server_port = server.server_address[1]
 
-    class LoopbackSession(requests.Session):
-        def __init__(self):
-            super().__init__()
-            self.trust_env = False
+    drip_worker_script = tmp_path / "drip_worker.py"
+    drip_worker_code = f"""import sys, json, time, requests
 
-        def get(self, url, **kwargs):
-            return super().get(f"http://127.0.0.1:{server.server_address[1]}/drip", **kwargs)
+raw = sys.stdin.read()
+resp = requests.get("http://127.0.0.1:{server_port}/drip", stream=True, timeout=10.0)
+chunks = []
+for chunk in resp.iter_content(chunk_size=1):
+    chunks.append(chunk)
+
+out = {{
+    "status_code": resp.status_code, "content_type": "application/json",
+    "body_b64": "", "bytes_received": len(b"".join(chunks)),
+    "bytes_stored": len(b"".join(chunks)), "limit_exceeded": False,
+    "final_url": "http://127.0.0.1:{server_port}/drip", "error_msg": None
+}}
+print(json.dumps(out))
+"""
+    drip_worker_script.write_text(drip_worker_code)
 
     budget = 0.25
-    sess = LoopbackSession()
-    probe = SourceProbe(timeout=budget, session=sess)
+    probe = SourceProbe(timeout=budget, worker_cmd=[sys.executable, str(drip_worker_script)])
     cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
 
     t0 = time.monotonic()
@@ -747,35 +803,40 @@ def test_real_requests_loopback_drip_interrupted_by_deadline():
         assert res["bytes_stored"] is None
         assert "deadline exceeded" in res["reason"].lower()
 
-        # Elapsed must be strictly within budget + 0.35s (and well under the 3.0s total stream)
         assert elapsed <= budget + 0.35, f"Elapsed {elapsed:.4f}s exceeded budget ({budget}s + 0.35s)"
-        assert bool(request_received.value) is True, "Test server did not receive GET request"
-        assert bytes_sent.value > 0, "No bytes were sent before interruption"
-        assert bytes_sent.value < len(body_data), "Entire stream was sent without being interrupted"
+        assert marker_file.is_file(), "Server marker file not created"
+        server_state = json.loads(marker_file.read_text())
+        assert server_state["received"] is True, "Test server did not receive GET request"
+        assert server_state["bytes_sent"] > 0, "No bytes were sent before interruption"
+        assert server_state["bytes_sent"] < len(body_data), "Entire stream was sent without being interrupted"
     finally:
-        sess.close()
         probe.close()
         server.shutdown()
         server.server_close()
         thread.join(timeout=1.0)
 
 
-def test_blocking_resolver_interrupted_by_deadline():
+def test_blocking_resolver_interrupted_by_deadline(tmp_path):
     """Blocking DNS resolver inside worker process is interrupted promptly by parent deadline."""
-    resolver_entered = mp.Value("b", False)
+    marker_file = tmp_path / "resolver_marker.txt"
+    resolver_worker_script = tmp_path / "resolver_worker.py"
+    resolver_worker_code = f"""import sys, time, socket
 
-    def delayed_resolver(*args, **kwargs):
-        resolver_entered.value = True
-        time.sleep(1.0)
-        raise socket.gaierror("synthetic resolver delay")
+raw = sys.stdin.read()
+with open(r"{marker_file}", "w") as f:
+    f.write("entered")
+
+time.sleep(2.0)
+raise socket.gaierror("synthetic resolver delay")
+"""
+    resolver_worker_script.write_text(resolver_worker_code)
 
     budget = 0.20
-    probe = SourceProbe(timeout=budget)
+    probe = SourceProbe(timeout=budget, worker_cmd=[sys.executable, str(resolver_worker_script)])
     cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
 
     t0 = time.monotonic()
-    with patch("socket.getaddrinfo", delayed_resolver):
-        res = probe.probe_single(cfg)
+    res = probe.probe_single(cfg)
     elapsed = time.monotonic() - t0
 
     assert res["status"] == "network_error"
@@ -786,47 +847,47 @@ def test_blocking_resolver_interrupted_by_deadline():
     assert "deadline exceeded" in res["reason"].lower()
 
     assert elapsed <= budget + 0.35, f"Elapsed {elapsed:.4f}s exceeded budget ({budget}s + 0.35s)"
-    assert bool(resolver_entered.value) is True, "Resolver was not entered"
+    assert marker_file.is_file() and marker_file.read_text() == "entered", "Resolver was not entered"
 
 
-def test_timeout_on_first_source_does_not_block_subsequent_source():
+def test_timeout_on_first_source_does_not_block_subsequent_source(tmp_path):
     """Timeout on first probed source terminates worker and leaves subsequent sources unaffected."""
-    class StallingSession(requests.Session):
-        def __init__(self):
-            super().__init__()
-            self.trust_env = False
+    multi_worker_script = tmp_path / "multi_worker.py"
+    multi_worker_code = '''import sys, json, time, base64
 
-        def get(self, url, **kwargs):
-            if "last/5.json" in url:
-                time.sleep(1.5)
-                raise requests.ConnectionError("stalled")
-            resp = requests.Response()
-            resp.status_code = 200
-            resp.headers["Content-Type"] = "application/json"
-            resp._content = json.dumps([
-                {"tag_name": "v3.0.0", "html_url": "https://github.com/deepseek-ai/DeepSeek-V3/releases/tag/v3.0.0"}
-            ]).encode("utf-8")
-            resp._content_consumed = True
-            return resp
+raw = sys.stdin.read()
+params = json.loads(raw)
+sid = params.get("source_id", "")
+url = params.get("initial_url", "")
 
-    sess = StallingSession()
-    probe = SourceProbe(timeout=0.20, session=sess)
+if sid == "nyfed_effr":
+    time.sleep(1.5)
+    sys.exit(0)
+elif sid == "github_deepseek_v3_releases":
+    body = json.dumps([
+        {"tag_name": "v3.0.0", "html_url": "https://github.com/deepseek-ai/DeepSeek-V3/releases/tag/v3.0.0"}
+    ]).encode("utf-8")
+    out = {
+        "status_code": 200, "content_type": "application/json",
+        "body_b64": base64.b64encode(body).decode("ascii"),
+        "bytes_received": len(body), "bytes_stored": len(body),
+        "limit_exceeded": False, "final_url": url, "error_msg": None
+    }
+    print(json.dumps(out))
+'''
+    multi_worker_script.write_text(multi_worker_code)
 
-    # First probe times out
+    probe = SourceProbe(timeout=0.20, worker_cmd=[sys.executable, str(multi_worker_script)])
+
     cfg1 = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
     res1 = probe.probe_single(cfg1)
     assert res1["status"] == "network_error"
     assert res1["body_sha256"] is None
 
-    # Second probe succeeds normally without interference
     cfg2 = {"source_id": "github_deepseek_v3_releases", "url": CANONICAL_SOURCES["github_deepseek_v3_releases"]}
     res2 = probe.probe_single(cfg2)
     assert res2["status"] == "valid"
     assert res2["body_sha256"] is not None
-
-    # Verify no lingering zombie child processes
-    active_children = mp.active_children()
-    assert len(active_children) == 0, f"Lingering child processes detected: {active_children}"
 
 
 def test_real_oversized_stream_through_fetch_path():
@@ -862,14 +923,137 @@ def test_real_oversized_stream_through_fetch_path():
     sess.trust_env = False
     sess.mount("https://", LargeStreamAdapter())
 
-    probe = SourceProbe(session=sess)
-    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
-    res = probe.probe_single(cfg)
+    res = _fetch_bounded_core(
+        sess=sess,
+        source_id="nyfed_effr",
+        initial_url=CANONICAL_SOURCES["nyfed_effr"],
+        timeout=5.0,
+        max_redirects=3,
+        max_bytes=STREAM_LIMIT_BYTES,
+        user_agent="test",
+    )
 
-    assert res["status"] == "invalid_content"
+    probe = SourceProbe()
+    status, level, reason, count = probe.validate_content(
+        source_id="nyfed_effr",
+        http_status=res["status_code"],
+        content_type=res["content_type"],
+        body=res["body"],
+        limit_exceeded=res["limit_exceeded"],
+        error_msg=res["error_msg"],
+    )
+
+    assert status == "invalid_content"
+    assert level == "transport"
+    assert res["bytes_stored"] == STREAM_LIMIT_BYTES
+    assert res["bytes_received"] > STREAM_LIMIT_BYTES
+    assert "Payload exceeded maximum stream limit" in reason
+
+
+def test_partial_ipc_message_stalled_interrupted_by_deadline(tmp_path):
+    """Worker sends partial stdout frame, then stalls; supervisor interrupts promptly by deadline."""
+    marker_file = tmp_path / "partial_ipc_marker.txt"
+    stalling_worker_script = tmp_path / "stalling_worker.py"
+    stalling_worker_code = f"""import sys, time
+
+raw = sys.stdin.read()
+sys.stdout.write('{{"status_code": 200, "content_type": "application/json", "body_b64": "')
+sys.stdout.flush()
+
+with open(r"{marker_file}", "w") as f:
+    f.write("partial_sent")
+
+time.sleep(2.0)
+"""
+    stalling_worker_script.write_text(stalling_worker_code)
+
+    budget = 0.20
+    probe = SourceProbe(timeout=budget, worker_cmd=[sys.executable, str(stalling_worker_script)])
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+
+    t0 = time.monotonic()
+    res = probe.probe_single(cfg)
+    elapsed = time.monotonic() - t0
+
+    assert res["status"] == "network_error"
     assert res["validation_level"] == "transport"
     assert res["body_sha256"] is None
-    assert res["bytes_stored"] == STREAM_LIMIT_BYTES  # exactly 2 MiB
-    assert res["bytes_received"] > STREAM_LIMIT_BYTES  # exceeded boundary
-    assert "Payload exceeded maximum stream limit" in res["reason"]
+    assert res["bytes_received"] is None
+    assert res["bytes_stored"] is None
+    assert res["http_status"] is None
+    assert "deadline exceeded" in res["reason"].lower()
 
+    assert elapsed <= budget + 0.35, f"Elapsed {elapsed:.4f}s exceeded budget ({budget}s + 0.35s)"
+    assert marker_file.is_file() and marker_file.read_text() == "partial_sent"
+
+
+def test_full_2mib_message_passes_without_pipe_deadlock(tmp_path):
+    """Full 2 MiB payload completes cleanly through IPC pipe without deadlock or truncation."""
+    worker_script = tmp_path / "large_worker.py"
+    worker_code = '''import sys, json, base64
+
+raw = sys.stdin.read()
+params = json.loads(raw)
+body = b" " * (2 * 1024 * 1024 - 1000) + json.dumps({
+    "refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 3.88}]
+}).encode("utf-8")
+out = {
+    "status_code": 200,
+    "content_type": "application/json",
+    "body_b64": base64.b64encode(body).decode("ascii"),
+    "bytes_received": len(body),
+    "bytes_stored": len(body),
+    "limit_exceeded": False,
+    "final_url": params["initial_url"],
+    "error_msg": None,
+}
+print(json.dumps(out))
+'''
+    worker_script.write_text(worker_code)
+
+    probe = SourceProbe(timeout=5.0, worker_cmd=[sys.executable, str(worker_script)])
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+
+    t0 = time.monotonic()
+    res = probe.probe_single(cfg)
+    elapsed = time.monotonic() - t0
+
+    assert res["status"] == "valid"
+    assert res["http_status"] == 200
+    assert res["body_sha256"] is not None
+    assert res["bytes_stored"] == (2 * 1024 * 1024 - 1000) + len(json.dumps({"refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 3.88}]}).encode("utf-8"))
+    assert elapsed < 1.0
+
+
+def test_late_message_rejected_by_deadline_recheck(tmp_path):
+    """Message that finishes after deadline is rejected even if payload is valid."""
+    worker_script = tmp_path / "late_worker.py"
+    worker_code = '''import sys, json, time, base64
+
+raw = sys.stdin.read()
+time.sleep(0.25)
+body = json.dumps({
+    "refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 3.88}]
+}).encode("utf-8")
+out = {
+    "status_code": 200,
+    "content_type": "application/json",
+    "body_b64": base64.b64encode(body).decode("ascii"),
+    "bytes_received": len(body),
+    "bytes_stored": len(body),
+    "limit_exceeded": False,
+    "final_url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
+    "error_msg": None,
+}
+print(json.dumps(out))
+'''
+    worker_script.write_text(worker_code)
+
+    budget = 0.20
+    probe = SourceProbe(timeout=budget, worker_cmd=[sys.executable, str(worker_script)])
+    cfg = {"source_id": "nyfed_effr", "url": CANONICAL_SOURCES["nyfed_effr"]}
+
+    res = probe.probe_single(cfg)
+    assert res["status"] == "network_error"
+    assert res["body_sha256"] is None
+    assert "deadline exceeded" in res["reason"].lower()

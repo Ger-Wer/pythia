@@ -1,0 +1,66 @@
+{
+  "baseline_commit": "e92e12912e74c673d187d89273c129fc407a8682",
+  "target_branch": "codex/evidence-r1-sources",
+  "python_version": "3.10.12",
+  "timestamp_utc": "2026-10-17T17:05:43Z",
+  "controls": [
+    {
+      "control": "partial_ipc_message_stalls_after_ready_header",
+      "budget_seconds": 0.2,
+      "cleanup_allowance_seconds": 0.5,
+      "elapsed_seconds": 0.2023,
+      "status": "network_error",
+      "validation_level": "transport",
+      "reported_duration_ms": 201.97,
+      "body_sha256": null,
+      "bytes_received": null,
+      "bytes_stored": null,
+      "http_status": null,
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "marker_confirmed": true,
+      "expected": "network_error within budget + cleanup, null hash/counters, worker reaped",
+      "meets_expectation": true,
+      "external_network": false
+    },
+    {
+      "control": "full_2mib_message_through_ipc_pipe",
+      "budget_seconds": 5.0,
+      "elapsed_seconds": 0.1152,
+      "status": "valid",
+      "validation_level": "content",
+      "reported_duration_ms": 80.78,
+      "bytes_stored": 2096236,
+      "body_sha256": "cdd768448ac4a9cc9c8ffc2f970d8afa78bc13119baf857438dc8e6ced6b2eaa",
+      "sha256_match": true,
+      "pipe_deadlock_detected": false,
+      "expected": "valid, full ~2 MiB payload parsed, sha256 match, no deadlock",
+      "meets_expectation": true,
+      "external_network": false
+    },
+    {
+      "control": "small_fast_message_through_ipc_pipe",
+      "budget_seconds": 2.0,
+      "elapsed_seconds": 0.0303,
+      "status": "valid",
+      "validation_level": "content",
+      "reported_duration_ms": 29.93,
+      "body_sha256": "407a6c3301d2952ec90e780d3b2f5bbe743f30571c14e71540778af29788fac2",
+      "expected": "valid, quick execution, correct duration",
+      "meets_expectation": true,
+      "external_network": false
+    },
+    {
+      "control": "late_message_rejected_by_deadline_recheck",
+      "budget_seconds": 0.2,
+      "elapsed_seconds": 0.202,
+      "status": "network_error",
+      "reported_duration_ms": 201.76,
+      "body_sha256": null,
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "expected": "network_error, null hash, deadline re-check catches late message",
+      "meets_expectation": true,
+      "external_network": false
+    }
+  ],
+  "all_controls_passed": true
+}

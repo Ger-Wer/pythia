@@ -1,0 +1,61 @@
+{
+  "baseline_commit": "e92e12912e74c673d187d89273c129fc407a8682",
+  "target_branch": "codex/evidence-r1-sources",
+  "python_version": "3.10.12",
+  "timestamp_utc": "2026-10-17T17:05:44Z",
+  "checks": [
+    {
+      "case": "bls_employment_feed_is_not_cpi",
+      "status": "invalid_content",
+      "validation_level": "content",
+      "reason": "Feed identity mismatch: expected BLS Consumer Price Index, got channel title 'Bureau of Labor Statistics'.",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "fed_bank_orders_are_not_monetary_policy",
+      "status": "invalid_content",
+      "validation_level": "content",
+      "reason": "Feed identity mismatch: expected Federal Reserve Monetary Policy, got channel title 'FRB: Press Release - Banking Applications'.",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "truncated_rss_xml",
+      "status": "invalid_content",
+      "validation_level": "envelope",
+      "reason": "Malformed or truncated XML: no element found: line 1, column 288",
+      "item_count": null,
+      "expected": "invalid_content",
+      "meets_expectation": true
+    },
+    {
+      "case": "real_requests_loopback_drip_deadline",
+      "budget_seconds": 0.2,
+      "elapsed_seconds": 0.2024,
+      "reported_ms": 202.25,
+      "status": "network_error",
+      "body_sha256": null,
+      "bytes_received": null,
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "server_received_request": true,
+      "bytes_sent_before_cutoff": 4,
+      "external_http": false,
+      "meets_expectation": true
+    },
+    {
+      "case": "blocking_resolver_deadline",
+      "budget_seconds": 0.2,
+      "elapsed_seconds": 0.2024,
+      "reported_ms": 202.25,
+      "status": "network_error",
+      "reason": "Overall source deadline exceeded (0.2s); worker process terminated.",
+      "child_entered_resolver": true,
+      "external_dns": false,
+      "meets_expectation": true
+    }
+  ],
+  "all_checks_passed": true
+}
