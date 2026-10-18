@@ -1,0 +1,224 @@
+======================================================================
+Pythia R3.0 Offline Facts & Frozen Dossier Demonstration
+======================================================================
+
+[Step 1] Verifying 32 blobs across 4 live archives BEFORE demo...
+Total blobs verified: 32; Healthy: True
+
+[Step 2] Creating consistent SQLite backup from /home/pythia/pythia-evidence-r2-data/live-r2-revision3/archive.db...
+Copying CAS blobs to snapshot directory...
+
+[Step 3] Mechanically selecting explicit receipt IDs from snapshot...
+  Selected: seq=1 | source=nyfed_effr | receipt_id=c5a86df9-f433-4090-a6a0-af11f2d18643
+  Selected: seq=2 | source=fed_monetary_rss | receipt_id=39bf5ee5-5918-489f-b9e1-dfcfcfbce96b
+  Selected: seq=3 | source=fed_speeches_rss | receipt_id=65207891-9bef-4a74-af54-abe32ddf58ae
+
+[Step 4] Event Descriptor:
+{
+  "event_id": "fixture_fomc_202610_context",
+  "question": "Will the Federal Reserve adjust the target federal funds rate range at the October/November 2026 FOMC meeting?",
+  "deadline": "2026-11-04T18:00:00Z",
+  "rules": null,
+  "provenance": "fixture",
+  "contract_status": "incomplete"
+}
+
+[Step 5] Building frozen dossier in /home/pythia/pythia-evidence-r3/scratch_demo/output_dossier (cutoff as_of_seq=8)...
+
+[Step 6] Dossier Published Successfully!
+  Bundle File:   dossier_0a3b8e58777a9cfffe21eee05da8e455b80c7778d419633d4ff205c7148e565b.json
+  Bundle Digest: 0a3b8e58777a9cfffe21eee05da8e455b80c7778d419633d4ff205c7148e565b
+  As-Of Seq:     8
+  Requested:     3
+  Verified:      3
+  Facts Count:   35
+  Rejections:    0
+  Origin Groups: 31
+  Usable Forecast: False
+  Dossier Type:    context_only
+
+Sample Facts Extracted:
+  Fact 1 (feed_item):
+    Source:    fed_monetary_rss (Federal Reserve Board)
+    Value:     {'title': 'Minutes of the Federal Open Market Committee, June 16-17, 2026', 'referenced_article_url': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm', 'article_status': 'referenced_not_fetched', 'feed_excerpt': 'Minutes of the Federal Open Market Committee, June 16-17, 2026', 'guid': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm', 'raw_pub_date': 'Wed, 8 Jul 2026 18:00:00 GMT'}
+    Unit:      None
+    Dates:     effective=None | published_at=2026-07-08T18:00:00+00:00
+    Locator:   /rss/channel/item[10]
+    Proof SHA: 69b638039ee490f0... (bytes 0-9687)
+  Fact 2 (feed_item):
+    Source:    fed_monetary_rss (Federal Reserve Board)
+    Value:     {'title': 'Federal Reserve issues FOMC statement', 'referenced_article_url': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm', 'article_status': 'referenced_not_fetched', 'feed_excerpt': 'Federal Reserve issues FOMC statement', 'guid': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm', 'raw_pub_date': 'Wed, 17 Jun 2026 18:00:00 GMT'}
+    Unit:      None
+    Dates:     effective=None | published_at=2026-06-17T18:00:00+00:00
+    Locator:   /rss/channel/item[11]
+    Proof SHA: 69b638039ee490f0... (bytes 0-9687)
+  Fact 3 (feed_item):
+    Source:    fed_monetary_rss (Federal Reserve Board)
+    Value:     {'title': 'Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting', 'referenced_article_url': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm', 'article_status': 'referenced_not_fetched', 'feed_excerpt': 'Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting', 'guid': 'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm', 'raw_pub_date': 'Wed, 17 Jun 2026 18:00:00 GMT'}
+    Unit:      None
+    Dates:     effective=None | published_at=2026-06-17T18:00:00+00:00
+    Locator:   /rss/channel/item[12]
+    Proof SHA: 69b638039ee490f0... (bytes 0-9687)
+
+Origin Groups:
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260429a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260709a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260825a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/barr20260923a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/barr20260929a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20260918a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20260918b.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20260929a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20261001a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20261006a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/bowman20261014a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/cook20260928a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/cook20260930a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/jefferson20260922a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/jefferson20261001a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/waller20260928a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/waller20261001a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:fed:article:https://www.federalreserve.gov/newsevents/speech/waller20261008a.htm
+    Publisher: Federal Reserve Board
+    Type:      referenced_article
+    Obs Count: 1
+    Indep Ev:  1
+  Origin ID:   origin:nyfed:effr_rates
+    Publisher: Federal Reserve Bank of New York
+    Type:      rate_series
+    Obs Count: 5
+    Indep Ev:  1
+
+[Step 7] Verifying 32 blobs across 4 live archives AFTER demo...
+Total blobs verified: 32; Healthy: True
+
+Artifacts saved to /home/pythia/pythia-evidence-r3/docs/research/2026-10-18/r3/increment0
+======================================================================

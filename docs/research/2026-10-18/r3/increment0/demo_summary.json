@@ -1,0 +1,26 @@
+{
+  "bundle_digest": "0a3b8e58777a9cfffe21eee05da8e455b80c7778d419633d4ff205c7148e565b",
+  "bundle_file": "dossier_0a3b8e58777a9cfffe21eee05da8e455b80c7778d419633d4ff205c7148e565b.json",
+  "cutoff_seq": 8,
+  "metadata": {
+    "coverage_limitations": [
+      "Only 3 canonical sources supported in R3.0 (nyfed_effr, fed_monetary_rss, fed_speeches_rss).",
+      "Background and contextual evidence only; does not prove future FOMC decisions or rate targets.",
+      "Articles referenced in RSS feeds are not fetched or crawled in R3.0.",
+      "No resolution text or Polymarket contract rules loaded; contract_status is incomplete.",
+      "No probabilities, betting recommendations, or edge estimates provided."
+    ],
+    "dossier_type": "context_only",
+    "evidence_status": "insufficient_direct_evidence",
+    "usable_for_forecast": false
+  },
+  "original_blobs_intact": true,
+  "receipt_ids": [
+    "c5a86df9-f433-4090-a6a0-af11f2d18643",
+    "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+    "65207891-9bef-4a74-af54-abe32ddf58ae"
+  ],
+  "total_facts": 35,
+  "total_origins": 31,
+  "total_rejections": 0
+}
