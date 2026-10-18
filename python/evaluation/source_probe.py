@@ -34,8 +34,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import feedparser
 import requests
 
-PROBE_VERSION = "pythia-probe-r2/1.0"
-COLLECTOR_VERSION = "pythia-collector-r2/1.0"
+PROBE_VERSION = "pythia-probe-r2.1/1.0"
+COLLECTOR_VERSION = "pythia-collector-r2.1/1.0"
 STREAM_LIMIT_BYTES = 2 * 1024 * 1024  # 2 MiB = 2,097,152 bytes
 DEFAULT_TIMEOUT_SECONDS = 15.0
 MAX_REDIRECTS = 3
@@ -433,6 +433,15 @@ class SourceProbe:
 
         Returns a typed CaptureResult.
         """
+        # Validate canonical source and URL prior to spawning worker process
+        if source_id not in CANONICAL_SOURCES:
+            raise ValueError(f"Unknown or non-canonical source_id: '{source_id}'")
+        expected_url = CANONICAL_SOURCES[source_id]
+        if initial_url != expected_url:
+            raise ValueError(
+                f"URL mismatch for '{source_id}': expected '{expected_url}', got '{initial_url}'"
+            )
+
         start_monotonic = time.monotonic()
         started_at = utc_now_iso()
         deadline = start_monotonic + self.timeout
@@ -602,73 +611,91 @@ class SourceProbe:
                 collector_version=COLLECTOR_VERSION,
             )
 
+        MANDATORY_WORKER_KEYS = {
+            "status_code",
+            "headers",
+            "body_b64",
+            "bytes_received",
+            "bytes_stored",
+            "complete",
+            "limit_exceeded",
+            "final_url",
+            "error_msg",
+        }
+        missing_keys = [k for k in sorted(MANDATORY_WORKER_KEYS) if k not in worker_result]
         schema_err: Optional[str] = None
-
-        body_b64 = worker_result.get("body_b64")
-        if body_b64 is not None:
-            if not isinstance(body_b64, str):
-                schema_err = f"Worker body_b64 must be str, got {type(body_b64).__name__}"
-                body = b""
-            else:
-                try:
-                    body = base64.b64decode(body_b64)
-                except Exception as exc:
-                    schema_err = f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}"
-                    body = b""
-        else:
-            body = b""
+        if missing_keys:
+            schema_err = f"Worker protocol error: missing required key(s): {', '.join(missing_keys)}"
 
         raw_complete = worker_result.get("complete")
-        if raw_complete is not None:
-            if not isinstance(raw_complete, bool):
-                schema_err = schema_err or f"Worker 'complete' must be boolean, got {type(raw_complete).__name__}"
-                complete = False
-            else:
-                complete = raw_complete
+        if type(raw_complete) is not bool:
+            schema_err = schema_err or f"Worker 'complete' must be boolean, got {type(raw_complete).__name__}"
+            complete = False
         else:
-            complete = (
-                worker_result.get("status_code") is not None
-                and not worker_result.get("limit_exceeded", False)
-                and worker_result.get("error_msg") is None
-            )
+            complete = raw_complete
 
-        raw_limit = worker_result.get("limit_exceeded", False)
-        if not isinstance(raw_limit, bool):
+        raw_limit = worker_result.get("limit_exceeded")
+        if type(raw_limit) is not bool:
             schema_err = schema_err or f"Worker 'limit_exceeded' must be boolean, got {type(raw_limit).__name__}"
             limit_exceeded = False
         else:
             limit_exceeded = raw_limit
 
-        status_code = worker_result.get("status_code")
-        if status_code is not None and not isinstance(status_code, int):
-            schema_err = schema_err or f"Worker 'status_code' must be integer or null, got {type(status_code).__name__}"
+        raw_status = worker_result.get("status_code")
+        if raw_status is not None and (type(raw_status) is not int or isinstance(raw_status, bool)):
+            schema_err = schema_err or f"Worker 'status_code' must be integer or null, got {type(raw_status).__name__}"
             status_code = None
+        else:
+            status_code = raw_status
 
-        final_url = worker_result.get("final_url")
-        if final_url is not None and not isinstance(final_url, str):
-            schema_err = schema_err or f"Worker 'final_url' must be string or null, got {type(final_url).__name__}"
+        raw_final_url = worker_result.get("final_url")
+        if raw_final_url is not None and type(raw_final_url) is not str:
+            schema_err = schema_err or f"Worker 'final_url' must be string or null, got {type(raw_final_url).__name__}"
             final_url = None
+        else:
+            final_url = raw_final_url
 
         raw_headers = worker_result.get("headers")
         headers: Dict[str, str] = {}
         if raw_headers is not None:
-            if not isinstance(raw_headers, dict):
-                schema_err = schema_err or f"Worker 'headers' must be an object, got {type(raw_headers).__name__}"
+            if type(raw_headers) is not dict or not all(type(k) is str and type(v) is str for k, v in raw_headers.items()):
+                schema_err = schema_err or "Worker 'headers' must be an object with string keys and values"
             else:
                 for hk, hv in raw_headers.items():
-                    headers[str(hk).lower()] = str(hv)
-        elif worker_result.get("content_type"):
-            headers["content-type"] = str(worker_result.get("content_type"))
+                    headers[hk.lower()] = hv
+        else:
+            schema_err = schema_err or "Worker 'headers' cannot be null"
 
-        bytes_received = worker_result.get("bytes_received")
-        if bytes_received is not None and not isinstance(bytes_received, int):
-            schema_err = schema_err or f"Worker 'bytes_received' must be int or null, got {type(bytes_received).__name__}"
+        raw_received = worker_result.get("bytes_received")
+        if raw_received is not None and (type(raw_received) is not int or isinstance(raw_received, bool) or raw_received < 0):
+            schema_err = schema_err or f"Worker 'bytes_received' must be non-negative integer or null, got {raw_received!r}"
             bytes_received = None
+        else:
+            bytes_received = raw_received
 
-        bytes_stored = worker_result.get("bytes_stored")
-        if bytes_stored is not None and not isinstance(bytes_stored, int):
-            schema_err = schema_err or f"Worker 'bytes_stored' must be int or null, got {type(bytes_stored).__name__}"
+        raw_stored = worker_result.get("bytes_stored")
+        if raw_stored is not None and (type(raw_stored) is not int or isinstance(raw_stored, bool) or raw_stored < 0):
+            schema_err = schema_err or f"Worker 'bytes_stored' must be non-negative integer or null, got {raw_stored!r}"
             bytes_stored = None
+        else:
+            bytes_stored = raw_stored
+
+        body_b64 = worker_result.get("body_b64")
+        body = b""
+        if type(body_b64) is not str:
+            schema_err = schema_err or f"Worker 'body_b64' must be str, got {type(body_b64).__name__}"
+        else:
+            try:
+                body = base64.b64decode(body_b64, validate=True)
+            except Exception as exc:
+                schema_err = schema_err or f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}"
+
+        raw_error_msg = worker_result.get("error_msg")
+        if raw_error_msg is not None and type(raw_error_msg) is not str:
+            schema_err = schema_err or f"Worker 'error_msg' must be string or null, got {type(raw_error_msg).__name__}"
+            worker_error_msg = None
+        else:
+            worker_error_msg = raw_error_msg
 
         if not schema_err:
             if bytes_stored is not None and bytes_stored != len(body):
@@ -676,14 +703,44 @@ class SourceProbe:
             elif bytes_received is not None and bytes_stored is not None and bytes_stored > bytes_received:
                 schema_err = f"Worker counter inconsistency: bytes_stored ({bytes_stored}) > bytes_received ({bytes_received})"
 
+        if complete:
+            if schema_err is not None:
+                complete = False
+            elif limit_exceeded:
+                schema_err = "Worker response marked complete=True cannot have limit_exceeded=True"
+                complete = False
+            elif worker_error_msg is not None:
+                schema_err = f"Worker response marked complete=True cannot have error_msg: {worker_error_msg}"
+                complete = False
+            elif status_code is None or not (100 <= status_code < 600):
+                schema_err = f"Worker response marked complete=True must have valid HTTP status code, got {status_code}"
+                complete = False
+            elif final_url is None or not final_url:
+                schema_err = "Worker response marked complete=True must have non-empty final_url"
+                complete = False
+            elif bytes_received is None or bytes_stored is None:
+                schema_err = "Worker response marked complete=True must have non-null byte counters"
+                complete = False
+            elif bytes_received != bytes_stored or bytes_stored != len(body):
+                schema_err = f"Worker response marked complete=True counter mismatch: received={bytes_received}, stored={bytes_stored}, len={len(body)}"
+                complete = False
+            elif len(body) == 0:
+                if not (bytes_received == 0 and bytes_stored == 0 and status_code is not None and not limit_exceeded and worker_error_msg is None):
+                    schema_err = "Empty body without explicit zero counters cannot be complete"
+                    complete = False
+
         if len(body) > self.max_bytes:
             limit_exceeded = True
             complete = False
             body = body[: self.max_bytes]
+            schema_err = schema_err or f"Stream limit exceeded ({self.max_bytes} bytes)"
 
-        error_msg = schema_err or worker_result.get("error_msg")
+        error_msg = schema_err or worker_error_msg
         if schema_err:
             complete = False
+
+        if not complete and (status_code is None or error_msg is not None):
+            final_url = None
 
         # POST-DECODE DEADLINE CHECK & DURATION MEASUREMENT:
         elapsed = time.monotonic() - start_monotonic
@@ -1187,7 +1244,13 @@ class SourceProbe:
         source_id = source_cfg["source_id"]
         initial_url = source_cfg["url"]
 
-        if capture is None:
+        if capture is not None:
+            if capture.source_id != source_id or capture.initial_url != initial_url:
+                raise ValueError(
+                    f"Capture mismatch: capture is for ({capture.source_id}, {capture.initial_url}) "
+                    f"but source_cfg specifies ({source_id}, {initial_url})"
+                )
+        else:
             capture = self.capture_source(source_id, initial_url)
 
         status, validation_level, reason, item_count = self.validate_content(

@@ -32,6 +32,8 @@ from python.evaluation.source_probe import (
 
 logger = logging.getLogger(__name__)
 
+SCHEMA_VERSION = "pythia-archive-r2/2.0"
+
 
 class ArchiveError(Exception):
     """Base exception for evidence archive operations."""
@@ -63,11 +65,15 @@ class ArchiveReceipt:
     bytes_received: Optional[int]
     bytes_stored: Optional[int]
     complete: bool
+    limit_exceeded: bool
+    error_msg: Optional[str]
+    collector_version: str
     status: str
     validation_level: str
     reason: str
     checker_version: str
     usable_for_forecast: bool
+    payload_fingerprint: str
     blob_sha256: Optional[str]
     revision_id: Optional[str]
 
@@ -116,13 +122,34 @@ class EvidenceArchive:
             isolation_level=None,  # Autocommit mode; transactions managed via BEGIN IMMEDIATE
         )
         conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA synchronous = FULL;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA busy_timeout = 10000;")
         return conn
 
     def _init_db(self) -> None:
         """Initialize tables, indices, and append-only triggers."""
+        # Detect legacy or incompatible schema prior to running DDL
+        if self.db_path.is_file():
+            # Inspect read-only to avoid modifying legacy files, headers, or PRAGMAs
+            ro_uri = f"file:{self.db_path.resolve()}?mode=ro"
+            ro_conn = sqlite3.connect(ro_uri, uri=True)
+            try:
+                cursor = ro_conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_info';")
+                if cursor.fetchone() is not None:
+                    cursor.execute("SELECT value FROM schema_info WHERE key = 'version';")
+                    row = cursor.fetchone()
+                    if row is not None:
+                        existing_version = row[0]
+                        if existing_version != SCHEMA_VERSION:
+                            raise ArchiveIntegrityError(
+                                f"Incompatible archive schema version '{existing_version}'. "
+                                f"Expected '{SCHEMA_VERSION}'. Do not modify legacy archive."
+                            )
+            finally:
+                ro_conn.close()
+
         with self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
             conn.execute("""
@@ -168,11 +195,15 @@ class EvidenceArchive:
                     bytes_received INTEGER,
                     bytes_stored INTEGER,
                     complete INTEGER NOT NULL,
+                    limit_exceeded INTEGER NOT NULL,
+                    error_msg TEXT,
+                    collector_version TEXT NOT NULL,
                     status TEXT NOT NULL,
                     validation_level TEXT NOT NULL,
                     reason TEXT NOT NULL,
                     checker_version TEXT NOT NULL,
                     usable_for_forecast INTEGER NOT NULL DEFAULT 0,
+                    payload_fingerprint TEXT NOT NULL,
                     blob_sha256 TEXT,
                     revision_id TEXT,
                     FOREIGN KEY (revision_id) REFERENCES revisions (revision_id)
@@ -218,7 +249,7 @@ class EvidenceArchive:
             """)
 
             conn.execute(
-                "INSERT OR IGNORE INTO schema_info (key, value) VALUES ('version', 'pythia-archive-r2/1.0');"
+                f"INSERT OR IGNORE INTO schema_info (key, value) VALUES ('version', '{SCHEMA_VERSION}');"
             )
             conn.execute("COMMIT;")
 
@@ -227,22 +258,34 @@ class EvidenceArchive:
         return self.blobs_dir / sha256[:2] / sha256[2:4] / f"{sha256}.bin"
 
     def _store_blob(self, body: bytes) -> str:
-        """Store bytes into filesystem CAS atomically with fsync.
-        
-        Deduplicates identical blobs: if the blob already exists with identical
-        size and hash, it is preserved without re-writing.
+        """Store bytes into filesystem CAS atomically with fsync and no-clobber semantics.
+
+        Deduplicates identical blobs: if the blob already exists, verifies both
+        size and SHA-256 hash. If corrupted, raises ArchiveIntegrityError without
+        modifying the corrupted file. Publishes new blobs atomically via link
+        without clobbering, followed by directory fsync.
         """
         sha256 = hashlib.sha256(body).hexdigest()
         dest_path = self._blob_path(sha256)
 
         if dest_path.is_file():
-            # Already exists: verify size to ensure no partial write
-            if dest_path.stat().st_size == len(body):
-                return sha256
+            # Already exists: verify exact size AND hash
+            stat_size = dest_path.stat().st_size
+            if stat_size != len(body):
+                raise ArchiveIntegrityError(
+                    f"CAS blob size mismatch at {dest_path}: expected {len(body)} bytes, found {stat_size} bytes."
+                )
+            existing_data = dest_path.read_bytes()
+            existing_sha = hashlib.sha256(existing_data).hexdigest()
+            if existing_sha != sha256:
+                raise ArchiveIntegrityError(
+                    f"CAS blob hash mismatch at {dest_path}: expected SHA-256 {sha256}, found corrupted blob {existing_sha}."
+                )
+            return sha256
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write to temporary file in self.tmp_dir (same filesystem for atomic rename)
+        # Write to temporary file in self.tmp_dir (same filesystem for atomic hardlink/rename)
         temp_fd, temp_path_str = tempfile.mkstemp(dir=str(self.tmp_dir), prefix="blob_", suffix=".tmp")
         temp_path = Path(temp_path_str)
         try:
@@ -251,8 +294,39 @@ class EvidenceArchive:
                 f.flush()
                 os.fsync(f.fileno())
 
-            # Atomic publish to destination CAS path
-            os.replace(temp_path, dest_path)
+            # Atomic no-clobber publish: os.link fails with FileExistsError if dest_path already exists
+            published = False
+            try:
+                os.link(temp_path, dest_path)
+                published = True
+            except FileExistsError:
+                published = False
+
+            # Remove temporary staging file
+            temp_path.unlink(missing_ok=True)
+
+            if not published:
+                # Race condition: another concurrent writer wrote dest_path
+                stat_size = dest_path.stat().st_size
+                if stat_size != len(body):
+                    raise ArchiveIntegrityError(
+                        f"CAS blob race corruption at {dest_path}: expected {len(body)} bytes, found {stat_size} bytes."
+                    )
+                existing_data = dest_path.read_bytes()
+                existing_sha = hashlib.sha256(existing_data).hexdigest()
+                if existing_sha != sha256:
+                    raise ArchiveIntegrityError(
+                        f"CAS blob race hash mismatch at {dest_path}: expected {sha256}, found {existing_sha}."
+                    )
+                return sha256
+
+            # Fsync destination parent directory to ensure directory entry durability on Linux
+            dir_fd = os.open(str(dest_path.parent), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+
         except Exception:
             if temp_path.exists():
                 try:
@@ -277,12 +351,92 @@ class EvidenceArchive:
             )
         return data
 
+    def _validate_capture(self, capture: CaptureResult) -> None:
+        """Validate CaptureResult invariants at archive boundary before persistent processing."""
+        if capture.source_id not in CANONICAL_SOURCES:
+            raise ValueError(f"Unknown or non-canonical source_id: '{capture.source_id}'")
+        expected_url = CANONICAL_SOURCES[capture.source_id]
+        if capture.initial_url != expected_url:
+            raise ValueError(
+                f"URL mismatch for '{capture.source_id}': expected '{expected_url}', got '{capture.initial_url}'"
+            )
+        if type(capture.complete) is not bool:
+            raise ValueError(f"CaptureResult 'complete' must be bool, got {type(capture.complete).__name__}")
+        if type(capture.limit_exceeded) is not bool:
+            raise ValueError(f"CaptureResult 'limit_exceeded' must be bool, got {type(capture.limit_exceeded).__name__}")
+        if capture.status_code is not None and (type(capture.status_code) is not int or isinstance(capture.status_code, bool)):
+            raise ValueError("CaptureResult 'status_code' must be integer or None")
+        if capture.bytes_received is not None and (type(capture.bytes_received) is not int or isinstance(capture.bytes_received, bool) or capture.bytes_received < 0):
+            raise ValueError("CaptureResult 'bytes_received' must be non-negative integer or None")
+        if capture.bytes_stored is not None and (type(capture.bytes_stored) is not int or isinstance(capture.bytes_stored, bool) or capture.bytes_stored < 0):
+            raise ValueError("CaptureResult 'bytes_stored' must be non-negative integer or None")
+        if type(capture.body) is not bytes:
+            raise ValueError(f"CaptureResult 'body' must be bytes, got {type(capture.body).__name__}")
+        if type(capture.headers) is not dict:
+            raise ValueError(f"CaptureResult 'headers' must be dict, got {type(capture.headers).__name__}")
+        if capture.complete:
+            if capture.error_msg is not None:
+                raise ValueError(f"Contradictory CaptureResult: complete=True cannot have error_msg: {capture.error_msg}")
+            if capture.limit_exceeded:
+                raise ValueError("Contradictory CaptureResult: complete=True cannot have limit_exceeded=True")
+            if capture.status_code is None or not (100 <= capture.status_code < 600):
+                raise ValueError(f"Contradictory CaptureResult: complete=True requires valid status_code, got {capture.status_code}")
+            if capture.final_url is None or not capture.final_url:
+                raise ValueError("Contradictory CaptureResult: complete=True requires non-empty final_url")
+            if capture.bytes_received is None or capture.bytes_stored is None:
+                raise ValueError("Contradictory CaptureResult: complete=True requires non-null counters")
+            if capture.bytes_received != capture.bytes_stored or capture.bytes_stored != len(capture.body):
+                raise ValueError(f"Contradictory CaptureResult: counter mismatch (received={capture.bytes_received}, stored={capture.bytes_stored}, len={len(capture.body)})")
+
+    def _compute_payload_fingerprint(
+        self,
+        capture: CaptureResult,
+        diag_status: str,
+        diag_level: str,
+        diag_reason: str,
+        diag_checker_version: str,
+    ) -> str:
+        """Compute deterministic SHA-256 fingerprint over all capture and diagnostic fields."""
+        canonical_headers = {str(k).lower(): str(v) for k, v in sorted(capture.headers.items())}
+        payload_dict = {
+            "source_id": capture.source_id,
+            "initial_url": capture.initial_url,
+            "final_url": capture.final_url,
+            "status_code": capture.status_code,
+            "headers": canonical_headers,
+            "fetch_started_at": capture.fetch_started_at,
+            "fetch_completed_at": capture.fetch_completed_at,
+            "duration_ms": capture.duration_ms,
+            "bytes_received": capture.bytes_received,
+            "bytes_stored": capture.bytes_stored,
+            "complete": capture.complete,
+            "limit_exceeded": capture.limit_exceeded,
+            "error_msg": capture.error_msg,
+            "collector_version": capture.collector_version,
+            "raw_body_sha256": hashlib.sha256(capture.body).hexdigest(),
+            "diag_status": diag_status,
+            "diag_level": diag_level,
+            "diag_reason": diag_reason,
+            "diag_checker_version": diag_checker_version,
+        }
+        serialized = json.dumps(payload_dict, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def _verify_idempotency_payload(self, existing: ArchiveReceipt, expected_fingerprint: str) -> None:
+        """Verify that duplicate receipt_id matches full immutable payload fingerprint."""
+        if existing.payload_fingerprint != expected_fingerprint:
+            raise ArchiveConflictError(
+                f"Conflict on receipt_id '{existing.receipt_id}': existing payload differs from provided capture "
+                f"(existing fingerprint {existing.payload_fingerprint[:16]}... != {expected_fingerprint[:16]}...)"
+            )
+
     def record_capture(
         self,
         capture: CaptureResult,
         receipt_id: Optional[str] = None,
         probe_result: Optional[Dict[str, Any]] = None,
         failpoint: Optional[str] = None,
+        test_hook: Optional[Any] = None,
     ) -> ArchiveReceipt:
         """Record a completed CaptureResult into the archive.
 
@@ -292,14 +446,8 @@ class EvidenceArchive:
         - Guarantees idempotency on duplicate receipt_id with identical payload;
           raises ArchiveConflictError on duplicate receipt_id with conflicting payload.
         """
-        # Validate canonical source contract
-        if capture.source_id not in CANONICAL_SOURCES:
-            raise ValueError(f"Unknown or non-canonical source_id: '{capture.source_id}'")
-        expected_url = CANONICAL_SOURCES[capture.source_id]
-        if capture.initial_url != expected_url:
-            raise ValueError(
-                f"URL mismatch for '{capture.source_id}': expected '{expected_url}', got '{capture.initial_url}'"
-            )
+        # Validate canonical source and DTO invariants
+        self._validate_capture(capture)
 
         if receipt_id is None:
             receipt_id = str(uuid.uuid4())
@@ -325,6 +473,10 @@ class EvidenceArchive:
             diag_reason = reason
             diag_checker_version = PROBE_VERSION
 
+        expected_fingerprint = self._compute_payload_fingerprint(
+            capture, diag_status, diag_level, diag_reason, diag_checker_version
+        )
+
         # Check idempotency before expensive storage operations
         conn = self._get_connection()
         try:
@@ -333,14 +485,16 @@ class EvidenceArchive:
             row = cursor.fetchone()
             if row is not None:
                 existing = self._row_to_receipt(row)
-                self._verify_idempotency_payload(existing, capture)
+                self._verify_idempotency_payload(existing, expected_fingerprint)
                 return existing
 
-            # CAS storage: complete responses (including complete 403 or unverified HTML)
-            # are stored as CAS blobs. Incomplete / timeout / limit_exceeded captures do not.
+            # CAS storage: complete responses without error or limit
             blob_sha256: Optional[str] = None
             if capture.complete and not capture.limit_exceeded and capture.error_msg is None:
                 blob_sha256 = self._store_blob(capture.body)
+
+            if test_hook:
+                test_hook("after_blob_published_before_db")
 
             # Injected failpoint for crash-resilience testing
             if failpoint == "after_blob_fsync_before_db_commit":
@@ -355,7 +509,7 @@ class EvidenceArchive:
             if row is not None:
                 conn.execute("ROLLBACK;")
                 existing = self._row_to_receipt(row)
-                self._verify_idempotency_payload(existing, capture)
+                self._verify_idempotency_payload(existing, expected_fingerprint)
                 return existing
 
             # Determine next monotonic sequence number
@@ -405,16 +559,17 @@ class EvidenceArchive:
                         ),
                     )
 
-            # Insert receipt
+            # Insert receipt with metadata and fingerprint
             cursor.execute(
                 """
                 INSERT INTO receipts (
                     receipt_id, seq, source_id, initial_url, final_url,
                     http_status, headers_json, fetch_started_at, fetch_completed_at,
                     recorded_at, duration_ms, bytes_received, bytes_stored,
-                    complete, status, validation_level, reason, checker_version,
-                    usable_for_forecast, blob_sha256, revision_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    complete, limit_exceeded, error_msg, collector_version,
+                    status, validation_level, reason, checker_version,
+                    usable_for_forecast, payload_fingerprint, blob_sha256, revision_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     receipt_id,
@@ -431,15 +586,22 @@ class EvidenceArchive:
                     capture.bytes_received,
                     capture.bytes_stored,
                     1 if capture.complete else 0,
+                    1 if capture.limit_exceeded else 0,
+                    capture.error_msg,
+                    capture.collector_version,
                     diag_status,
                     diag_level,
                     diag_reason,
                     diag_checker_version,
-                    0,  # Strict invariant: usable_for_forecast is always False in R2
+                    0,  # Strict invariant: usable_for_forecast is always False in R2/R2.1
+                    expected_fingerprint,
                     blob_sha256,
                     revision_id,
                 ),
             )
+
+            if test_hook:
+                test_hook("inside_db_tx_before_commit")
 
             conn.execute("COMMIT;")
 
@@ -458,11 +620,15 @@ class EvidenceArchive:
                 bytes_received=capture.bytes_received,
                 bytes_stored=capture.bytes_stored,
                 complete=capture.complete,
+                limit_exceeded=capture.limit_exceeded,
+                error_msg=capture.error_msg,
+                collector_version=capture.collector_version,
                 status=diag_status,
                 validation_level=diag_level,
                 reason=diag_reason,
                 checker_version=diag_checker_version,
                 usable_for_forecast=False,
+                payload_fingerprint=expected_fingerprint,
                 blob_sha256=blob_sha256,
                 revision_id=revision_id,
             )
@@ -474,35 +640,6 @@ class EvidenceArchive:
             raise
         finally:
             conn.close()
-
-    def _verify_idempotency_payload(self, existing: ArchiveReceipt, capture: CaptureResult) -> None:
-        """Verify that a duplicate receipt_id has identical capture payload; raise conflict otherwise."""
-        mismatches: List[str] = []
-        if existing.source_id != capture.source_id:
-            mismatches.append(f"source_id: {existing.source_id} != {capture.source_id}")
-        if existing.initial_url != capture.initial_url:
-            mismatches.append(f"initial_url: {existing.initial_url} != {capture.initial_url}")
-        if existing.final_url != capture.final_url:
-            mismatches.append(f"final_url: {existing.final_url} != {capture.final_url}")
-        if existing.http_status != capture.status_code:
-            mismatches.append(f"http_status: {existing.http_status} != {capture.status_code}")
-        if existing.complete != capture.complete:
-            mismatches.append(f"complete: {existing.complete} != {capture.complete}")
-
-        # If complete, verify content hash
-        if capture.complete and not capture.limit_exceeded and capture.error_msg is None:
-            expected_sha = hashlib.sha256(capture.body).hexdigest()
-            if existing.blob_sha256 != expected_sha:
-                mismatches.append(f"blob_sha256: {existing.blob_sha256} != {expected_sha}")
-        else:
-            if existing.blob_sha256 is not None:
-                mismatches.append(f"blob_sha256: {existing.blob_sha256} != None")
-
-        if mismatches:
-            raise ArchiveConflictError(
-                f"Conflict on receipt_id '{existing.receipt_id}': existing payload differs from provided capture: "
-                + "; ".join(mismatches)
-            )
 
     def _row_to_receipt(self, row: Tuple[Any, ...]) -> ArchiveReceipt:
         """Convert a SQLite receipts row tuple into an ArchiveReceipt dataclass."""
@@ -521,13 +658,17 @@ class EvidenceArchive:
             bytes_received=row[11],
             bytes_stored=row[12],
             complete=bool(row[13]),
-            status=row[14],
-            validation_level=row[15],
-            reason=row[16],
-            checker_version=row[17],
-            usable_for_forecast=bool(row[18]),
-            blob_sha256=row[19],
-            revision_id=row[20],
+            limit_exceeded=bool(row[14]),
+            error_msg=row[15],
+            collector_version=row[16],
+            status=row[17],
+            validation_level=row[18],
+            reason=row[19],
+            checker_version=row[20],
+            usable_for_forecast=bool(row[21]),
+            payload_fingerprint=row[22],
+            blob_sha256=row[23],
+            revision_id=row[24],
         )
 
     def _row_to_revision(self, row: Tuple[Any, ...]) -> ArchiveRevision:
@@ -659,15 +800,31 @@ class EvidenceArchive:
         """Perform full integrity check across CAS filesystem blobs and SQLite database.
 
         Verifies:
-        1. Every committed receipt referencing a blob has a valid CAS file matching SHA-256 and size.
-        2. Every committed revision has a valid CAS file matching SHA-256 and byte_size.
-        3. Foreign keys are consistent.
+        1. Schema version matches SCHEMA_VERSION.
+        2. SQLite quick_check passes without corruption.
+        3. Foreign key constraints are respected.
+        4. Every committed receipt referencing a blob has a valid CAS file matching SHA-256 and size.
+        5. Every committed revision has a valid CAS file matching SHA-256 and byte_size.
+        6. Receipt sequence numbers are strictly monotonic.
         """
         errors: List[str] = []
         checked_blobs: set[str] = set()
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
+            # Verify schema version
+            cursor.execute("SELECT value FROM schema_info WHERE key = 'version';")
+            vrow = cursor.fetchone()
+            if vrow is None or vrow[0] != SCHEMA_VERSION:
+                errors.append(f"Schema version mismatch: found {vrow}, expected {SCHEMA_VERSION}")
+
+            # SQLite quick_check
+            cursor.execute("PRAGMA quick_check;")
+            qc = cursor.fetchall()
+            for r in qc:
+                if r[0] != "ok":
+                    errors.append(f"SQLite quick_check error: {r[0]}")
 
             # Check foreign key violations
             cursor.execute("PRAGMA foreign_key_check;")
@@ -735,6 +892,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Pythia Evidence Archive CLI")
     parser.add_argument(
         "--state-dir",
+        "--archive-dir",
+        dest="state_dir",
         type=Path,
         required=True,
         help="Path to archive state directory containing archive.db and blobs/",

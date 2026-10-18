@@ -592,23 +592,26 @@ url = params.get("initial_url", "")
 if "effr" in url:
     body = json.dumps({"refRates": [{"type": "EFFR", "effectiveDate": "2026-10-16", "percentRate": 4.83}]}).encode()
     out = {
-        "status_code": 200, "content_type": "application/json",
+        "status_code": 200, "headers": {"content-type": "application/json"},
         "body_b64": base64.b64encode(body).decode("ascii"),
         "bytes_received": len(body), "bytes_stored": len(body),
+        "complete": True,
         "limit_exceeded": False, "final_url": url, "error_msg": None
     }
 elif "cpi.rss" in url:
     body = b"Forbidden"
     out = {
-        "status_code": 403, "content_type": "text/html",
+        "status_code": 403, "headers": {"content-type": "text/html"},
         "body_b64": base64.b64encode(body).decode("ascii"),
         "bytes_received": len(body), "bytes_stored": len(body),
+        "complete": True,
         "limit_exceeded": False, "final_url": url, "error_msg": None
     }
 else:
     out = {
-        "status_code": None, "content_type": None,
+        "status_code": None, "headers": {},
         "body_b64": "", "bytes_received": 0, "bytes_stored": 0,
+        "complete": False,
         "limit_exceeded": False, "final_url": url,
         "error_msg": "Connection timed out"
     }
@@ -778,9 +781,9 @@ for chunk in resp.iter_content(chunk_size=1):
     chunks.append(chunk)
 
 out = {{
-    "status_code": resp.status_code, "content_type": "application/json",
+    "status_code": resp.status_code, "headers": {{"content-type": "application/json"}},
     "body_b64": "", "bytes_received": len(b"".join(chunks)),
-    "bytes_stored": len(b"".join(chunks)), "limit_exceeded": False,
+    "bytes_stored": len(b"".join(chunks)), "complete": False, "limit_exceeded": False,
     "final_url": "http://127.0.0.1:{server_port}/drip", "error_msg": None
 }}
 print(json.dumps(out))
@@ -868,9 +871,10 @@ elif sid == "github_deepseek_v3_releases":
         {"tag_name": "v3.0.0", "html_url": "https://github.com/deepseek-ai/DeepSeek-V3/releases/tag/v3.0.0"}
     ]).encode("utf-8")
     out = {
-        "status_code": 200, "content_type": "application/json",
+        "status_code": 200, "headers": {"content-type": "application/json"},
         "body_b64": base64.b64encode(body).decode("ascii"),
         "bytes_received": len(body), "bytes_stored": len(body),
+        "complete": True,
         "limit_exceeded": False, "final_url": url, "error_msg": None
     }
     print(json.dumps(out))
@@ -999,10 +1003,11 @@ body = b" " * (2 * 1024 * 1024 - 1000) + json.dumps({
 }).encode("utf-8")
 out = {
     "status_code": 200,
-    "content_type": "application/json",
+    "headers": {"content-type": "application/json"},
     "body_b64": base64.b64encode(body).decode("ascii"),
     "bytes_received": len(body),
     "bytes_stored": len(body),
+    "complete": True,
     "limit_exceeded": False,
     "final_url": params["initial_url"],
     "error_msg": None,
@@ -1037,10 +1042,11 @@ body = json.dumps({
 }).encode("utf-8")
 out = {
     "status_code": 200,
-    "content_type": "application/json",
+    "headers": {"content-type": "application/json"},
     "body_b64": base64.b64encode(body).decode("ascii"),
     "bytes_received": len(body),
     "bytes_stored": len(body),
+    "complete": True,
     "limit_exceeded": False,
     "final_url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
     "error_msg": None,

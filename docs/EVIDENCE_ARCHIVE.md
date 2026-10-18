@@ -1,25 +1,28 @@
-# Pythia Evidence Archive (R2)
+# Pythia Evidence Archive (R2.1)
 
-**Status:** R2 Production Specification & Operational Guide  
+**Status:** R2.1 Production Specification & Operational Guide  
 **Module:** `python/evaluation/evidence_archive.py`  
-**Storage Architecture:** Filesystem Content-Addressable Storage (CAS) + SQLite Database (`archive.db`)
+**Storage Architecture:** Filesystem Content-Addressable Storage (CAS) + SQLite Database (`archive.db`)  
+**Schema Version:** `pythia-archive-r2/2.0`  
+**Collector Version:** `pythia-collector-r2.1/1.0`  
+**Probe Version:** `pythia-probe-r2.1/1.0`
 
 ---
 
 ## 1. Directory Structure
 
-The archive resides in an explicitly configured directory (`state_dir`):
+The archive resides in an explicitly configured directory (`state_dir` or `--archive-dir`):
 
 ```
 <state_dir>/
-├── archive.db         # SQLite database in WAL mode with append-only triggers
+├── archive.db         # SQLite database in WAL mode (PRAGMA synchronous = FULL)
 ├── archive.db-shm     # SQLite shared-memory index
 ├── archive.db-wal     # SQLite write-ahead log
 ├── blobs/             # Content-addressable storage (CAS) of verbatim raw bodies
 │   └── 7d/
 │       └── eb/
 │           └── 7debc1936f7b...bin
-└── tmp/               # Scratch directory on same mount for atomic fsync + rename
+└── tmp/               # Scratch directory on same mount for atomic fsync + no-clobber publish
 ```
 
 ---
@@ -54,11 +57,15 @@ CREATE TABLE receipts (
     bytes_received INTEGER,
     bytes_stored INTEGER,
     complete INTEGER NOT NULL,
+    limit_exceeded INTEGER NOT NULL,
+    error_msg TEXT,
+    collector_version TEXT NOT NULL,
     status TEXT NOT NULL,
     validation_level TEXT NOT NULL,
     reason TEXT NOT NULL,
     checker_version TEXT NOT NULL,
     usable_for_forecast INTEGER NOT NULL DEFAULT 0,
+    payload_fingerprint TEXT NOT NULL,
     blob_sha256 TEXT,
     revision_id TEXT,
     FOREIGN KEY (revision_id) REFERENCES revisions (revision_id)
@@ -67,6 +74,10 @@ CREATE TABLE receipts (
 
 - `final_url`: `NULL` if connection failed, DNS failed, or worker was killed before response. Never defaults to `initial_url`.
 - `bytes_received` / `bytes_stored`: `NULL` if worker was terminated by timeout before transferring metrics.
+- `limit_exceeded`: Strictly `0` or `1` boolean integer.
+- `error_msg`: String error explanation or `NULL` if capture completed without error.
+- `collector_version`: Explicit version string of capturing collector (e.g. `pythia-collector-r2.1/1.0`).
+- `payload_fingerprint`: Canonical SHA-256 digest over all capture metadata, transport headers (key-sorted), body SHA-256, and diagnostics.
 - `blob_sha256` / `revision_id`: `NULL` if capture was incomplete, timed out, or exceeded stream limit. Complete blocked (403) and unverified HTML receive a CAS blob and revision link.
 - `usable_for_forecast`: Strictly `0` (`false`) on all records.
 
@@ -95,7 +106,7 @@ CREATE TABLE revisions (
 
 ---
 
-## 4. Lineage Rules & Idempotency
+## 4. Lineage Rules, Full Fingerprint Idempotency & Conflict Detection
 
 ### A → B → A Evolution
 1. **Fetch 1 (Body A):** Creates Receipt 1, Revision 1 (`prev_revision_id = NULL`), Blob A.
@@ -103,26 +114,43 @@ CREATE TABLE revisions (
 3. **Fetch 3 (Body B):** Creates Receipt 3, Revision 2 (`prev_revision_id = Revision 1`), Blob B. (3 receipts, 2 revisions, 2 blobs).
 4. **Fetch 4 (Body A):** Creates Receipt 4, Revision 3 (`prev_revision_id = Revision 2`), Reuses Blob A. (4 receipts, 3 revisions, 2 blobs).
 
-### Idempotency & Conflict Resolution
+### Canonical Payload Fingerprint & Full Idempotency
+- Every `CaptureResult` produces an immutable canonical payload fingerprint:
+  $$	ext{fingerprint} = 	ext{SHA-256}(	ext{JSON}(	ext{source\_id}, 	ext{urls}, 	ext{status}, 	ext{headers\_sorted}, 	ext{timestamps}, 	ext{duration}, 	ext{counters}, 	ext{complete}, 	ext{limit}, 	ext{error}, 	ext{collector\_version}, 	ext{raw\_body\_sha256}, 	ext{diagnostics}))$$
 - Calling `record_capture(capture, receipt_id="...")` with an already committed `receipt_id`:
-  - If the payload (`source_id`, `initial_url`, `final_url`, `http_status`, `complete`, content hash) matches: returns the existing `ArchiveReceipt` without creating duplicates.
-  - If the payload differs: raises `ArchiveConflictError`.
+  - If the fingerprint matches exactly: returns the existing `ArchiveReceipt` without creating duplicates or modifying SQLite.
+  - If **any** metadata or payload field differs (ETag change, timestamp change, collector version change, or negative error change like timeout vs. resolver failed): immediately raises `ArchiveConflictError` before transaction commit.
+- Under concurrency, double-check fingerprint verification under `BEGIN IMMEDIATE` lock guarantees that racing writers on identical payloads succeed idempotently, while racing writers on conflicting payloads yield exactly 1 winner and conflicts for all losers.
 
 ---
 
-## 5. Failure Recovery & Storage Invariants
+## 5. CAS Durability, No-Clobber Publication & Corruption Defense
 
-1. **Blob-before-DB Commit:**
-   - Raw body is written to `tmp/blob_*.tmp`, fsynced via `os.fsync(fd)`, and atomically renamed to `blobs/ab/cd/abcd...bin` before the SQLite transaction begins.
-   - If a crash occurs between fsync and commit, the database rolls back cleanly; no committed receipt or revision can ever reference a missing blob.
-2. **Append-Only Triggers:**
-   - SQLite triggers `trg_receipts_no_update`, `trg_receipts_no_delete`, `trg_revisions_no_update`, and `trg_revisions_no_delete` reject any `UPDATE` or `DELETE` with `ABORT`.
-3. **WAL Mode & Concurrency:**
-   - Database operates with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA foreign_keys = ON;`, and `busy_timeout = 10000;`. Concurrent writes serialize via `BEGIN IMMEDIATE`.
+1. **Pre-Reuse Integrity Verification:**
+   - Before reusing an existing CAS blob file at `blobs/ab/cd/abcd...bin`, the archive checks both `st_size` and computes the actual SHA-256 of the on-disk file.
+   - If the file was corrupted (e.g. byte flipped with same size, or truncated file): raises `ArchiveIntegrityError` without committing any receipt/revision and **without touching, overwriting, or repairing** the corrupted file (preserving diagnostic evidence).
+2. **Atomic No-Clobber Publication & Parent Directory fsync:**
+   - Raw body is written to a temporary staging file in `tmp/`, flushed, and fsynced with `os.fsync(fd)`.
+   - The file is published to the target CAS destination using `os.link` (atomic no-clobber publish). If destination already exists due to a race, the appearing file is verified.
+   - On Linux systems, the destination directory entry is hardened by opening the parent directory file descriptor and calling `os.fsync(dir_fd)` before starting the SQLite database transaction.
+3. **SQLite WAL & Durability Guarantees:**
+   - Database operates with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = FULL;`, `PRAGMA foreign_keys = ON;`, and `busy_timeout = 10000;`.
+   - **Crash Guarantee:** If a writer process crashes (SIGKILL) after CAS publish but before SQLite commit, an orphaned uncommitted blob remains in `blobs/`, but SQLite contains no receipt or revision. The archive remains 100% healthy.
+   - If a crash occurs inside the SQLite transaction before `COMMIT`, SQLite WAL recovery automatically rolls back all uncommitted rows on subsequent open.
+   - *Scope Note:* Software process crash tests (SIGKILL) prove state machine and transaction rollback guarantees; they do not simulate underlying physical drive controller failures or magnetic media decay.
 
 ---
 
-## 6. Point-in-Time Cutoff API (`as_of_seq`)
+## 6. Legacy Archive Preservation (`pythia-archive-r2/1.0`)
+
+- The v1 archive directory `/home/pythia/pythia-evidence-r2-data/live-r2-run1` is permanently preserved.
+- `EvidenceArchive` inspects existing databases via a **read-only SQLite connection** (`?mode=ro`) before executing any DDL or PRAGMAs.
+- When an incompatible schema version (such as `pythia-archive-r2/1.0`) is detected, `ArchiveIntegrityError` is raised immediately. Not a single byte or filesystem timestamp (`mtime`) is altered.
+- Legacy archives remain accessible via pinned commit `7854de2` or standard read-only SQLite tools.
+
+---
+
+## 7. Point-in-Time Cutoff API (`as_of_seq`)
 
 All query methods accept an optional `as_of_seq: int` parameter:
 
@@ -133,7 +161,7 @@ All query methods accept an optional `as_of_seq: int` parameter:
 
 ---
 
-## 7. CLI Reference & Verification Commands
+## 8. CLI Reference & Verification Commands
 
 ### CLI Syntax
 
@@ -160,16 +188,14 @@ python -m python.evaluation.evidence_archive --state-dir <path> --read-blob <sha
 ### Verification on amper
 
 ```bash
-# 1. Run all tests (165 passed)
+# 1. Run all tests (173 passed)
 cd /home/pythia/pythia-evidence-r2
 /home/pythia/pythia-paper-channel-20261017/python/venv/bin/pytest python/evaluation/tests/ -v
 
-# 2. Run live capture across 8 canonical endpoints
-mkdir -p /home/pythia/pythia-evidence-r2-data/live-r2-run1
-/home/pythia/pythia-paper-channel-20261017/python/venv/bin/python3 -m python.evaluation.evidence_archive \
-    --state-dir /home/pythia/pythia-evidence-r2-data/live-r2-run1 --capture-all
+# 2. Run live capture across 8 canonical endpoints into revision1 directory
+mkdir -p /home/pythia/pythia-evidence-r2-data/live-r2-revision1
+/home/pythia/pythia-paper-channel-20261017/python/venv/bin/python3 -m python.evaluation.evidence_archive     --state-dir /home/pythia/pythia-evidence-r2-data/live-r2-revision1 --capture-all
 
 # 3. Verify database and CAS integrity
-/home/pythia/pythia-paper-channel-20261017/python/venv/bin/python3 -m python.evaluation.evidence_archive \
-    --state-dir /home/pythia/pythia-evidence-r2-data/live-r2-run1 --verify
+/home/pythia/pythia-paper-channel-20261017/python/venv/bin/python3 -m python.evaluation.evidence_archive     --state-dir /home/pythia/pythia-evidence-r2-data/live-r2-revision1 --verify
 ```

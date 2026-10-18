@@ -1,0 +1,84 @@
+{
+  "evaluated_commit": "working_tree_r2.1",
+  "utc": "2026-10-18T12:34:00.972996+00:00",
+  "external_network": false,
+  "production_touched": false,
+  "checks": [
+    {
+      "case": "identical_payload_positive",
+      "meets_requirement": true,
+      "detail": "Identical replay returned exact existing receipt with no new row"
+    },
+    {
+      "case": "changed_header",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true
+    },
+    {
+      "case": "changed_fetch_time",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true
+    },
+    {
+      "case": "changed_collector_version",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true
+    },
+    {
+      "case": "changed_negative_error",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true
+    },
+    {
+      "case": "existing_blob_same_size_wrong_hash",
+      "original_hash": "e7e6876d2ef25557a519add34d769c598cec32cd0f5bba7f14671a427e1ae7f9",
+      "fixture_corrupted_hash": "145b62b36e65e67b9d95f09b1c14c6cc8a3b7f7118c3f5cd575c1d801c3f5e5e",
+      "same_size": true,
+      "new_receipt_committed": false,
+      "exception": "ArchiveIntegrityError",
+      "verify_healthy": false,
+      "meets_requirement": true
+    },
+    {
+      "case": "missing_explicit_eof",
+      "capture_complete": false,
+      "capture_error": "Worker protocol error: missing required key(s): complete",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true
+    },
+    {
+      "case": "invalid_base64_ignored_suffix",
+      "capture_complete": false,
+      "capture_error": "Failed to decode worker body base64: Error: Non-base64 digit found",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true
+    },
+    {
+      "case": "contradictory_complete_counters",
+      "capture_complete": false,
+      "capture_error": "Worker response marked complete=True counter mismatch: received=3, stored=2, len=2",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true
+    },
+    {
+      "case": "missing_required_body_metadata",
+      "capture_complete": false,
+      "capture_error": "Worker protocol error: missing required key(s): body_b64, bytes_received, bytes_stored, error_msg, final_url, headers, limit_exceeded, status_code",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true
+    }
+  ],
+  "all_checks_passed": true
+}

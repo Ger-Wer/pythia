@@ -24,9 +24,12 @@ import os
 import socketserver
 import sqlite3
 import sys
+import signal
+import subprocess
 import tempfile
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -347,17 +350,24 @@ def test_idempotency_and_conflict_rejection(archive: EvidenceArchive):
     )
     with pytest.raises(ArchiveConflictError) as exc_info2:
         archive.record_capture(conflicting_status_cap, receipt_id="receipt-idem-001")
-    assert "http_status" in str(exc_info2.value)
+    assert "Conflict on receipt_id 'receipt-idem-001'" in str(exc_info2.value)
 
 
 def test_concurrent_writers_safety(archive: EvidenceArchive):
     """Concurrent writers recording identical and distinct receipts do not corrupt CAS or SQLite."""
     shared_body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-16","percentRate":3.88}]}'
 
+    # Pre-instantiate immutable CaptureResults per receipt_id for identical replay testing
+    # (Per B2.3: Avoid generating new timestamps in each thread which creates conflicting fingerprints)
+    distinct_caps = {
+        f"concurrent-worker-{k}": make_capture(source_id="nyfed_effr", body=shared_body)
+        for k in range(4)
+    }
+
     def worker_task(idx: int) -> ArchiveReceipt:
         # Some workers use same receipt_id, others use distinct
         rid = f"concurrent-worker-{idx % 4}"
-        cap = make_capture(source_id="nyfed_effr", body=shared_body)
+        cap = distinct_caps[rid]
         return archive.record_capture(cap, receipt_id=rid)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -371,6 +381,37 @@ def test_concurrent_writers_safety(archive: EvidenceArchive):
     # All 4 receipts should share the same revision and blob
     assert len(archive.query_revisions()) == 1
 
+    integrity = archive.verify_integrity()
+    assert integrity["healthy"] is True
+
+
+def test_concurrent_competing_payloads_same_id(archive: EvidenceArchive):
+    """Competing writers attempting to record distinct payloads with the same receipt_id:
+    exactly one succeeds, and all others fail with ArchiveConflictError."""
+    target_rid = "racing-same-id"
+    bodies = [f'{{"writer":{i}}}'.encode("utf-8") for i in range(10)]
+
+    successes = []
+    conflicts = []
+
+    def racer(idx: int):
+        cap = make_capture(source_id="nyfed_effr", body=bodies[idx])
+        try:
+            rec = archive.record_capture(cap, receipt_id=target_rid)
+            successes.append(rec)
+        except ArchiveConflictError as err:
+            conflicts.append(err)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(racer, i) for i in range(10)]
+        for f in futures:
+            f.result()
+
+    assert len(successes) == 1
+    assert len(conflicts) == 9
+    receipts = archive.query_receipts()
+    assert len(receipts) == 1
+    assert receipts[0].receipt_id == target_rid
     integrity = archive.verify_integrity()
     assert integrity["healthy"] is True
 
@@ -663,7 +704,7 @@ raw = sys.stdin.read()
 body = b'{"refRates":[]}'
 out = {
     "status_code": 200,
-    "content_type": "application/json",
+    "headers": {"content-type": "application/json"},
     "body_b64": base64.b64encode(body).decode("ascii"),
     "bytes_received": len(body),
     "bytes_stored": len(body),
@@ -687,7 +728,7 @@ raw = sys.stdin.read()
 body = b'{"refRates":[]}'
 out = {
     "status_code": 200,
-    "content_type": "application/json",
+    "headers": {"content-type": "application/json"},
     "body_b64": base64.b64encode(body).decode("ascii"),
     "bytes_received": 100,
     "bytes_stored": 50,  # len(body) is 15 != 50!
@@ -703,3 +744,451 @@ print(json.dumps(out))
     capture2 = probe2.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
     assert capture2.complete is False
     assert "Worker counter inconsistency" in capture2.error_msg
+
+
+# -------------------------------------------------------------------------
+# 9. Real Separate Process SIGKILL Tests & Injected Error Rollback
+# -------------------------------------------------------------------------
+
+def test_separate_process_sigkill_boundary_a_blob_published_before_db(tmp_path: Path):
+    """Separate process writer killed with SIGKILL after CAS blob is published but before DB begin:
+    orphaned blob is created on disk, no DB receipt or revision is committed, baseline data intact."""
+    sdir = tmp_path / "sigkill_boundary_a"
+    archive = EvidenceArchive(sdir)
+
+    # 1. Establish baseline record
+    cap0 = make_capture(source_id="nyfed_effr", body=b'{"baseline":1}')
+    rec0 = archive.record_capture(cap0, receipt_id="baseline-001")
+    assert rec0.seq == 1
+    assert len(archive.query_receipts()) == 1
+
+    marker_file = tmp_path / "boundary_a_marker.txt"
+    crashed_body = b'{"crashed_at":"boundary_a","data":"xyz"}'
+    crashed_cap = make_capture(source_id="nyfed_effr", body=crashed_body)
+    crashed_sha = hashlib.sha256(crashed_body).hexdigest()
+
+    # Subprocess script that runs record_capture with test_hook
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    subproc_code = f"""import sys, time, os, json
+sys.path.insert(0, r"{repo_root}")
+from python.evaluation.evidence_archive import EvidenceArchive
+from python.evaluation.source_probe import CaptureResult
+
+archive = EvidenceArchive(r"{sdir}")
+cap = CaptureResult(
+    source_id="{crashed_cap.source_id}",
+    initial_url="{crashed_cap.initial_url}",
+    final_url="{crashed_cap.final_url}",
+    body={repr(crashed_body)},
+    status_code=200,
+    headers={{"content-type": "application/json"}},
+    fetch_started_at="{crashed_cap.fetch_started_at}",
+    fetch_completed_at="{crashed_cap.fetch_completed_at}",
+    duration_ms=10.0,
+    bytes_received={len(crashed_body)},
+    bytes_stored={len(crashed_body)},
+    complete=True,
+    limit_exceeded=False,
+    error_msg=None,
+    collector_version="{crashed_cap.collector_version}",
+)
+
+def hook(point):
+    if point == "after_blob_published_before_db":
+        with open(r"{marker_file}", "w") as f:
+            f.write(f"reached:{os.getpid()}")
+        while True:
+            time.sleep(0.01)
+
+archive.record_capture(cap, receipt_id="crashed-a-001", test_hook=hook)
+"""
+    script_path = tmp_path / "writer_a.py"
+    script_path.write_text(subproc_code)
+
+    proc = subprocess.Popen([sys.executable, str(script_path)])
+    try:
+        # Wait for marker file
+        t0 = time.monotonic()
+        while not marker_file.is_file():
+            if time.monotonic() - t0 > 5.0:
+                raise TimeoutError("Subprocess failed to reach hook boundary A within 5 seconds")
+            time.sleep(0.05)
+
+        # Confirm process is alive and send SIGKILL
+        assert proc.poll() is None
+        proc.send_signal(signal.SIGKILL)
+        ret = proc.wait()
+        assert ret != 0
+
+        # Reopen archive and verify state
+        reopened = EvidenceArchive(sdir)
+        receipts = reopened.query_receipts()
+        assert len(receipts) == 1
+        assert receipts[0].receipt_id == "baseline-001"
+        assert reopened.get_receipt("crashed-a-001") is None
+
+        # The CAS blob was published before crash, so it exists as an orphan
+        assert reopened._blob_path(crashed_sha).is_file() is True
+        assert reopened.get_blob(crashed_sha) == crashed_body
+
+        # Verify integrity: orphan blobs are permitted, archive is 100% healthy
+        integrity = reopened.verify_integrity()
+        assert integrity["healthy"] is True
+        assert integrity["total_receipts"] == 1
+        assert integrity["total_revisions"] == 1
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
+def test_separate_process_sigkill_boundary_b_inside_db_tx_before_commit(tmp_path: Path):
+    """Separate process writer killed with SIGKILL inside SQLite transaction before commit:
+    SQLite WAL recovery rolls back transaction, no uncommitted rows exist, baseline data intact."""
+    sdir = tmp_path / "sigkill_boundary_b"
+    archive = EvidenceArchive(sdir)
+
+    # 1. Establish baseline record
+    cap0 = make_capture(source_id="nyfed_effr", body=b'{"baseline":2}')
+    rec0 = archive.record_capture(cap0, receipt_id="baseline-002")
+    assert rec0.seq == 1
+    assert len(archive.query_receipts()) == 1
+
+    marker_file = tmp_path / "boundary_b_marker.txt"
+    crashed_body = b'{"crashed_at":"boundary_b","data":"abc"}'
+    crashed_cap = make_capture(source_id="nyfed_effr", body=crashed_body)
+    crashed_sha = hashlib.sha256(crashed_body).hexdigest()
+
+    # Subprocess script that runs record_capture with test_hook inside DB tx
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    subproc_code = f"""import sys, time, os, json
+sys.path.insert(0, r"{repo_root}")
+from python.evaluation.evidence_archive import EvidenceArchive
+from python.evaluation.source_probe import CaptureResult
+
+archive = EvidenceArchive(r"{sdir}")
+cap = CaptureResult(
+    source_id="{crashed_cap.source_id}",
+    initial_url="{crashed_cap.initial_url}",
+    final_url="{crashed_cap.final_url}",
+    body={repr(crashed_body)},
+    status_code=200,
+    headers={{"content-type": "application/json"}},
+    fetch_started_at="{crashed_cap.fetch_started_at}",
+    fetch_completed_at="{crashed_cap.fetch_completed_at}",
+    duration_ms=10.0,
+    bytes_received={len(crashed_body)},
+    bytes_stored={len(crashed_body)},
+    complete=True,
+    limit_exceeded=False,
+    error_msg=None,
+    collector_version="{crashed_cap.collector_version}",
+)
+
+def hook(point):
+    if point == "inside_db_tx_before_commit":
+        with open(r"{marker_file}", "w") as f:
+            f.write(f"reached:{os.getpid()}")
+        while True:
+            time.sleep(0.01)
+
+archive.record_capture(cap, receipt_id="crashed-b-001", test_hook=hook)
+"""
+    script_path = tmp_path / "writer_b.py"
+    script_path.write_text(subproc_code)
+
+    proc = subprocess.Popen([sys.executable, str(script_path)])
+    try:
+        # Wait for marker file
+        t0 = time.monotonic()
+        while not marker_file.is_file():
+            if time.monotonic() - t0 > 5.0:
+                raise TimeoutError("Subprocess failed to reach hook boundary B within 5 seconds")
+            time.sleep(0.05)
+
+        # Confirm process is alive and send SIGKILL
+        assert proc.poll() is None
+        proc.send_signal(signal.SIGKILL)
+        ret = proc.wait()
+        assert ret != 0
+
+        # Reopen archive and verify state
+        reopened = EvidenceArchive(sdir)
+        receipts = reopened.query_receipts()
+        assert len(receipts) == 1
+        assert receipts[0].receipt_id == "baseline-002"
+        assert reopened.get_receipt("crashed-b-001") is None
+
+        # Verify integrity: SQLite WAL automatically recovered cleanly
+        integrity = reopened.verify_integrity()
+        assert integrity["healthy"] is True
+        assert integrity["total_receipts"] == 1
+        assert integrity["total_revisions"] == 1
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
+def test_injected_error_transaction_rollback(archive: EvidenceArchive):
+    """Exception raised inside DB transaction rolls back SQLite transaction without partial state."""
+    cap0 = make_capture(source_id="nyfed_effr", body=b'{"baseline":3}')
+    archive.record_capture(cap0, receipt_id="rollback-base-001")
+
+    failing_cap = make_capture(source_id="nyfed_effr", body=b'{"failing":1}')
+
+    def failing_hook(point):
+        if point == "inside_db_tx_before_commit":
+            raise RuntimeError("Injected database failure before commit")
+
+    with pytest.raises(RuntimeError, match="Injected database failure"):
+        archive.record_capture(failing_cap, receipt_id="failing-tx-001", test_hook=failing_hook)
+
+    # SQLite transaction was rolled back cleanly
+    assert archive.get_receipt("failing-tx-001") is None
+    assert len(archive.query_receipts()) == 1
+    integrity = archive.verify_integrity()
+    assert integrity["healthy"] is True
+
+
+# -------------------------------------------------------------------------
+# 10. Canonical Worker Gzip and Single GET via LoopbackRouteAdapter
+# -------------------------------------------------------------------------
+
+def test_canonical_worker_loopback_gzip_and_single_get(archive: EvidenceArchive):
+    """Canonical worker and _fetch_bounded_core correctly decode gzip content and make exactly 1 GET."""
+    raw_payload = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-18","percentRate":4.95}]}'
+    gzipped = gzip.compress(raw_payload)
+    get_counter = [0]
+
+    class GzipLoopbackHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            get_counter[0] += 1
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(gzipped)))
+            self.end_headers()
+            self.wfile.write(gzipped)
+
+        def log_message(self, format, *args):
+            pass
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), GzipLoopbackHandler)
+    server_port = server.server_address[1]
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    try:
+        # Route canonical nyfed_effr URL to loopback server via LoopbackRouteAdapter
+        loopback_mapping = {
+            "https://markets.newyorkfed.org": f"http://127.0.0.1:{server_port}",
+        }
+        old_env = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
+        os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps(loopback_mapping)
+        try:
+            # Using canonical SourceProbe which spawns source_probe_worker.py
+            with SourceProbe() as probe:
+                capture = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
+
+            # Verify single HTTP GET occurred
+            assert get_counter[0] == 1, f"Expected exactly 1 GET request, got {get_counter[0]}"
+
+            # Verify content-decoded payload and complete metadata
+            assert capture.complete is True
+            assert capture.body == raw_payload
+            assert capture.bytes_stored == len(raw_payload)
+            assert capture.headers.get("content-encoding") == "gzip"
+            assert capture.status_code == 200
+
+            # Record into archive and verify CAS blob matches decompressed bytes
+            rec = archive.record_capture(capture, receipt_id="gzip-canon-001")
+            assert rec.blob_sha256 == hashlib.sha256(raw_payload).hexdigest()
+            assert archive.get_blob(rec.blob_sha256) == raw_payload
+        finally:
+            if old_env is None:
+                os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
+            else:
+                os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old_env
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+# -------------------------------------------------------------------------
+# 11. Reviewer Defect Controls Suite
+# -------------------------------------------------------------------------
+
+def test_reviewer_controls_complete_suite(tmp_path: Path):
+    """Adapt all reviewer defect controls: verifies that all 9 previously reproducing defects are fixed."""
+    folder = tmp_path / "reviewer_suite"
+    folder.mkdir()
+
+    # Baseline capture
+    cap = make_capture(
+        source_id="nyfed_effr",
+        body=b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-16","percentRate":3.88}]}',
+        headers={"content-type": "application/json", "etag": "v1"},
+    )
+
+    # 1. Identical payload positive replay
+    arch_id = EvidenceArchive(folder / "idempotency")
+    orig = arch_id.record_capture(cap, receipt_id="stable-id")
+    replay = arch_id.record_capture(cap, receipt_id="stable-id")
+    assert replay == orig
+    assert len(arch_id.query_receipts()) == 1
+
+    # 2. Metadata changes under same receipt_id must raise ArchiveConflictError
+    with pytest.raises(ArchiveConflictError):
+        arch_id.record_capture(replace(cap, headers={**cap.headers, "etag": "v2"}), receipt_id="stable-id")
+
+    with pytest.raises(ArchiveConflictError):
+        arch_id.record_capture(replace(cap, fetch_completed_at="2026-10-18T05:00:02.000000Z"), receipt_id="stable-id")
+
+    with pytest.raises(ArchiveConflictError):
+        arch_id.record_capture(replace(cap, collector_version="review-capture/2"), receipt_id="stable-id")
+
+    # 3. Negative capture error change under same receipt_id
+    negative = replace(
+        cap,
+        body=b"",
+        status_code=None,
+        final_url=None,
+        headers={},
+        bytes_received=None,
+        bytes_stored=None,
+        complete=False,
+        error_msg="timeout",
+    )
+    arch_id.record_capture(negative, receipt_id="negative-id")
+    with pytest.raises(ArchiveConflictError):
+        arch_id.record_capture(replace(negative, error_msg="resolver failed"), receipt_id="negative-id")
+
+    # 4. CAS same-size and wrong-size corruption prevention
+    cas_dir = EvidenceArchive(folder / "cas-integrity")
+    first = cas_dir.record_capture(cap, receipt_id="before-corruption")
+    blob_path = cas_dir._blob_path(first.blob_sha256)
+    original_bytes = blob_path.read_bytes()
+
+    # Mutate to same size, wrong hash
+    wrong = bytes([cap.body[0] ^ 1]) + cap.body[1:]
+    blob_path.write_bytes(wrong)
+
+    # Attempt to record identical cap: must be rejected with ArchiveIntegrityError without clobbering
+    with pytest.raises(ArchiveIntegrityError):
+        cas_dir.record_capture(cap, receipt_id="after-corruption")
+
+    # File must NOT have been overwritten
+    assert blob_path.read_bytes() == wrong
+    # No receipt committed
+    assert cas_dir.get_receipt("after-corruption") is None
+    # verify_integrity reports corruption
+    integ = cas_dir.verify_integrity()
+    assert integ["healthy"] is False
+
+    # Restore and test wrong size
+    blob_path.write_bytes(original_bytes[:5])
+    with pytest.raises(ArchiveIntegrityError):
+        cas_dir.record_capture(cap, receipt_id="after-truncation")
+
+    # 5. Malformed worker cases
+    sid = "github_deepseek_v3_releases"
+    full_body = b"[]"
+    full_dict = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json"},
+        "body_b64": base64.b64encode(full_body).decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": True,
+        "limit_exceeded": False,
+        "final_url": CANONICAL_SOURCES[sid],
+        "error_msg": None,
+    }
+
+    malformed_cases = [
+        ("missing_explicit_eof", {k: v for k, v in full_dict.items() if k != "complete"}),
+        ("invalid_base64_ignored_suffix", dict(full_dict, body_b64="W10=!!")),
+        ("contradictory_complete_counters", dict(full_dict, bytes_received=3)),
+        ("missing_required_body_metadata", {"complete": True}),
+    ]
+
+    for name, payload in malformed_cases:
+        worker_file = folder / f"{name}.py"
+        worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+        with SourceProbe(worker_cmd=[sys.executable, str(worker_file)]) as probe:
+            captured = probe.capture_source(sid, CANONICAL_SOURCES[sid])
+            diag = probe.probe_single({"source_id": sid, "url": CANONICAL_SOURCES[sid]}, capture=captured)
+
+        assert captured.complete is False, f"Case {name} must have complete=False"
+        target_arch = EvidenceArchive(folder / name)
+        receipt = target_arch.record_capture(captured, receipt_id=name, probe_result=diag)
+        assert receipt.blob_sha256 is None, f"Case {name} must not store CAS blob"
+        assert receipt.revision_id is None, f"Case {name} must not create revision"
+
+
+def test_direct_invalid_dto_rejected_at_archive_boundary(archive: EvidenceArchive):
+    """Direct invalid DTOs passed to record_capture are rejected at the boundary."""
+    cap = make_capture(source_id="nyfed_effr", body=b'{"ok":1}')
+
+    # Non-bool complete
+    with pytest.raises(ValueError, match="must be bool"):
+        archive.record_capture(replace(cap, complete=1))  # type: ignore
+
+    # Non-bool limit_exceeded
+    with pytest.raises(ValueError, match="must be bool"):
+        archive.record_capture(replace(cap, limit_exceeded="no"))  # type: ignore
+
+    # Negative counter
+    with pytest.raises(ValueError, match="must be non-negative integer"):
+        archive.record_capture(replace(cap, bytes_received=-1))
+
+    # Complete=True with error_msg
+    with pytest.raises(ValueError, match="Contradictory CaptureResult"):
+        archive.record_capture(replace(cap, complete=True, error_msg="oops"))
+
+    # Complete=True with limit_exceeded=True
+    with pytest.raises(ValueError, match="Contradictory CaptureResult"):
+        archive.record_capture(replace(cap, complete=True, limit_exceeded=True))
+
+    # Complete=True with counter mismatch
+    with pytest.raises(ValueError, match="counter mismatch"):
+        archive.record_capture(replace(cap, complete=True, bytes_received=10, bytes_stored=10, body=b"123"))
+
+    # Foreign source_id/url in probe_single
+    with pytest.raises(ValueError, match="Capture mismatch"):
+        with SourceProbe() as probe:
+            probe.probe_single({"source_id": "bls_cpi_rss", "url": CANONICAL_SOURCES["bls_cpi_rss"]}, capture=cap)
+
+
+def test_legacy_schema_version_detection(tmp_path: Path):
+    """Archive detects legacy schema (v1.0) before running DDL and raises ArchiveIntegrityError without touching files."""
+    import sqlite3
+    legacy_dir = tmp_path / "legacy_v1_archive"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    db_path = legacy_dir / "archive.db"
+
+    # Create a mock v1.0 SQLite database
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE schema_info (key TEXT PRIMARY KEY, value TEXT);")
+    conn.execute("INSERT INTO schema_info (key, value) VALUES ('version', 'pythia-archive-r2/1.0');")
+    conn.execute("CREATE TABLE legacy_data (id INT);")
+    conn.execute("INSERT INTO legacy_data VALUES (42);")
+    conn.commit()
+    conn.close()
+
+    stat_before = db_path.stat()
+
+    # Attempting to open EvidenceArchive on legacy_dir must raise ArchiveIntegrityError
+    with pytest.raises(ArchiveIntegrityError, match="Incompatible archive schema version 'pythia-archive-r2/1.0'"):
+        EvidenceArchive(legacy_dir)
+
+    # Verify database was NOT modified
+    stat_after = db_path.stat()
+    assert stat_after.st_mtime == stat_before.st_mtime
+
+    # Verify legacy table intact
+    conn2 = sqlite3.connect(db_path)
+    res = conn2.execute("SELECT id FROM legacy_data;").fetchone()
+    assert res[0] == 42
+    conn2.close()

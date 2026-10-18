@@ -25,7 +25,9 @@
    - Translated text is strictly separated from original text and explicitly attributed to a translation engine and version.
 4. **Anonymous & Bounded Transport:**
    - All diagnostic probes and evidence collectors operate with anonymous transport: ambient environment credentials (`.netrc`, ambient proxy variables) are disabled (`trust_env = False`), cookie persistence and transmission are blocked, and TLS certificate verification is enforced.
-   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, stream read, and complete IPC transmission) enforced strictly via an isolated short-lived worker process under parent deadline control via `subprocess.Popen` and `communicate(input=..., timeout=remaining)`. The worker receives JSON on `stdin`, communicates protocol-pure JSON with base64-encoded payload on `stdout`, and writes diagnostics strictly to `stderr`.
+   - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, stream read, and complete IPC transmission) enforced strictly via an isolated short-lived worker process under parent deadline control via `subprocess.Popen` and `communicate(input=..., timeout=remaining)`. Canonical source_id and exact initial URL are strictly verified **prior to Popen**.
+   - **Mandatory Worker IPC Schema (R2.1):** The worker receives JSON on `stdin` and must emit a single JSON object on `stdout` containing all 9 mandatory keys: `status_code`, `headers`, `body_b64`, `bytes_received`, `bytes_stored`, `complete`, `limit_exceeded`, `final_url`, `error_msg`. Any missing key triggers an immediate protocol error (no silent defaulting). `complete` and `limit_exceeded` must be strictly boolean (Python `bool`), counters and status must be strict non-negative integers (`bool` is rejected as integer), headers must be an object with string keys and string values, and `body_b64` is validated via `validate=True` (trailing garbage rejected).
+   - **Explicit EOF & Completeness Invariant:** A response is marked `complete=True` if and only if explicit stream EOF was observed, HTTP status is in [100, 599], final URL is non-empty, error message is null, stream limit was not exceeded, and counters match exactly: `bytes_received == bytes_stored == len(body)`. An empty body is only complete if explicitly accompanied by 0 byte counters and clean HTTP status.
    - Parent calculates `deadline = monotonic() + budget` before `Popen`. After `communicate` returns, the parent validates process exit code, JSON schema, body bounds, and re-checks `elapsed <= budget` before accepting any response as valid; late responses even if well-formed are rejected as `network_error` with `null` hash and counters.
    - The final parent deadline check and duration measurement occur **after** worker JSON decoding, base64 extraction, and strict schema validation, right before returning the finished `CaptureResult`. Disk write/archival is not part of transport budget.
    - On timeout, the parent enforces termination via a sequence of `terminate()` -> grace (0.15s) -> `kill()` (SIGKILL) -> `wait()` (reap) sharing a single bounded cleanup allowance of **<= 0.50 seconds** over the operational budget. All pipe handles are closed. `duration_ms` is strictly measured by parent monotonic clock covering startup, IPC, execution, and cleanup.
@@ -62,7 +64,7 @@ A probe run tests whether an endpoint is reachable and conforms to expected tran
 | `reason` | `string` | No | Clear, human-readable justification for the status and level. |
 | `item_count` | `integer` | Yes | Number of verified items/releases/records parsed (e.g. 5 refRates, 0 releases). `null` for unparsed HTML. |
 | `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R2 probes. |
-| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r2/1.0`). |
+| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r2.1/1.0`). |
 | `usable_for_forecast` | `boolean` | No | Always `false` in R1/R2. |
 
 ### 2.2 Status Enumeration (`status`)
@@ -118,9 +120,12 @@ The evidence archive is an immutable, append-only persistence layer combining fi
   - `tmp/`: Same-filesystem scratch directory for atomic writes.
   - `archive.db`: SQLite database in WAL mode (`journal_mode = WAL`, `synchronous = NORMAL`, `foreign_keys = ON`, `busy_timeout = 10000`).
 - **Append-Only Invariant:** SQLite triggers forbid `UPDATE` and `DELETE` on `receipts` and `revisions`.
-- **Idempotency & Conflicts:** Re-recording an identical `receipt_id` with matching capture payload returns the existing receipt. Re-recording a `receipt_id` with conflicting payload raises `ArchiveConflictError`.
+- **Canonical Payload Fingerprint & Strict Idempotency:** Every capture generates a deterministic SHA-256 fingerprint over all transport metadata, timings, durations, byte counters, raw body SHA-256, key-sorted headers, and diagnostic results. Re-recording an identical `receipt_id` with matching fingerprint returns the existing receipt. Re-recording a `receipt_id` with any differing metadata or payload (e.g. ETag change, fetch time, collector version, or error reason) raises `ArchiveConflictError`. Under concurrency, double-checked fingerprint verification inside `BEGIN IMMEDIATE` transaction guarantees exactly 1 winner and conflicts for all competing payloads.
+- **Durable CAS & Corruption Rejection:** CAS files are published atomically via `os.link` (no-clobber publish) followed by destination directory `fsync` on Linux. Existing CAS blobs are verified for size and actual SHA-256 before reuse; any corrupted file raises `ArchiveIntegrityError` without being overwritten.
+- **Durability & WAL:** Database operates with `PRAGMA journal_mode = WAL;` and `PRAGMA synchronous = FULL;`. Uncommitted process crashes leave orphaned blobs while SQLite remains 100% consistent; crashes inside DB transaction are rolled back by WAL recovery.
+- **Legacy Schema Preservation:** Legacy archive `live-r2-run1` (schema `pythia-archive-r2/1.0`) is discovered via read-only inspection and strictly preserved with zero modification. Active schema is `pythia-archive-r2/2.0`.
 - **Point-in-Time Cutoff (`as_of_seq`):** Historical state queries filtered by monotonic sequence number `seq <= as_of_seq` render subsequent receipts and revisions invisible without knowledge leakage from the future.
-- **Usability Invariant:** Every receipt and revision in R2 carries `usable_for_forecast: false`.
+- **Usability Invariant:** Every receipt and revision in R2 and R2.1 carries `usable_for_forecast: false`.
 
 ### 3.2 Attempt Receipt Schema (`receipts` table)
 
@@ -142,11 +147,15 @@ Every completed fetch attempt (including blocked, unverified, invalid, and timeo
 | `bytes_received` | `INTEGER` | Nullable | Total stream bytes transferred, or `NULL`. |
 | `bytes_stored` | `INTEGER` | Nullable | Bytes retained in buffer (max 2 MiB), or `NULL`. |
 | `complete` | `INTEGER` | `NOT NULL` | 1 if clean EOF without error/overflow; 0 otherwise. |
+| `limit_exceeded` | `INTEGER` | `NOT NULL` | 1 if response stream exceeded 2 MiB limit; 0 otherwise. |
+| `error_msg` | `TEXT` | Nullable | Error message string or `NULL` if successful. |
+| `collector_version` | `TEXT` | `NOT NULL` | Version string of collector (e.g. `pythia-collector-r2.1/1.0`). |
 | `status` | `TEXT` | `NOT NULL` | Diagnostic status (`valid`, `blocked`, `invalid_content`, `network_error`, `unverified`). |
 | `validation_level` | `TEXT` | `NOT NULL` | Diagnostic depth (`transport`, `envelope`, `content`). |
 | `reason` | `TEXT` | `NOT NULL` | Human-readable explanation. |
 | `checker_version` | `TEXT` | `NOT NULL` | Collector/checker build version. |
-| `usable_for_forecast`| `INTEGER` | `NOT NULL DEFAULT 0` | Strictly 0 in R2. |
+| `usable_for_forecast`| `INTEGER` | `NOT NULL DEFAULT 0` | Strictly 0 in R2/R2.1. |
+| `payload_fingerprint`| `TEXT` | `NOT NULL` | Canonical SHA-256 fingerprint of full capture and diagnostic payload. |
 | `blob_sha256` | `TEXT` | Nullable | SHA-256 foreign key into CAS blob. `NULL` for incomplete/timeout. |
 | `revision_id` | `TEXT` | Nullable | Foreign key into `revisions`. `NULL` for incomplete/timeout. |
 
