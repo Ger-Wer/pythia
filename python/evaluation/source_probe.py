@@ -84,6 +84,129 @@ CANONICAL_SOURCES: Dict[str, str] = {
     "arena_text_overall": "https://arena.ai/leaderboard/text/overall-no-style-control",
 }
 
+
+def validate_capture_result(capture: Any) -> None:
+    """Validate CaptureResult invariants at archive boundary before persistent processing.
+
+    Enforces strict typing and protocol invariants:
+    - URL/source/version/time/error: strictly required types (no str() coercion).
+    - headers: dict[str, str] with no conflicting case-variant duplicate keys.
+    - duration_ms: finite non-negative number (bool is not a number).
+    - body: strictly bytes within STREAM_LIMIT_BYTES (2 MiB).
+    - flags/counters/complete: strict consistency and type rules.
+    - timestamps: valid ISO 8601 UTC strings.
+    Raises ValueError on any violation.
+    """
+    if not isinstance(capture, CaptureResult):
+        raise ValueError(f"Expected CaptureResult instance, got {type(capture).__name__}")
+
+    # source_id and initial_url
+    if type(capture.source_id) is not str or capture.source_id not in CANONICAL_SOURCES:
+        raise ValueError(f"Unknown or non-canonical source_id: {capture.source_id!r}")
+    expected_url = CANONICAL_SOURCES[capture.source_id]
+    if type(capture.initial_url) is not str or capture.initial_url != expected_url:
+        raise ValueError(
+            f"URL mismatch for '{capture.source_id}': expected '{expected_url}', got {capture.initial_url!r}"
+        )
+
+    # final_url
+    if capture.final_url is not None:
+        if type(capture.final_url) is not str:
+            raise ValueError(f"CaptureResult 'final_url' must be string or None, got {type(capture.final_url).__name__}")
+        if not capture.final_url:
+            raise ValueError("CaptureResult 'final_url' cannot be empty string")
+
+    # collector_version
+    if type(capture.collector_version) is not str or not capture.collector_version:
+        raise ValueError(f"CaptureResult 'collector_version' must be non-empty string, got {type(capture.collector_version).__name__}")
+
+    # fetch_started_at and fetch_completed_at
+    for fname, val in [("fetch_started_at", capture.fetch_started_at), ("fetch_completed_at", capture.fetch_completed_at)]:
+        if type(val) is not str or not val:
+            raise ValueError(f"CaptureResult '{fname}' must be non-empty ISO 8601 UTC string, got {type(val).__name__}")
+        if not (val.endswith("Z") or val.endswith("+00:00")):
+            raise ValueError(f"CaptureResult '{fname}' must be in UTC timezone (ending with 'Z' or '+00:00'), got '{val}'")
+        try:
+            iso_str = val[:-1] + "+00:00" if val.endswith("Z") else val
+            parsed = datetime.fromisoformat(iso_str)
+            if parsed.tzinfo is None:
+                raise ValueError
+        except Exception:
+            raise ValueError(f"CaptureResult '{fname}' is not a valid ISO 8601 UTC timestamp: '{val}'")
+
+    # duration_ms
+    if type(capture.duration_ms) not in (int, float) or isinstance(capture.duration_ms, bool):
+        raise ValueError(f"CaptureResult 'duration_ms' must be finite non-negative number, got {type(capture.duration_ms).__name__}")
+    if not math.isfinite(capture.duration_ms) or capture.duration_ms < 0.0:
+        raise ValueError(f"CaptureResult 'duration_ms' must be finite non-negative number, got {capture.duration_ms}")
+
+    # body
+    if type(capture.body) is not bytes:
+        raise ValueError(f"CaptureResult 'body' must be bytes, got {type(capture.body).__name__}")
+    if len(capture.body) > STREAM_LIMIT_BYTES:
+        raise ValueError(f"CaptureResult 'body' exceeds stream limit of {STREAM_LIMIT_BYTES} bytes ({len(capture.body)} bytes)")
+
+    # status_code
+    if capture.status_code is not None and (type(capture.status_code) is not int or isinstance(capture.status_code, bool)):
+        raise ValueError("CaptureResult 'status_code' must be integer or None")
+
+    # headers
+    if type(capture.headers) is not dict:
+        raise ValueError(f"CaptureResult 'headers' must be dict, got {type(capture.headers).__name__}")
+    seen_lower_headers: Dict[str, str] = {}
+    for hk, hv in capture.headers.items():
+        if type(hk) is not str:
+            raise ValueError(f"CaptureResult header keys must be str, got {type(hk).__name__} for key {hk!r}")
+        if type(hv) is not str:
+            raise ValueError(f"CaptureResult header values must be str, got {type(hv).__name__} for key {hk!r}")
+        hk_lower = hk.lower()
+        if hk_lower in seen_lower_headers and seen_lower_headers[hk_lower] != hv:
+            raise ValueError(f"Conflicting case-variant headers for key '{hk_lower}': '{seen_lower_headers[hk_lower]}' vs '{hv}'")
+        seen_lower_headers[hk_lower] = hv
+
+    # bytes counters
+    if capture.bytes_received is not None and (type(capture.bytes_received) is not int or isinstance(capture.bytes_received, bool) or capture.bytes_received < 0):
+        raise ValueError("CaptureResult 'bytes_received' must be non-negative integer or None")
+    if capture.bytes_stored is not None and (type(capture.bytes_stored) is not int or isinstance(capture.bytes_stored, bool) or capture.bytes_stored < 0):
+        raise ValueError("CaptureResult 'bytes_stored' must be non-negative integer or None")
+
+    # complete & limit_exceeded
+    if type(capture.complete) is not bool:
+        raise ValueError(f"CaptureResult 'complete' must be bool, got {type(capture.complete).__name__}")
+    if type(capture.limit_exceeded) is not bool:
+        raise ValueError(f"CaptureResult 'limit_exceeded' must be bool, got {type(capture.limit_exceeded).__name__}")
+
+    # error_msg
+    if capture.error_msg is not None and type(capture.error_msg) is not str:
+        raise ValueError(f"CaptureResult 'error_msg' must be string or None, got {type(capture.error_msg).__name__}")
+
+    # Consistency checks
+    if capture.complete:
+        if capture.error_msg is not None:
+            raise ValueError(f"Contradictory CaptureResult: complete=True cannot have error_msg: {capture.error_msg}")
+        if capture.limit_exceeded:
+            raise ValueError("Contradictory CaptureResult: complete=True cannot have limit_exceeded=True")
+        if capture.status_code is None or not (100 <= capture.status_code < 600):
+            raise ValueError(f"Contradictory CaptureResult: complete=True requires valid status_code (100-599), got {capture.status_code}")
+        if capture.final_url is None:
+            raise ValueError("Contradictory CaptureResult: complete=True requires non-empty final_url")
+        if capture.bytes_received is None or capture.bytes_stored is None:
+            raise ValueError("Contradictory CaptureResult: complete=True requires non-null byte counters")
+        if capture.bytes_received != capture.bytes_stored or capture.bytes_stored != len(capture.body):
+            raise ValueError(
+                f"Contradictory CaptureResult: counter mismatch (received={capture.bytes_received}, stored={capture.bytes_stored}, len={len(capture.body)})"
+            )
+    else:
+        if capture.bytes_stored is not None and capture.bytes_stored != len(capture.body):
+            raise ValueError(
+                f"Inconsistent CaptureResult: bytes_stored ({capture.bytes_stored}) != len(body) ({len(capture.body)})"
+            )
+        if capture.bytes_received is not None and capture.bytes_stored is not None and capture.bytes_stored > capture.bytes_received:
+            raise ValueError(
+                f"Inconsistent CaptureResult: bytes_stored ({capture.bytes_stored}) > bytes_received ({capture.bytes_received})"
+            )
+
+
 ALLOWED_DOMAINS: Dict[str, Set[str]] = {
     "nyfed_effr": {"markets.newyorkfed.org"},
     "fed_monetary_rss": {"www.federalreserve.gov", "federalreserve.gov"},
@@ -741,6 +864,12 @@ class SourceProbe:
 
         if not complete and (status_code is None or error_msg is not None):
             final_url = None
+
+        if not complete:
+            if bytes_stored is not None and bytes_stored != len(body):
+                bytes_stored = len(body)
+            if bytes_received is not None and bytes_stored is not None and bytes_stored > bytes_received:
+                bytes_received = bytes_stored
 
         # POST-DECODE DEADLINE CHECK & DURATION MEASUREMENT:
         elapsed = time.monotonic() - start_monotonic

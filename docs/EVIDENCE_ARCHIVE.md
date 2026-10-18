@@ -129,10 +129,12 @@ CREATE TABLE revisions (
 1. **Pre-Reuse Integrity Verification:**
    - Before reusing an existing CAS blob file at `blobs/ab/cd/abcd...bin`, the archive checks both `st_size` and computes the actual SHA-256 of the on-disk file.
    - If the file was corrupted (e.g. byte flipped with same size, or truncated file): raises `ArchiveIntegrityError` without committing any receipt/revision and **without touching, overwriting, or repairing** the corrupted file (preserving diagnostic evidence).
-2. **Atomic No-Clobber Publication & Parent Directory fsync:**
+2. **Atomic No-Clobber Publication & CAS Durability Barrier (`_fsync_cas_barrier`):**
    - Raw body is written to a temporary staging file in `tmp/`, flushed, and fsynced with `os.fsync(fd)`.
-   - The file is published to the target CAS destination using `os.link` (atomic no-clobber publish). If destination already exists due to a race, the appearing file is verified.
-   - On Linux systems, the destination directory entry is hardened by opening the parent directory file descriptor and calling `os.fsync(dir_fd)` before starting the SQLite database transaction.
+   - The file is published to the target CAS destination using `os.link` (atomic no-clobber publish). If destination already exists due to a race, the appearing file is verified for size and SHA-256.
+   - Durability barrier: on all three CAS paths (new publish, existing blob reuse, concurrent race loser), file bytes and all required directory entries (`blobs/aa/bb`, `blobs/aa`, `blobs`) are synchronized via `_fsync_cas_barrier` before returning from `_store_blob` and before beginning the SQLite database transaction.
+   - If an error occurs during directory fsync, no receipt or revision is committed to SQLite.
+   - *Fixture-Only Routing:* Production worker runtime (`source_probe_worker.py`) does not read ambient environment mappings. Test HTTP redirects and loopback adapters are isolated strictly to test fixtures via explicit `worker_cmd`.
 3. **SQLite WAL & Durability Guarantees:**
    - Database operates with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = FULL;`, `PRAGMA foreign_keys = ON;`, and `busy_timeout = 10000;`.
    - **Crash Guarantee:** If a writer process crashes (SIGKILL) after CAS publish but before SQLite commit, an orphaned uncommitted blob remains in `blobs/`, but SQLite contains no receipt or revision. The archive remains 100% healthy.

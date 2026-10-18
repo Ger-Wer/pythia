@@ -25,6 +25,7 @@ import socketserver
 import sqlite3
 import sys
 import signal
+import stat
 import subprocess
 import tempfile
 import threading
@@ -952,11 +953,12 @@ def test_injected_error_transaction_rollback(archive: EvidenceArchive):
 
 
 # -------------------------------------------------------------------------
-# 10. Canonical Worker Gzip and Single GET via LoopbackRouteAdapter
+# -------------------------------------------------------------------------
+# 10. Canonical Worker Gzip and Single GET via Fixture Worker
 # -------------------------------------------------------------------------
 
-def test_canonical_worker_loopback_gzip_and_single_get(archive: EvidenceArchive):
-    """Canonical worker and _fetch_bounded_core correctly decode gzip content and make exactly 1 GET."""
+def test_canonical_worker_loopback_gzip_and_single_get(archive: EvidenceArchive, tmp_path: Path):
+    """Canonical worker and _fetch_bounded_core correctly decode gzip content and make exactly 1 GET via explicit fixture-worker."""
     raw_payload = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-18","percentRate":4.95}]}'
     gzipped = gzip.compress(raw_payload)
     get_counter = [0]
@@ -980,42 +982,93 @@ def test_canonical_worker_loopback_gzip_and_single_get(archive: EvidenceArchive)
     server_thread.start()
 
     try:
-        # Route canonical nyfed_effr URL to loopback server via LoopbackRouteAdapter
-        loopback_mapping = {
-            "https://markets.newyorkfed.org": f"http://127.0.0.1:{server_port}",
-        }
-        old_env = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
-        os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps(loopback_mapping)
-        try:
-            # Using canonical SourceProbe which spawns source_probe_worker.py
-            with SourceProbe() as probe:
-                capture = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent
+        fixture_worker_script = tmp_path / "gzip_fixture_worker.py"
+        fixture_worker_script.write_text(
+            "import sys, urllib.parse, requests\n"
+            f"sys.path.insert(0, r'{repo_root}')\n"
+            "from python.evaluation import source_probe_worker\n"
+            "from python.evaluation.source_probe import create_anonymous_session\n\n"
+            "class LoopbackRouteAdapter(requests.adapters.HTTPAdapter):\n"
+            "    def __init__(self, target_base: str) -> None:\n"
+            "        super().__init__()\n"
+            "        self.target_base = target_base.rstrip('/')\n\n"
+            "    def send(self, request: requests.PreparedRequest, **kwargs):\n"
+            "        p = urllib.parse.urlparse(request.url)\n"
+            "        original_host = p.netloc\n"
+            "        request.url = self.target_base + p.path + (f'?{p.query}' if p.query else '')\n"
+            "        request.headers['Host'] = original_host\n"
+            "        return super().send(request, **kwargs)\n\n"
+            "sess = create_anonymous_session()\n"
+            f"sess.mount('https://markets.newyorkfed.org', LoopbackRouteAdapter('http://127.0.0.1:{server_port}'))\n"
+            "source_probe_worker.main(session=sess)\n"
+        )
 
-            # Verify single HTTP GET occurred
-            assert get_counter[0] == 1, f"Expected exactly 1 GET request, got {get_counter[0]}"
+        with SourceProbe(worker_cmd=[sys.executable, str(fixture_worker_script)]) as probe:
+            capture = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
 
-            # Verify content-decoded payload and complete metadata
-            assert capture.complete is True
-            assert capture.body == raw_payload
-            assert capture.bytes_stored == len(raw_payload)
-            assert capture.headers.get("content-encoding") == "gzip"
-            assert capture.status_code == 200
+        # Verify single HTTP GET occurred
+        assert get_counter[0] == 1, f"Expected exactly 1 GET request, got {get_counter[0]}"
 
-            # Record into archive and verify CAS blob matches decompressed bytes
-            rec = archive.record_capture(capture, receipt_id="gzip-canon-001")
-            assert rec.blob_sha256 == hashlib.sha256(raw_payload).hexdigest()
-            assert archive.get_blob(rec.blob_sha256) == raw_payload
-        finally:
-            if old_env is None:
-                os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
-            else:
-                os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old_env
+        # Verify content-decoded payload and complete metadata
+        assert capture.complete is True
+        assert capture.body == raw_payload
+        assert capture.bytes_stored == len(raw_payload)
+        assert capture.headers.get("content-encoding") == "gzip"
+        assert capture.status_code == 200
+
+        # Record into archive and verify CAS blob matches decompressed bytes
+        rec = archive.record_capture(capture, receipt_id="gzip-canon-001")
+        assert rec.blob_sha256 == hashlib.sha256(raw_payload).hexdigest()
+        assert archive.get_blob(rec.blob_sha256) == raw_payload
     finally:
         server.shutdown()
         server.server_close()
 
 
-# -------------------------------------------------------------------------
+def test_default_worker_ignores_ambient_loopback_env(tmp_path: Path):
+    """Default worker does not read PYTHIA_TEST_LOOPBACK_MAP; ambient env does not redirect default worker."""
+    hits = [0]
+
+    class MockHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits[0] += 1
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), MockHandler)
+    server_port = server.server_address[1]
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    old_env = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
+    os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps({
+        "https://markets.newyorkfed.org": f"http://127.0.0.1:{server_port}"
+    })
+    try:
+        # Default SourceProbe with default worker
+        # Use short timeout so test stays bounded and offline
+        with SourceProbe(timeout=0.10) as probe:
+            capture = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
+
+        # The ambient loopback server must NEVER be contacted by the default worker
+        assert hits[0] == 0, f"Default worker unexpectedly routed request to ambient loopback server ({hits[0]} hits)"
+        assert capture.body != b"{}"
+    finally:
+        if old_env is None:
+            os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
+        else:
+            os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old_env
+        server.shutdown()
+        server.server_close()
+
+
 # 11. Reviewer Defect Controls Suite
 # -------------------------------------------------------------------------
 
@@ -1155,6 +1208,68 @@ def test_direct_invalid_dto_rejected_at_archive_boundary(archive: EvidenceArchiv
     with pytest.raises(ValueError, match="counter mismatch"):
         archive.record_capture(replace(cap, complete=True, bytes_received=10, bytes_stored=10, body=b"123"))
 
+    # Non-str headers
+    with pytest.raises(ValueError, match="header values must be str"):
+        archive.record_capture(replace(cap, headers={"etag": 1}))
+
+    with pytest.raises(ValueError, match="header keys must be str"):
+        archive.record_capture(replace(cap, headers={1: "val"}))
+
+    # Conflicting case-variant headers
+    with pytest.raises(ValueError, match="Conflicting case-variant headers"):
+        archive.record_capture(replace(cap, headers={"ETag": "v1", "etag": "v2"}))
+
+    # Non-str final_url
+    with pytest.raises(ValueError, match="final_url.*must be string"):
+        archive.record_capture(replace(cap, final_url=123))
+
+    # Empty final_url
+    with pytest.raises(ValueError, match="final_url.*cannot be empty"):
+        archive.record_capture(replace(cap, final_url=""))
+
+    # Non-number or invalid duration_ms
+    with pytest.raises(ValueError, match="duration_ms"):
+        archive.record_capture(replace(cap, duration_ms=True))
+
+    with pytest.raises(ValueError, match="duration_ms"):
+        archive.record_capture(replace(cap, duration_ms=float("nan")))
+
+    with pytest.raises(ValueError, match="duration_ms"):
+        archive.record_capture(replace(cap, duration_ms=-5.0))
+
+    # Non-bytes body
+    with pytest.raises(ValueError, match="body.*must be bytes"):
+        archive.record_capture(replace(cap, body="string_not_bytes"))
+
+    # Body exceeding limit
+    with pytest.raises(ValueError, match="body.*exceeds stream limit"):
+        archive.record_capture(replace(cap, body=b"x" * (2 * 1024 * 1024 + 1)))
+
+    # Invalid timestamp formats
+    with pytest.raises(ValueError, match="fetch_started_at"):
+        archive.record_capture(replace(cap, fetch_started_at="2026-10-18"))
+
+    with pytest.raises(ValueError, match="fetch_completed_at"):
+        archive.record_capture(replace(cap, fetch_completed_at=12345))
+
+    # Invalid collector version
+    with pytest.raises(ValueError, match="collector_version"):
+        archive.record_capture(replace(cap, collector_version=""))
+
+    # Non-int or bool status_code
+    with pytest.raises(ValueError, match="status_code"):
+        archive.record_capture(replace(cap, status_code=True))
+
+    # Non-int or bool bytes counters
+    with pytest.raises(ValueError, match="bytes_received"):
+        archive.record_capture(replace(cap, bytes_received=True))
+
+    # Header order invariance and positive replay
+    rec1 = archive.record_capture(replace(cap, headers={"b": "2", "a": "1"}), receipt_id="order-test")
+    rec2 = archive.record_capture(replace(cap, headers={"a": "1", "b": "2"}), receipt_id="order-test")
+    assert rec1 == rec2
+    assert rec1.payload_fingerprint == rec2.payload_fingerprint
+
     # Foreign source_id/url in probe_single
     with pytest.raises(ValueError, match="Capture mismatch"):
         with SourceProbe() as probe:
@@ -1192,3 +1307,267 @@ def test_legacy_schema_version_detection(tmp_path: Path):
     res = conn2.execute("SELECT id FROM legacy_data;").fetchone()
     assert res[0] == 42
     conn2.close()
+
+
+# -------------------------------------------------------------------------
+# 12. CAS Durability Barrier Tests (C3 Invariants)
+# -------------------------------------------------------------------------
+
+def test_cas_durability_barrier_trace_before_db_commit(tmp_path: Path):
+    """Trace confirms file, leaf prefix, parent prefix, and blobs directory barriers before DB commit."""
+    archive = EvidenceArchive(tmp_path / "barrier_trace")
+    cap = make_capture(source_id="nyfed_effr", body=b'{"trace":1}')
+    calls = []
+    real_fsync = os.fsync
+
+    def trace_fsync(fd):
+        target = Path(os.readlink(f"/proc/self/fd/{fd}"))
+        calls.append({
+            "directory": stat.S_ISDIR(os.fstat(fd).st_mode),
+            "path": str(target.relative_to(archive.state_dir)),
+        })
+        return real_fsync(fd)
+
+    hook_calls = []
+
+    def hook(point):
+        if point == "inside_db_tx_before_commit":
+            hook_calls.append(len(calls))
+
+    os.fsync = trace_fsync
+    try:
+        rec = archive.record_capture(cap, receipt_id="trace-001", test_hook=hook)
+    finally:
+        os.fsync = real_fsync
+
+    blob = archive._blob_path(rec.blob_sha256)
+    required = {str(p.relative_to(archive.state_dir)) for p in (blob.parent, blob.parent.parent, archive.blobs_dir)}
+    synced_dirs = {x["path"] for x in calls if x["directory"]}
+
+    # All required directory entries must be fsynced
+    assert required.issubset(synced_dirs), f"Missing directory barriers: {required - synced_dirs}"
+    # File staging must be fsynced
+    assert any(not x["directory"] for x in calls), "Staging file was not fsynced"
+    # All barriers must occur before inside_db_tx_before_commit
+    assert hook_calls and hook_calls[0] >= 4, f"Fsync barriers did not complete before DB tx: {hook_calls}"
+
+
+def test_cas_durability_barrier_covers_fresh_prefix_parents(tmp_path: Path):
+    """Fresh state directory store blob ensures leaf, prefix parent, and root blobs directories are synced."""
+    archive = EvidenceArchive(tmp_path / "fresh_parents")
+    cap = make_capture(source_id="nyfed_effr", body=b'{"fresh_parents":1}')
+    calls = []
+    real_fsync = os.fsync
+
+    def trace_fsync(fd):
+        target = Path(os.readlink(f"/proc/self/fd/{fd}"))
+        calls.append({
+            "directory": stat.S_ISDIR(os.fstat(fd).st_mode),
+            "path": str(target.relative_to(archive.state_dir)),
+        })
+        return real_fsync(fd)
+
+    os.fsync = trace_fsync
+    try:
+        rec = archive.record_capture(cap, receipt_id="fresh-parents-001")
+    finally:
+        os.fsync = real_fsync
+
+    blob = archive._blob_path(rec.blob_sha256)
+    required = {str(p.relative_to(archive.state_dir)) for p in (blob.parent, blob.parent.parent, archive.blobs_dir)}
+    synced_dirs = {x["path"] for x in calls if x["directory"]}
+    assert not (required - synced_dirs)
+
+
+def test_cas_durability_barrier_delayed_publisher_second_writer_syncs(tmp_path: Path):
+    """When publisher is delayed after link, second writer executes durability barrier before DB commit."""
+    archive = EvidenceArchive(tmp_path / "delayed_pub")
+    cap = make_capture(source_id="nyfed_effr", body=b'{"delayed_pub":1}')
+    published = threading.Event()
+    release = threading.Event()
+    real_link = os.link
+    real_fsync = os.fsync
+    events = []
+    errors = []
+
+    def delayed_link(src, dst, *args, **kwargs):
+        val = real_link(src, dst, *args, **kwargs)
+        if threading.current_thread().name == "publisher":
+            published.set()
+            if not release.wait(timeout=10):
+                raise RuntimeError("Release timed out")
+        return val
+
+    def race_fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            events.append(str(Path(os.readlink(f"/proc/self/fd/{fd}"))))
+        return real_fsync(fd)
+
+    def publisher():
+        try:
+            archive.record_capture(cap, receipt_id="pub-001")
+        except Exception as exc:
+            errors.append(repr(exc))
+
+    os.link = delayed_link
+    os.fsync = race_fsync
+    writer = threading.Thread(target=publisher, name="publisher")
+    writer.start()
+    try:
+        assert published.wait(timeout=5), "Publisher failed to reach link"
+        second = archive.record_capture(cap, receipt_id="second-001")
+        # Second writer must not commit without performing directory fsync
+        assert second.seq >= 1
+        assert len(events) >= 3, f"Expected at least 3 directory fsyncs from second writer, got {len(events)}"
+    finally:
+        release.set()
+        writer.join(timeout=5)
+        os.link = real_link
+        os.fsync = real_fsync
+
+    assert not writer.is_alive() and not errors, errors
+    assert len(archive.query_receipts()) == 2
+
+
+def test_cas_durability_barrier_fsync_error_prevents_db_commit(tmp_path: Path):
+    """Error during CAS directory fsync prevents database transaction from committing."""
+    archive = EvidenceArchive(tmp_path / "fsync_err")
+    cap = make_capture(source_id="nyfed_effr", body=b'{"fsync_err":1}')
+    real_fsync = os.fsync
+
+    def failing_fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(5, "Simulated I/O error during directory fsync")
+        return real_fsync(fd)
+
+    os.fsync = failing_fsync
+    try:
+        with pytest.raises(OSError, match="Simulated I/O error"):
+            archive.record_capture(cap, receipt_id="fail-fsync-001")
+    finally:
+        os.fsync = real_fsync
+
+    # No receipt committed
+    assert archive.get_receipt("fail-fsync-001") is None
+    assert len(archive.query_receipts()) == 0
+
+
+def test_cas_durability_barrier_retry_after_halted_publisher(tmp_path: Path):
+    """Retry after halted publisher cleanly reuses existing blob, completes barrier, and commits."""
+    archive = EvidenceArchive(tmp_path / "retry_pub")
+    cap = make_capture(source_id="nyfed_effr", body=b'{"retry_pub":1}')
+
+    # Simulate publisher halted after link
+    real_link = os.link
+
+    def halt_after_link(src, dst, *args, **kwargs):
+        val = real_link(src, dst, *args, **kwargs)
+        raise RuntimeError("Publisher abruptly killed after link")
+
+    os.link = halt_after_link
+    try:
+        with pytest.raises(RuntimeError, match="Publisher abruptly killed"):
+            archive.record_capture(cap, receipt_id="attempt-1")
+    finally:
+        os.link = real_link
+
+    # Destination file exists on disk (orphaned)
+    blob_path = archive._blob_path(hashlib.sha256(cap.body).hexdigest())
+    assert blob_path.is_file()
+    assert len(archive.query_receipts()) == 0
+
+    # Retry with same capture
+    rec = archive.record_capture(cap, receipt_id="attempt-2")
+    assert rec.seq == 1
+    assert rec.blob_sha256 == hashlib.sha256(cap.body).hexdigest()
+    assert len(archive.query_receipts()) == 1
+    integrity = archive.verify_integrity()
+    assert integrity["healthy"] is True
+
+
+# -------------------------------------------------------------------------
+# 13. Reviewer R2.1 Defect Controls Resolution Suite
+# -------------------------------------------------------------------------
+
+def test_reviewer_r21_defects_fixed(tmp_path: Path):
+    """Verify that all 5 defects identified in R2.1 review are fixed and forbidden."""
+    folder = tmp_path / "r21_fixes"
+    folder.mkdir()
+    cap = make_capture(
+        source_id="nyfed_effr",
+        body=b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-16","percentRate":3.88}]}',
+        headers={"content-type": "application/json"},
+    )
+    fixed_diag = {"status": "valid", "validation_level": "content", "reason": "fixture", "checker_version": "review/1"}
+
+    # Defect 1: ambient test routing cannot activate on default worker
+    hits = []
+    class H(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a): pass
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(200); self.end_headers(); self.wfile.write(b"{}")
+    srv = socketserver.TCPServer(("127.0.0.1", 0), H)
+    t = threading.Thread(target=srv.serve_forever, daemon=True); t.start()
+    old = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
+    os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps({"https://markets.newyorkfed.org": f"http://127.0.0.1:{srv.server_address[1]}"})
+    try:
+        with SourceProbe(timeout=0.10) as probe:
+            res = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
+        assert len(hits) == 0, "Default worker routed to ambient loopback"
+    finally:
+        if old is None: os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
+        else: os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old
+        srv.shutdown(); srv.server_close()
+
+    # Defect 2: fresh prefix directory barriers
+    arch2 = EvidenceArchive(folder / "fresh-dirs")
+    calls = []
+    real_fsync = os.fsync
+    def trace_f(fd):
+        calls.append({"directory": stat.S_ISDIR(os.fstat(fd).st_mode), "path": str(Path(os.readlink(f"/proc/self/fd/{fd}")).relative_to(arch2.state_dir))})
+        return real_fsync(fd)
+    os.fsync = trace_f
+    try:
+        rec2 = arch2.record_capture(cap, receipt_id="fresh")
+    finally:
+        os.fsync = real_fsync
+    b2 = arch2._blob_path(rec2.blob_sha256)
+    req2 = {str(p.relative_to(arch2.state_dir)) for p in (b2.parent, b2.parent.parent, arch2.blobs_dir)}
+    synced2 = {x["path"] for x in calls if x["directory"]}
+    assert not (req2 - synced2), f"Missing barriers: {req2 - synced2}"
+
+    # Defect 3: publisher link delay race
+    arch3 = EvidenceArchive(folder / "race")
+    pub_done = threading.Event(); rel = threading.Event()
+    real_link = os.link; events = []
+    def del_link(src, dst, *a, **kw):
+        v = real_link(src, dst, *a, **kw)
+        if threading.current_thread().name == "pub":
+            pub_done.set()
+            rel.wait(timeout=10)
+        return v
+    def rf(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode): events.append(os.readlink(f"/proc/self/fd/{fd}"))
+        return real_fsync(fd)
+    os.link = del_link; os.fsync = rf
+    w = threading.Thread(target=lambda: arch3.record_capture(cap, receipt_id="pub"), name="pub")
+    w.start()
+    try:
+        assert pub_done.wait(timeout=5)
+        sec = arch3.record_capture(cap, receipt_id="sec")
+        assert sec.seq >= 1
+        assert len(events) >= 3, "Second writer committed with 0 directory fsync"
+    finally:
+        rel.set(); w.join(timeout=5)
+        os.link = real_link; os.fsync = real_fsync
+
+    # Defect 4: direct header type collision rejected
+    arch4 = EvidenceArchive(folder / "hdr")
+    with pytest.raises(ValueError, match="header values must be str"):
+        arch4.record_capture(replace(cap, headers={"etag": 1}), receipt_id="hdr", probe_result=fixed_diag)
+
+    # Defect 5: direct final url integer rejected
+    arch5 = EvidenceArchive(folder / "url")
+    with pytest.raises(ValueError, match="final_url.*must be string"):
+        arch5.record_capture(replace(cap, final_url=123), receipt_id="url", probe_result=fixed_diag)

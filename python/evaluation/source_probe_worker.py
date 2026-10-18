@@ -1,4 +1,4 @@
-"""Pythia R2.1: Isolated worker process for single-source bounded fetch and probe.
+"""Pythia R2.2: Isolated worker process for single-source bounded fetch and probe.
 
 Reads probe execution parameters as JSON from stdin, creates an isolated
 anonymous requests Session, executes _fetch_bounded_core, and outputs
@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import sys
-import urllib.parse
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -27,26 +25,7 @@ from python.evaluation.source_probe import (
 )
 
 
-class LoopbackRouteAdapter(requests.adapters.HTTPAdapter):
-    """Testing adapter: routes requests for a canonical prefix to a loopback test server.
-
-    Allows tests to verify _fetch_bounded_core and worker with gzip and single-GET
-    without modifying the production domain allowlist or HTTPS scheme requirement.
-    """
-
-    def __init__(self, target_base: str) -> None:
-        super().__init__()
-        self.target_base = target_base.rstrip("/")
-
-    def send(self, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
-        p = urllib.parse.urlparse(request.url)
-        original_host = p.netloc
-        request.url = self.target_base + p.path + (f"?{p.query}" if p.query else "")
-        request.headers["Host"] = original_host
-        return super().send(request, **kwargs)
-
-
-def main() -> None:
+def main(session: Optional[requests.Session] = None) -> None:
     try:
         raw_input = sys.stdin.read()
         if not raw_input:
@@ -66,17 +45,7 @@ def main() -> None:
         sys.stderr.flush()
         sys.exit(1)
 
-    sess = create_anonymous_session()
-
-    # Route canonical URLs to loopback in test fixtures if requested
-    loopback_map_str = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
-    if loopback_map_str:
-        try:
-            mapping = json.loads(loopback_map_str)
-            for prefix, target_base in mapping.items():
-                sess.mount(prefix, LoopbackRouteAdapter(target_base))
-        except Exception as exc:
-            sys.stderr.write(f"Worker loopback mount error: {type(exc).__name__}: {str(exc)}\n")
+    sess = session if session is not None else create_anonymous_session()
 
     try:
         res = _fetch_bounded_core(

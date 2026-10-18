@@ -1,0 +1,137 @@
+{
+  "reviewed_commit_baseline": "829a2b17e3f0077fb4e860cc27865b044dbe467c",
+  "utc": "2026-10-18T13:46:48.062379+00:00",
+  "total_controls": 15,
+  "previous_controls_count": 10,
+  "r21_defect_checks_count": 5,
+  "all_previous_requirements_met": true,
+  "all_r21_defects_forbidden": true,
+  "all_controls_passed": true,
+  "previous_controls": [
+    {
+      "case": "identical_payload_positive",
+      "meets_requirement": true
+    },
+    {
+      "case": "changed_header",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "changed_fetch_time",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "changed_collector_version",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "changed_negative_error",
+      "expected": "ArchiveConflictError",
+      "actual": "rejected",
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "existing_blob_same_size_wrong_hash",
+      "original_hash": "e7e6876d2ef25557a519add34d769c598cec32cd0f5bba7f14671a427e1ae7f9",
+      "fixture_corrupted_hash": "145b62b36e65e67b9d95f09b1c14c6cc8a3b7f7118c3f5cd575c1d801c3f5e5e",
+      "same_size": true,
+      "new_receipt_committed": false,
+      "exception": "ArchiveIntegrityError",
+      "total_receipts": 1,
+      "verify_healthy": false,
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "missing_explicit_eof",
+      "capture_complete": false,
+      "capture_error": "Worker protocol error: missing required key(s): complete",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "invalid_base64_ignored_suffix",
+      "capture_complete": false,
+      "capture_error": "Failed to decode worker body base64: Error: Non-base64 digit found",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "contradictory_complete_counters",
+      "capture_complete": false,
+      "capture_error": "Worker response marked complete=True counter mismatch: received=3, stored=2, len=2",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true,
+      "defect_reproduced": false
+    },
+    {
+      "case": "missing_required_body_metadata",
+      "capture_complete": false,
+      "capture_error": "Worker protocol error: missing required key(s): body_b64, bytes_received, bytes_stored, error_msg, final_url, headers, limit_exceeded, status_code",
+      "probe_status": "network_error",
+      "full_blob_hash": null,
+      "revision_created": false,
+      "meets_requirement": true,
+      "defect_reproduced": false
+    }
+  ],
+  "r21_defect_checks": [
+    {
+      "case": "default_worker_ambient_test_route",
+      "loopback_gets": 0,
+      "ambient_route_activated": false,
+      "defect_forbidden": true
+    },
+    {
+      "case": "fresh_prefix_directory_barriers",
+      "required_directory_paths": [
+        "blobs",
+        "blobs/e7",
+        "blobs/e7/e6"
+      ],
+      "synced_directory_paths": [
+        "blobs",
+        "blobs/e7",
+        "blobs/e7/e6"
+      ],
+      "missing_directory_barriers": [],
+      "defect_forbidden": true
+    },
+    {
+      "case": "reuse_before_publisher_directory_sync",
+      "second_receipt_committed": true,
+      "directory_fsync_count_before_second_commit": 3,
+      "defect_forbidden": true
+    },
+    {
+      "case": "direct_header_type_collision",
+      "rejected_with_value_error": true,
+      "exception": "ValueError",
+      "defect_forbidden": true
+    },
+    {
+      "case": "direct_final_url_integer",
+      "rejected_with_value_error": true,
+      "exception": "ValueError",
+      "defect_forbidden": true
+    }
+  ]
+}

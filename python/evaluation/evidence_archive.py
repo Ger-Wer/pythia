@@ -28,6 +28,7 @@ from python.evaluation.source_probe import (
     CaptureResult,
     SourceProbe,
     utc_now_iso,
+    validate_capture_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,13 +258,36 @@ class EvidenceArchive:
         """Return the CAS filesystem path for a given SHA-256 hash."""
         return self.blobs_dir / sha256[:2] / sha256[2:4] / f"{sha256}.bin"
 
+    def _fsync_cas_barrier(self, dest_path: Path, sync_file: bool = False) -> None:
+        """Durable filesystem barrier for CAS before SQLite transaction commit.
+
+        Synchronizes the blob file (if requested) and all required prefix directory
+        entries (leaf prefix, parent prefix, and base blobs directory).
+        """
+        if sync_file:
+            file_fd = os.open(str(dest_path), os.O_RDONLY)
+            try:
+                os.fsync(file_fd)
+            finally:
+                os.close(file_fd)
+
+        dirs_to_sync = [dest_path.parent, dest_path.parent.parent, self.blobs_dir]
+        for d in dirs_to_sync:
+            dir_fd = os.open(str(d), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+
     def _store_blob(self, body: bytes) -> str:
         """Store bytes into filesystem CAS atomically with fsync and no-clobber semantics.
 
         Deduplicates identical blobs: if the blob already exists, verifies both
         size and SHA-256 hash. If corrupted, raises ArchiveIntegrityError without
         modifying the corrupted file. Publishes new blobs atomically via link
-        without clobbering, followed by directory fsync.
+        without clobbering, followed by directory fsync. All paths (new publish,
+        existing reuse, concurrent race loser) execute the durable filesystem
+        barrier before returning.
         """
         sha256 = hashlib.sha256(body).hexdigest()
         dest_path = self._blob_path(sha256)
@@ -281,6 +305,8 @@ class EvidenceArchive:
                 raise ArchiveIntegrityError(
                     f"CAS blob hash mismatch at {dest_path}: expected SHA-256 {sha256}, found corrupted blob {existing_sha}."
                 )
+            # Enforce durability barrier on reuse path
+            self._fsync_cas_barrier(dest_path, sync_file=True)
             return sha256
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -318,14 +344,12 @@ class EvidenceArchive:
                     raise ArchiveIntegrityError(
                         f"CAS blob race hash mismatch at {dest_path}: expected {sha256}, found {existing_sha}."
                     )
+                # Enforce durability barrier on race loser path
+                self._fsync_cas_barrier(dest_path, sync_file=True)
                 return sha256
 
-            # Fsync destination parent directory to ensure directory entry durability on Linux
-            dir_fd = os.open(str(dest_path.parent), os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
+            # Enforce durability barrier on new publish path (temp file was already fsynced)
+            self._fsync_cas_barrier(dest_path, sync_file=False)
 
         except Exception:
             if temp_path.exists():
@@ -353,40 +377,7 @@ class EvidenceArchive:
 
     def _validate_capture(self, capture: CaptureResult) -> None:
         """Validate CaptureResult invariants at archive boundary before persistent processing."""
-        if capture.source_id not in CANONICAL_SOURCES:
-            raise ValueError(f"Unknown or non-canonical source_id: '{capture.source_id}'")
-        expected_url = CANONICAL_SOURCES[capture.source_id]
-        if capture.initial_url != expected_url:
-            raise ValueError(
-                f"URL mismatch for '{capture.source_id}': expected '{expected_url}', got '{capture.initial_url}'"
-            )
-        if type(capture.complete) is not bool:
-            raise ValueError(f"CaptureResult 'complete' must be bool, got {type(capture.complete).__name__}")
-        if type(capture.limit_exceeded) is not bool:
-            raise ValueError(f"CaptureResult 'limit_exceeded' must be bool, got {type(capture.limit_exceeded).__name__}")
-        if capture.status_code is not None and (type(capture.status_code) is not int or isinstance(capture.status_code, bool)):
-            raise ValueError("CaptureResult 'status_code' must be integer or None")
-        if capture.bytes_received is not None and (type(capture.bytes_received) is not int or isinstance(capture.bytes_received, bool) or capture.bytes_received < 0):
-            raise ValueError("CaptureResult 'bytes_received' must be non-negative integer or None")
-        if capture.bytes_stored is not None and (type(capture.bytes_stored) is not int or isinstance(capture.bytes_stored, bool) or capture.bytes_stored < 0):
-            raise ValueError("CaptureResult 'bytes_stored' must be non-negative integer or None")
-        if type(capture.body) is not bytes:
-            raise ValueError(f"CaptureResult 'body' must be bytes, got {type(capture.body).__name__}")
-        if type(capture.headers) is not dict:
-            raise ValueError(f"CaptureResult 'headers' must be dict, got {type(capture.headers).__name__}")
-        if capture.complete:
-            if capture.error_msg is not None:
-                raise ValueError(f"Contradictory CaptureResult: complete=True cannot have error_msg: {capture.error_msg}")
-            if capture.limit_exceeded:
-                raise ValueError("Contradictory CaptureResult: complete=True cannot have limit_exceeded=True")
-            if capture.status_code is None or not (100 <= capture.status_code < 600):
-                raise ValueError(f"Contradictory CaptureResult: complete=True requires valid status_code, got {capture.status_code}")
-            if capture.final_url is None or not capture.final_url:
-                raise ValueError("Contradictory CaptureResult: complete=True requires non-empty final_url")
-            if capture.bytes_received is None or capture.bytes_stored is None:
-                raise ValueError("Contradictory CaptureResult: complete=True requires non-null counters")
-            if capture.bytes_received != capture.bytes_stored or capture.bytes_stored != len(capture.body):
-                raise ValueError(f"Contradictory CaptureResult: counter mismatch (received={capture.bytes_received}, stored={capture.bytes_stored}, len={len(capture.body)})")
+        validate_capture_result(capture)
 
     def _compute_payload_fingerprint(
         self,
@@ -397,7 +388,7 @@ class EvidenceArchive:
         diag_checker_version: str,
     ) -> str:
         """Compute deterministic SHA-256 fingerprint over all capture and diagnostic fields."""
-        canonical_headers = {str(k).lower(): str(v) for k, v in sorted(capture.headers.items())}
+        canonical_headers = {k.lower(): capture.headers[k] for k in sorted(capture.headers.keys(), key=lambda s: s.lower())}
         payload_dict = {
             "source_id": capture.source_id,
             "initial_url": capture.initial_url,
