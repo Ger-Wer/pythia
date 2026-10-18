@@ -31,8 +31,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from python.evaluation.evidence_reader import VerifiedCapture
 from python.evaluation.source_probe import CANONICAL_SOURCES, SourceProbe
 
-EXTRACTOR_VERSION = "pythia-extractor-r3/0.2"
-FACT_SCHEMA_VERSION = "pythia-fact-r3/1.1"
+EXTRACTOR_VERSION = "pythia-extractor-r3/0.3"
+FACT_SCHEMA_VERSION = "pythia-fact-r3/1.2"
 SUPPORTED_SOURCES = ("nyfed_effr", "fed_monetary_rss", "fed_speeches_rss")
 
 
@@ -439,7 +439,20 @@ def extract_facts_from_captures(captures: List[VerifiedCapture]) -> ExtractionRe
             )
             continue
 
-        # 2. Check clean transport gate (HTTP status MUST be 200)
+        # 2. Check stored diagnostic status (MUST be 'valid' - cannot promote non-valid frozen receipts)
+        if rec.status != "valid":
+            rejections.append(
+                RejectionRecord(
+                    receipt_id=rec.receipt_id,
+                    seq=rec.seq,
+                    source_id=rec.source_id,
+                    status=rec.status,
+                    reason=f"Stored diagnostic status is '{rec.status}' (expected 'valid')",
+                )
+            )
+            continue
+
+        # 3. Check clean transport gate (HTTP status MUST be 200)
         if rec.http_status != 200:
             rejections.append(
                 RejectionRecord(

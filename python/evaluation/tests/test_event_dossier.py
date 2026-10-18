@@ -433,7 +433,7 @@ def test_origin_lineage_same_article_in_multiple_feeds_groups_together(tmp_path:
     r2 = archive.record_capture(create_capture("fed_monetary_rss", feed2), receipt_id="rec-feed-2")
 
     out_dir = tmp_path / "dossier_out"
-    desc = EventDescriptor(event_id="fomc_origin_test", question="Test?")
+    desc = EventDescriptor(event_id="fixture_fomc_origin_test", question="Test?", provenance="fixture")
     bundle_path, bundle = build_event_dossier(
         archive_dir=archive_dir,
         as_of_seq=2,
@@ -497,6 +497,7 @@ def test_idempotent_bundle_digest_and_permutation_invariance(tmp_path: Path):
     desc = EventDescriptor(
         event_id="fixture_fomc_synth",
         question="Will EFFR stay within 3.75 - 4.00?",
+        provenance="fixture",
         contract_status="incomplete",
     )
 
@@ -539,7 +540,7 @@ def test_output_dir_cannot_be_inside_archive_dir(tmp_path: Path):
     r1 = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-1")
 
     nested_out = archive_dir / "nested_dossiers"
-    desc = EventDescriptor(event_id="test", question="Test?")
+    desc = EventDescriptor(event_id="fixture_test_nested", question="Test?", provenance="fixture")
     with pytest.raises(ValueError, match="must not be located inside archive_dir"):
         build_event_dossier(
             archive_dir=archive_dir,
@@ -632,7 +633,7 @@ def test_f4_complete_clean_receipt_missing_mandatory_blob(tmp_path: Path):
     conn.commit()
     conn.close()
 
-    desc = EventDescriptor(event_id="f4_test", question="Test?")
+    desc = EventDescriptor(event_id="fixture_f4_test", question="Test?", provenance="fixture")
     with pytest.raises(ReaderIntegrityError, match="missing mandatory CAS blob and revision linkage"):
         build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
 
@@ -658,13 +659,23 @@ def test_f5_descriptor_validation_and_frozen_versions_in_empty_dossier(tmp_path:
     """F5: Descriptor requires non-empty fields and consistent contract status; versions are frozen in empty dossiers."""
     # 1. Empty event_id or question rejected
     with pytest.raises(ValueError, match="event_id must be a non-empty string"):
-        EventDescriptor(event_id="", question="Question?")
+        EventDescriptor(event_id="", question="Question?", provenance="fixture")
     with pytest.raises(ValueError, match="question must be a non-empty string"):
-        EventDescriptor(event_id="id", question="")
+        EventDescriptor(event_id="fixture_id", question="", provenance="fixture")
 
-    # 2. rules=None cannot be verified
-    with pytest.raises(ValueError, match="contract_status cannot be 'verified' when rules is None"):
-        EventDescriptor(event_id="id", question="Q?", rules=None, contract_status="verified")
+    # Provenance required and must be valid
+    with pytest.raises(ValueError, match="provenance must be an explicit non-empty string"):
+        EventDescriptor(event_id="fixture_id", question="Q?", provenance="")
+    with pytest.raises(ValueError, match="is not supported; must be 'fixture' or 'operator_supplied'"):
+        EventDescriptor(event_id="fixture_id", question="Q?", provenance="invalid_prov")
+
+    # Fixture prefix validation
+    with pytest.raises(ValueError, match="Fixture event_id must be synthetic"):
+        EventDescriptor(event_id="non_fixture_id", question="Q?", provenance="fixture")
+
+    # 2. contract_status validation: in R3.0 only 'incomplete' and 'unverified'
+    with pytest.raises(ValueError, match="contract_status 'verified' is not supported in R3.0"):
+        EventDescriptor(event_id="fixture_id", question="Q?", rules="Some rules", contract_status="verified", provenance="fixture")
 
     # 3. All-rejected dossier preserves frozen versions
     archive_dir = tmp_path / "archive"
@@ -672,7 +683,7 @@ def test_f5_descriptor_validation_and_frozen_versions_in_empty_dossier(tmp_path:
     cap = create_capture("nyfed_effr", b"", complete=False, error_msg="Timeout")
     r = archive.record_capture(cap, receipt_id="rec-f5-neg")
 
-    desc = EventDescriptor(event_id="f5_empty", question="Empty test?", contract_status="incomplete")
+    desc = EventDescriptor(event_id="fixture_f5_empty", question="Empty test?", provenance="fixture", contract_status="incomplete")
     _, bundle = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
 
     dossier = bundle["dossier"]
@@ -693,7 +704,7 @@ def test_f6_origin_groups_no_claimed_independence_and_correct_nyfed_url(tmp_path
     body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
     r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f6")
 
-    desc = EventDescriptor(event_id="f6_test", question="Test?", contract_status="incomplete")
+    desc = EventDescriptor(event_id="fixture_f6_test", question="Test?", provenance="fixture", contract_status="incomplete")
     _, bundle = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
 
     groups = bundle["dossier"]["origin_groups"]
@@ -711,7 +722,7 @@ def test_f7_atomic_no_clobber_publication_and_collision_rejection(tmp_path: Path
     r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f7")
 
     out_dir = tmp_path / "out"
-    desc = EventDescriptor(event_id="f7_test", question="Test?", contract_status="incomplete")
+    desc = EventDescriptor(event_id="fixture_f7_test", question="Test?", provenance="fixture", contract_status="incomplete")
 
     # First publication
     p1, b1 = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, out_dir)
@@ -738,3 +749,128 @@ def test_f7_atomic_no_clobber_publication_and_collision_rejection(tmp_path: Path
 
     # Verify competing file was preserved
     assert competing_file.read_bytes() == sentinel
+
+
+# --- Additional R3.0.2 Residual Tests (F3 - F6) ---
+
+def test_r302_negative_stored_status_diagnostic(tmp_path: Path):
+    """F3: Stored status non-'valid' (blocked, unverified, invalid_content) must be rejected."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    plain = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    good_desc = EventDescriptor(event_id="fixture_review_contract", question="Synthetic context?", provenance="fixture")
+
+    for status in ("blocked", "unverified", "invalid_content"):
+        receipt = archive.record_capture(
+            create_capture("nyfed_effr", plain),
+            receipt_id=f"rec-{status}",
+            probe_result={
+                "status": status,
+                "validation_level": "content",
+                "reason": "fixture negative diagnostic",
+                "checker_version": "review/1",
+            },
+        )
+        _, bundle = build_event_dossier(archive.state_dir, receipt.seq, [receipt.receipt_id], good_desc, tmp_path / f"out-{status}")
+        dossier = bundle["dossier"]
+        assert dossier["manifest"]["total_facts_extracted"] == 0
+        assert dossier["manifest"]["total_rejected"] == 1
+        assert dossier["manifest"]["rejected_receipts"][0]["status"] == status
+
+
+def test_r302_clean403_missing_links(tmp_path: Path):
+    """F4: Clean HTTP 403 capture (CAS-eligible) missing links raises ReaderIntegrityError."""
+    archive_dir = tmp_path / "archive_clean403"
+    archive = EvidenceArchive(archive_dir)
+    plain = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    good_desc = EventDescriptor(event_id="fixture_clean403", question="Synthetic context?", provenance="fixture")
+
+    receipt = archive.record_capture(
+        create_capture("nyfed_effr", plain, status_code=403),
+        receipt_id="rec-clean403",
+    )
+    db = sqlite3.connect(archive.db_path)
+    for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='receipts'").fetchall():
+        db.execute('DROP TRIGGER "' + name.replace('"', '""') + '"')
+    db.execute("UPDATE receipts SET blob_sha256=NULL, revision_id=NULL WHERE receipt_id=?", (receipt.receipt_id,))
+    db.commit()
+    db.close()
+
+    with pytest.raises(ReaderIntegrityError, match="missing mandatory CAS blob and revision linkage"):
+        build_event_dossier(archive.state_dir, 1, [receipt.receipt_id], good_desc, tmp_path / "out-clean403")
+
+
+def test_r302_partial_retains_full_links(tmp_path: Path):
+    """F4: Incomplete capture retaining full CAS links raises ReaderIntegrityError."""
+    archive_dir = tmp_path / "archive_partial"
+    archive = EvidenceArchive(archive_dir)
+    plain = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    good_desc = EventDescriptor(event_id="fixture_partial", question="Synthetic context?", provenance="fixture")
+
+    receipt = archive.record_capture(
+        create_capture("nyfed_effr", plain, status_code=200),
+        receipt_id="rec-partial",
+    )
+    db = sqlite3.connect(archive.db_path)
+    for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='receipts'").fetchall():
+        db.execute('DROP TRIGGER "' + name.replace('"', '""') + '"')
+    db.execute("UPDATE receipts SET complete=0, error_msg='fixture timeout' WHERE receipt_id=?", (receipt.receipt_id,))
+    db.commit()
+    db.close()
+
+    with pytest.raises(ReaderIntegrityError, match="unexpectedly references a blob or revision"):
+        build_event_dossier(archive.state_dir, 1, [receipt.receipt_id], good_desc, tmp_path / "out-partial")
+
+
+def test_r302_bad_descriptors():
+    """F5: Rejection of bad descriptor types and synthetic fixture IDs."""
+    # 1. Non-string deadline
+    with pytest.raises(ValueError, match="deadline must be None or a non-empty ISO 8601 string"):
+        EventDescriptor(event_id="fixture_bad", question="Q?", provenance="operator_supplied", deadline=123)
+
+    # 2. Non-timezone deadline
+    with pytest.raises(ValueError, match="must include explicit timezone offset"):
+        EventDescriptor(event_id="fixture_bad", question="Q?", provenance="operator_supplied", deadline="2026-10-18T12:00:00")
+
+    # 3. Non-string rules
+    with pytest.raises(ValueError, match="rules must be None or a non-empty string"):
+        EventDescriptor(event_id="fixture_bad", question="Q?", provenance="operator_supplied", rules={"not": "string"})
+
+    # 4. Empty string rules
+    with pytest.raises(ValueError, match="rules must be None or a non-empty string"):
+        EventDescriptor(event_id="fixture_bad", question="Q?", provenance="operator_supplied", rules="")
+
+    # 5. contract_status verified not supported in R3.0
+    with pytest.raises(ValueError, match="contract_status 'verified' is not supported in R3.0"):
+        EventDescriptor(event_id="fixture_bad", question="Q?", provenance="operator_supplied", rules="rules", contract_status="verified")
+
+    # 6. Implicit provenance / non-synthetic fixture
+    with pytest.raises((ValueError, TypeError)):
+        EventDescriptor(event_id="123456", question="Q?")  # missing provenance
+
+    with pytest.raises(ValueError, match="Fixture event_id must be synthetic"):
+        EventDescriptor(event_id="123456", question="Q?", provenance="fixture")
+
+
+def test_r302_preserve_distinct_url_paths_with_trailing_slash(tmp_path: Path):
+    """F6: Distinct URLs differing by trailing slash must produce distinct origin entities."""
+    archive_dir = tmp_path / "archive_slash"
+    archive = EvidenceArchive(archive_dir)
+    base = "https://www.federalreserve.gov/newsevents/pressreleases/monetary-fixture"
+    good_desc = EventDescriptor(event_id="fixture_slash_test", question="Synthetic context?", provenance="fixture")
+
+    ids = []
+    for idx, url in enumerate((base, base + "/")):
+        body = (
+            '<rss version="2.0"><channel><title>Federal Reserve Monetary Policy</title>'
+            '<link>https://www.federalreserve.gov/feeds/monetary.htm</link><item>'
+            '<title>FOMC statement</title><link>' + url + '</link><description>Fixture</description>'
+            '</item></channel></rss>'
+        ).encode()
+        rec = archive.record_capture(create_capture("fed_monetary_rss", body), receipt_id=f"rec-url-{idx}")
+        ids.append(rec.receipt_id)
+
+    _, bundle = build_event_dossier(archive.state_dir, 2, ids, good_desc, tmp_path / "out-slash")
+    groups = bundle["dossier"]["origin_groups"]
+    assert len(groups) == 2
+    assert {g.get("canonical_article_url") for g in groups} == {base, base + "/"}

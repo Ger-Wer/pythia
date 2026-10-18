@@ -37,9 +37,10 @@ from python.evaluation.evidence_reader import (
     ReadOnlyArchiveReader,
     VerifiedCapture,
 )
+from datetime import datetime
 from python.evaluation.source_probe import CANONICAL_SOURCES
 
-DOSSIER_VERSION = "pythia-dossier-r3/0.2"
+DOSSIER_VERSION = "pythia-dossier-r3/0.3"
 
 
 class DossierError(Exception):
@@ -52,9 +53,9 @@ class EventDescriptor:
 
     event_id: str
     question: str
+    provenance: str
     deadline: Optional[str] = None
     rules: Optional[str] = None
-    provenance: str = "fixture"
     contract_status: str = "incomplete"
 
     def __post_init__(self) -> None:
@@ -62,30 +63,56 @@ class EventDescriptor:
             raise ValueError("event_id must be a non-empty string")
         if not isinstance(self.question, str) or not self.question.strip():
             raise ValueError("question must be a non-empty string")
+
+        # Explicit provenance required (no silent defaults)
         if not isinstance(self.provenance, str) or not self.provenance.strip():
-            raise ValueError("provenance must be a non-empty string")
-        # Invariant: rules=None cannot be verified or complete
-        if self.rules is None and self.contract_status in ("verified", "complete"):
+            raise ValueError("provenance must be an explicit non-empty string")
+        if self.provenance not in ("fixture", "operator_supplied"):
             raise ValueError(
-                f"contract_status cannot be '{self.contract_status}' when rules is None; "
-                f"must be 'incomplete'."
+                f"provenance '{self.provenance}' is not supported; must be 'fixture' or 'operator_supplied'"
             )
-        if self.contract_status not in ("incomplete", "complete", "verified"):
-            raise ValueError(f"Invalid contract_status '{self.contract_status}'")
+
+        # Fixture event IDs must be explicitly synthetic
+        if self.provenance == "fixture" and not self.event_id.startswith(("fixture_", "fixture-")):
+            raise ValueError(
+                f"Fixture event_id must be synthetic (e.g. prefix 'fixture_'), got '{self.event_id}'"
+            )
+
+        # Nullable string / ISO 8601 deadline validation
+        if self.deadline is not None:
+            if type(self.deadline) is not str or not self.deadline.strip():
+                raise ValueError("deadline must be None or a non-empty ISO 8601 string")
+            try:
+                dt = datetime.fromisoformat(self.deadline.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    raise ValueError(f"deadline '{self.deadline}' must include explicit timezone offset")
+            except Exception as exc:
+                raise ValueError(
+                    f"deadline '{self.deadline}' is not a valid ISO 8601 datetime string: {exc}"
+                ) from exc
+
+        # Nullable string rules validation
+        if self.rules is not None:
+            if type(self.rules) is not str or not self.rules.strip():
+                raise ValueError("rules must be None or a non-empty string")
+
+        # contract_status validation: in R3.0 only 'incomplete' and 'unverified' are supported
+        if self.contract_status not in ("incomplete", "unverified"):
+            raise ValueError(
+                f"contract_status '{self.contract_status}' is not supported in R3.0 "
+                f"(supported: 'incomplete', 'unverified')"
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
 def _normalize_article_url(url: str) -> str:
-    """Conservative URL normalization: preserve path and query, lowercase host."""
+    """Conservative URL normalization: preserve path and query verbatim, lowercase scheme/host."""
     try:
         parts = urllib.parse.urlsplit(url.strip())
         netloc = parts.netloc.lower()
-        path = parts.path
-        if len(path) > 1 and path.endswith("/"):
-            path = path[:-1]
-        return urllib.parse.urlunsplit((parts.scheme.lower(), netloc, path, parts.query, ""))
+        return urllib.parse.urlunsplit((parts.scheme.lower(), netloc, parts.path, parts.query, ""))
     except Exception:
         return url.strip()
 

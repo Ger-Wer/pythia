@@ -274,19 +274,24 @@ class ReadOnlyArchiveReader:
                             f"Inconsistent linkage in receipt '{rid}': blob_sha256={rec.blob_sha256!r}, revision_id={rec.revision_id!r}"
                         )
 
-                    # A complete clean HTTP 200 receipt without errors or limits MUST have blob & revision
-                    is_complete_clean_200 = (
+                    # Eligibility for full CAS links under R2 storage contract:
+                    # complete is True, not limit_exceeded, and error_msg is None
+                    is_cas_eligible = (
                         rec.complete
-                        and rec.http_status == 200
-                        and rec.error_msg is None
                         and not rec.limit_exceeded
+                        and rec.error_msg is None
                     )
-                    if is_complete_clean_200 and not has_blob:
-                        raise ReaderIntegrityError(
-                            f"Complete clean HTTP 200 receipt '{rid}' is missing mandatory CAS blob and revision linkage"
-                        )
 
-                    if not has_blob:
+                    if is_cas_eligible:
+                        if not has_blob:
+                            raise ReaderIntegrityError(
+                                f"Complete clean receipt '{rid}' is missing mandatory CAS blob and revision linkage"
+                            )
+                    else:
+                        if has_blob:
+                            raise ReaderIntegrityError(
+                                f"Incomplete/failed receipt '{rid}' unexpectedly references a blob or revision"
+                            )
                         # Legitimate negative capture without stored blob
                         verified_captures.append(
                             VerifiedCapture(receipt=rec, revision=None, blob_bytes=None)
