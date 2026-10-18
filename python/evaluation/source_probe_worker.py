@@ -1,8 +1,8 @@
-"""Pythia R1.3: Isolated worker process for single-source bounded probe.
+"""Pythia R2: Isolated worker process for single-source bounded fetch and probe.
 
 Reads probe execution parameters as JSON from stdin, creates an isolated
 anonymous requests Session, executes _fetch_bounded_core, and outputs
-a single-line JSON result with base64-encoded body to stdout.
+a single-line JSON result with base64-encoded body and response headers to stdout.
 All logging and diagnostics are written strictly to stderr.
 """
 
@@ -60,12 +60,14 @@ def main() -> None:
 
         output = {
             "status_code": res.get("status_code"),
+            "headers": res.get("headers", {}),
             "content_type": res.get("content_type"),
             "body_b64": body_b64,
             "bytes_received": res.get("bytes_received"),
             "bytes_stored": res.get("bytes_stored"),
-            "limit_exceeded": res.get("limit_exceeded", False),
-            "final_url": res.get("final_url", initial_url),
+            "complete": bool(res.get("complete", False)),
+            "limit_exceeded": bool(res.get("limit_exceeded", False)),
+            "final_url": res.get("final_url"),
             "error_msg": res.get("error_msg"),
         }
 

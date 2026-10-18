@@ -26,6 +26,7 @@ import sys
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -33,14 +34,44 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import feedparser
 import requests
 
-PROBE_VERSION = "pythia-probe-r1.3/1.0"
+PROBE_VERSION = "pythia-probe-r2/1.0"
+COLLECTOR_VERSION = "pythia-collector-r2/1.0"
 STREAM_LIMIT_BYTES = 2 * 1024 * 1024  # 2 MiB = 2,097,152 bytes
 DEFAULT_TIMEOUT_SECONDS = 15.0
 MAX_REDIRECTS = 3
 CLEANUP_GRACE_SECONDS = 0.15
 MAX_CLEANUP_SECONDS = 0.50
 
-DEFAULT_USER_AGENT = "Pythia-source-probe/1.3 (+https://github.com/Ger-Wer/pythia)"
+DEFAULT_USER_AGENT = "Pythia-source-probe/2.0 (+https://github.com/Ger-Wer/pythia)"
+
+
+@dataclass(frozen=True)
+class CaptureResult:
+    """Typed container for a single bounded fetch attempt."""
+
+    source_id: str
+    initial_url: str
+    final_url: Optional[str]
+    body: bytes
+    status_code: Optional[int]
+    headers: Dict[str, str]
+    fetch_started_at: str
+    fetch_completed_at: str
+    duration_ms: float
+    bytes_received: Optional[int]
+    bytes_stored: Optional[int]
+    complete: bool
+    limit_exceeded: bool
+    error_msg: Optional[str]
+    collector_version: str = COLLECTOR_VERSION
+
+    @property
+    def content_type(self) -> Optional[str]:
+        for k, v in self.headers.items():
+            if k.lower() == "content-type":
+                return v
+        return None
+
 
 CANONICAL_SOURCES: Dict[str, str] = {
     "nyfed_effr": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
@@ -166,12 +197,14 @@ def _fetch_bounded_core(
             duration_ms = elapsed * 1000.0
             return {
                 "status_code": None,
+                "headers": {},
                 "content_type": None,
                 "body": b"",
                 "bytes_received": 0,
                 "bytes_stored": 0,
+                "complete": False,
                 "limit_exceeded": False,
-                "final_url": current_url,
+                "final_url": None,
                 "duration_ms": duration_ms,
                 "error_msg": f"Overall source deadline exceeded ({timeout}s): elapsed {elapsed:.2f}s",
             }
@@ -183,12 +216,14 @@ def _fetch_bounded_core(
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             return {
                 "status_code": None,
+                "headers": {},
                 "content_type": None,
                 "body": b"",
                 "bytes_received": 0,
                 "bytes_stored": 0,
+                "complete": False,
                 "limit_exceeded": False,
-                "final_url": current_url,
+                "final_url": None,
                 "duration_ms": duration_ms,
                 "error_msg": f"Non-HTTPS scheme rejected: {parsed.scheme}",
             }
@@ -198,12 +233,14 @@ def _fetch_bounded_core(
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             return {
                 "status_code": None,
+                "headers": {},
                 "content_type": None,
                 "body": b"",
                 "bytes_received": 0,
                 "bytes_stored": 0,
+                "complete": False,
                 "limit_exceeded": False,
-                "final_url": current_url,
+                "final_url": None,
                 "duration_ms": duration_ms,
                 "error_msg": f"Domain {domain} not in allowlist for source {source_id}",
             }
@@ -220,22 +257,26 @@ def _fetch_bounded_core(
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             return {
                 "status_code": None,
+                "headers": {},
                 "content_type": None,
                 "body": b"",
                 "bytes_received": 0,
                 "bytes_stored": 0,
+                "complete": False,
                 "limit_exceeded": False,
-                "final_url": current_url,
+                "final_url": None,
                 "duration_ms": duration_ms,
                 "error_msg": f"Network transport error: {type(exc).__name__}: {str(exc)}",
             }
 
+        resp_headers = {str(k).lower(): str(v) for k, v in resp.headers.items()} if hasattr(resp, "headers") and resp.headers else {}
+
         # Handle redirects manually to enforce max_redirects and domain constraints
         if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
             redirect_count += 1
-            location = resp.headers.get("Location")
+            location = resp.headers.get("Location") if hasattr(resp, "headers") else None
             status_code = resp.status_code
-            content_type = resp.headers.get("Content-Type")
+            content_type = resp_headers.get("content-type")
             try:
                 resp.close()
             except Exception:
@@ -245,10 +286,12 @@ def _fetch_bounded_core(
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
                 return {
                     "status_code": status_code,
+                    "headers": resp_headers,
                     "content_type": content_type,
                     "body": b"",
                     "bytes_received": 0,
                     "bytes_stored": 0,
+                    "complete": False,
                     "limit_exceeded": False,
                     "final_url": current_url,
                     "duration_ms": duration_ms,
@@ -258,10 +301,12 @@ def _fetch_bounded_core(
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
                 return {
                     "status_code": status_code,
+                    "headers": resp_headers,
                     "content_type": content_type,
                     "body": b"",
                     "bytes_received": 0,
                     "bytes_stored": 0,
+                    "complete": False,
                     "limit_exceeded": False,
                     "final_url": current_url,
                     "duration_ms": duration_ms,
@@ -271,7 +316,7 @@ def _fetch_bounded_core(
             continue
 
         # Stream body up to max_bytes + 1 byte
-        content_type = resp.headers.get("Content-Type")
+        content_type = resp_headers.get("content-type")
         status_code = resp.status_code
         chunks: List[bytes] = []
         bytes_received = 0
@@ -312,12 +357,16 @@ def _fetch_bounded_core(
         if duration_ms > (timeout * 1000.0) and not read_error:
             read_error = f"Overall source deadline exceeded ({timeout}s): elapsed {duration_ms / 1000.0:.2f}s"
 
+        complete = (status_code is not None and not limit_exceeded and read_error is None)
+
         return {
             "status_code": status_code,
+            "headers": resp_headers,
             "content_type": content_type,
             "body": body,
             "bytes_received": bytes_received,
             "bytes_stored": bytes_stored,
+            "complete": complete,
             "limit_exceeded": limit_exceeded,
             "final_url": current_url,
             "duration_ms": duration_ms,
@@ -374,18 +423,18 @@ class SourceProbe:
         sources = data.get("sources", [])
         return validate_registry(sources)
 
-    def _fetch_bounded(
+    def capture_source(
         self,
         source_id: str,
         initial_url: str,
-    ) -> Tuple[Optional[int], Optional[str], bytes, Optional[int], Optional[int], bool, str, float, Optional[str]]:
+    ) -> CaptureResult:
         """Fetch URL with strict redirect, domain allowlist, deadline, and stream bounds
         enforced by an isolated worker process under parent deadline control via Popen + communicate.
 
-        Returns:
-            (status_code, content_type, body_bytes, bytes_received, bytes_stored, limit_exceeded, final_url, duration_ms, error_msg)
+        Returns a typed CaptureResult.
         """
         start_monotonic = time.monotonic()
+        started_at = utc_now_iso()
         deadline = start_monotonic + self.timeout
 
         worker_input = json.dumps({
@@ -418,16 +467,22 @@ class SourceProbe:
             timed_out = True
         except Exception as exc:
             elapsed = time.monotonic() - start_monotonic
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                elapsed * 1000.0,
-                f"Worker process launch error: {type(exc).__name__}: {str(exc)}",
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=utc_now_iso(),
+                duration_ms=elapsed * 1000.0,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg=f"Worker process launch error: {type(exc).__name__}: {str(exc)}",
+                collector_version=COLLECTOR_VERSION,
             )
         finally:
             if proc is not None:
@@ -466,111 +521,219 @@ class SourceProbe:
 
         elapsed = time.monotonic() - start_monotonic
         duration_ms = elapsed * 1000.0
+        completed_at = utc_now_iso()
 
         if timed_out:
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                duration_ms,
-                f"Overall source deadline exceeded ({self.timeout}s); worker process terminated.",
-            )
-
-        # RE-CHECK DEADLINE: If elapsed monotonic time exceeded timeout before complete message was received
-        if elapsed > self.timeout:
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                duration_ms,
-                f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.3f}s; response rejected.",
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=completed_at,
+                duration_ms=duration_ms,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg=f"Overall source deadline exceeded ({self.timeout}s); worker process terminated.",
+                collector_version=COLLECTOR_VERSION,
             )
 
         if proc is not None and proc.returncode != 0:
             err_text = stderr_bytes.decode("utf-8", errors="replace").strip()
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                duration_ms,
-                f"Worker process terminated unexpectedly (exit code {proc.returncode}): {err_text[:200]}",
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=completed_at,
+                duration_ms=duration_ms,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg=f"Worker process terminated unexpectedly (exit code {proc.returncode}): {err_text[:200]}",
+                collector_version=COLLECTOR_VERSION,
             )
 
         try:
             worker_result = json.loads(stdout_bytes.decode("utf-8"))
         except Exception as exc:
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                duration_ms,
-                f"Failed to parse worker output as JSON: {type(exc).__name__}: {str(exc)}",
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=completed_at,
+                duration_ms=duration_ms,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg=f"Failed to parse worker output as JSON: {type(exc).__name__}: {str(exc)}",
+                collector_version=COLLECTOR_VERSION,
             )
 
         if not isinstance(worker_result, dict):
-            return (
-                None,
-                None,
-                b"",
-                None,
-                None,
-                False,
-                initial_url,
-                duration_ms,
-                "Worker output JSON must be an object.",
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=completed_at,
+                duration_ms=duration_ms,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg="Worker output JSON must be an object.",
+                collector_version=COLLECTOR_VERSION,
             )
+
+        schema_err: Optional[str] = None
 
         body_b64 = worker_result.get("body_b64")
         if body_b64 is not None:
-            try:
-                body = base64.b64decode(body_b64)
-            except Exception as exc:
-                return (
-                    None,
-                    None,
-                    b"",
-                    None,
-                    None,
-                    False,
-                    initial_url,
-                    duration_ms,
-                    f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}",
-                )
+            if not isinstance(body_b64, str):
+                schema_err = f"Worker body_b64 must be str, got {type(body_b64).__name__}"
+                body = b""
+            else:
+                try:
+                    body = base64.b64decode(body_b64)
+                except Exception as exc:
+                    schema_err = f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}"
+                    body = b""
         else:
             body = b""
 
-        limit_exceeded = worker_result.get("limit_exceeded", False)
+        raw_complete = worker_result.get("complete")
+        if raw_complete is not None:
+            if not isinstance(raw_complete, bool):
+                schema_err = schema_err or f"Worker 'complete' must be boolean, got {type(raw_complete).__name__}"
+                complete = False
+            else:
+                complete = raw_complete
+        else:
+            complete = (
+                worker_result.get("status_code") is not None
+                and not worker_result.get("limit_exceeded", False)
+                and worker_result.get("error_msg") is None
+            )
+
+        raw_limit = worker_result.get("limit_exceeded", False)
+        if not isinstance(raw_limit, bool):
+            schema_err = schema_err or f"Worker 'limit_exceeded' must be boolean, got {type(raw_limit).__name__}"
+            limit_exceeded = False
+        else:
+            limit_exceeded = raw_limit
+
+        status_code = worker_result.get("status_code")
+        if status_code is not None and not isinstance(status_code, int):
+            schema_err = schema_err or f"Worker 'status_code' must be integer or null, got {type(status_code).__name__}"
+            status_code = None
+
+        final_url = worker_result.get("final_url")
+        if final_url is not None and not isinstance(final_url, str):
+            schema_err = schema_err or f"Worker 'final_url' must be string or null, got {type(final_url).__name__}"
+            final_url = None
+
+        raw_headers = worker_result.get("headers")
+        headers: Dict[str, str] = {}
+        if raw_headers is not None:
+            if not isinstance(raw_headers, dict):
+                schema_err = schema_err or f"Worker 'headers' must be an object, got {type(raw_headers).__name__}"
+            else:
+                for hk, hv in raw_headers.items():
+                    headers[str(hk).lower()] = str(hv)
+        elif worker_result.get("content_type"):
+            headers["content-type"] = str(worker_result.get("content_type"))
+
+        bytes_received = worker_result.get("bytes_received")
+        if bytes_received is not None and not isinstance(bytes_received, int):
+            schema_err = schema_err or f"Worker 'bytes_received' must be int or null, got {type(bytes_received).__name__}"
+            bytes_received = None
+
+        bytes_stored = worker_result.get("bytes_stored")
+        if bytes_stored is not None and not isinstance(bytes_stored, int):
+            schema_err = schema_err or f"Worker 'bytes_stored' must be int or null, got {type(bytes_stored).__name__}"
+            bytes_stored = None
+
+        if not schema_err:
+            if bytes_stored is not None and bytes_stored != len(body):
+                schema_err = f"Worker counter inconsistency: bytes_stored ({bytes_stored}) != len(body) ({len(body)})"
+            elif bytes_received is not None and bytes_stored is not None and bytes_stored > bytes_received:
+                schema_err = f"Worker counter inconsistency: bytes_stored ({bytes_stored}) > bytes_received ({bytes_received})"
+
         if len(body) > self.max_bytes:
             limit_exceeded = True
+            complete = False
             body = body[: self.max_bytes]
 
-        return (
-            worker_result.get("status_code"),
-            worker_result.get("content_type"),
-            body,
-            worker_result.get("bytes_received"),
-            worker_result.get("bytes_stored"),
-            limit_exceeded,
-            worker_result.get("final_url", initial_url),
-            duration_ms,
-            worker_result.get("error_msg"),
+        error_msg = schema_err or worker_result.get("error_msg")
+        if schema_err:
+            complete = False
+
+        # POST-DECODE DEADLINE CHECK & DURATION MEASUREMENT:
+        elapsed = time.monotonic() - start_monotonic
+        duration_ms = elapsed * 1000.0
+        completed_at = utc_now_iso()
+
+        if elapsed > self.timeout:
+            return CaptureResult(
+                source_id=source_id,
+                initial_url=initial_url,
+                final_url=None,
+                body=b"",
+                status_code=None,
+                headers={},
+                fetch_started_at=started_at,
+                fetch_completed_at=completed_at,
+                duration_ms=duration_ms,
+                bytes_received=None,
+                bytes_stored=None,
+                complete=False,
+                limit_exceeded=False,
+                error_msg=f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.3f}s; response rejected.",
+                collector_version=COLLECTOR_VERSION,
+            )
+
+        return CaptureResult(
+            source_id=source_id,
+            initial_url=initial_url,
+            final_url=final_url,
+            body=body,
+            status_code=status_code,
+            headers=headers,
+            fetch_started_at=started_at,
+            fetch_completed_at=completed_at,
+            duration_ms=duration_ms,
+            bytes_received=bytes_received,
+            bytes_stored=bytes_stored,
+            complete=complete,
+            limit_exceeded=limit_exceeded,
+            error_msg=error_msg,
+            collector_version=COLLECTOR_VERSION,
         )
+
+    def _fetch_bounded(
+        self,
+        source_id: str,
+        initial_url: str,
+    ) -> CaptureResult:
+        """Alias for capture_source for backward compatibility."""
+        return self.capture_source(source_id, initial_url)
 
     def validate_content(
         self,
@@ -1012,61 +1175,62 @@ class SourceProbe:
 
     _validate_arena_overall = _validate_arena_html
 
-    def probe_single(self, source_cfg: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single bounded probe for a source configuration."""
+    def probe_single(
+        self,
+        source_cfg: Dict[str, Any],
+        capture: Optional[CaptureResult] = None,
+    ) -> Dict[str, Any]:
+        """Execute a single bounded probe for a source configuration.
+
+        If capture is not provided, executes a single fetch using capture_source().
+        """
         source_id = source_cfg["source_id"]
         initial_url = source_cfg["url"]
 
-        started_at = utc_now_iso()
-
-        (
-            status_code,
-            content_type,
-            body,
-            bytes_received,
-            bytes_stored,
-            limit_exceeded,
-            final_url,
-            duration_ms,
-            error_msg,
-        ) = self._fetch_bounded(source_id, initial_url)
-
-        completed_at = utc_now_iso()
+        if capture is None:
+            capture = self.capture_source(source_id, initial_url)
 
         status, validation_level, reason, item_count = self.validate_content(
             source_id=source_id,
-            http_status=status_code,
-            content_type=content_type,
-            body=body,
-            limit_exceeded=limit_exceeded,
-            error_msg=error_msg,
+            http_status=capture.status_code,
+            content_type=capture.content_type,
+            body=capture.body,
+            limit_exceeded=capture.limit_exceeded,
+            error_msg=capture.error_msg,
         )
 
         # Invariant: SHA-256 of complete body computed ONLY after successful EOF without error or overflow
-        if limit_exceeded or error_msg is not None or status_code is None or status_code >= 400 or status != "valid":
+        if (
+            capture.limit_exceeded
+            or capture.error_msg is not None
+            or capture.status_code is None
+            or capture.status_code >= 400
+            or status != "valid"
+            or not capture.complete
+        ):
             body_sha256 = None
         else:
-            body_sha256 = hashlib.sha256(body).hexdigest()
+            body_sha256 = hashlib.sha256(capture.body).hexdigest()
 
         return {
             "source_id": source_id,
             "platform": source_cfg.get("platform"),
             "family": source_cfg.get("family"),
             "initial_url": initial_url,
-            "final_url": final_url,
-            "http_status": status_code,
-            "fetch_started_at": started_at,
-            "fetch_completed_at": completed_at,
-            "duration_ms": round(duration_ms, 2),
-            "bytes_received": bytes_received,
-            "bytes_stored": bytes_stored,
-            "content_type": content_type,
+            "final_url": capture.final_url,
+            "http_status": capture.status_code,
+            "fetch_started_at": capture.fetch_started_at,
+            "fetch_completed_at": capture.fetch_completed_at,
+            "duration_ms": round(capture.duration_ms, 2),
+            "bytes_received": capture.bytes_received,
+            "bytes_stored": capture.bytes_stored,
+            "content_type": capture.content_type,
             "body_sha256": body_sha256,
             "status": status,
             "validation_level": validation_level,
             "reason": reason,
             "item_count": item_count,
-            "published_at": None,  # Strictly null in R1/R1.2 probe
+            "published_at": None,  # Strictly null in R1/R2 probe
             "checker_version": PROBE_VERSION,
             "usable_for_forecast": False,  # Strict invariant
         }

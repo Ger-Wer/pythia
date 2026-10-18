@@ -1,38 +1,42 @@
 # Pythia: Evidence Data Contract
 
-**Status:** R1.3 Specification (Design & Contract Only — No Storage / ORM / Migrations).  
-**Date:** 2026-10-17.  
-**Scope:** Defines the data contract for diagnostic probe runs (R1/R1.1) and future evidence records (R2+), distinguishing ephemeral probe checks, raw document captures, and extracted claims.
+**Status:** R2 Specification (Diagnostic Probe Layer 0 & Immutable Evidence Archive Layer 1 Implemented).  
+**Date:** 2026-10-18.  
+**Scope:** Defines the data contract for diagnostic probe runs (Layer 0), single-fetch capture results (`CaptureResult`), immutable content-addressable document revisions and attempt receipts (Layer 1, R2), and future extracted claims (Layer 2, R3+).
 
 ---
 
 ## 1. Architectural Principles
 
 1. **Separation of Layers:**
-   - **Probe Result (Layer 0, R1/R1.1):** An ephemeral diagnostic check of reachability, transport, and envelope structure under strict resource bounds. A single probe does **not** constitute a historical archive or a `first_seen` timeline.
-   - **Evidence Document (Layer 1, R2):** An immutable, append-only captured document with raw blob storage, complete SHA-256 integrity hash (only after verified EOF), HTTP metadata, collector/extractor versions, and rigorous timestamp lineage.
+   - **Capture Result (Boundary DTO, R2):** A single typed transport attempt capturing raw content-decoded bytes, headers, timings, and EOF/error status. Shared between diagnostic probe and archive storage without double fetching.
+   - **Probe Result (Layer 0, R1/R2):** An ephemeral diagnostic check of reachability, transport, envelope, and content schema under strict resource bounds. A probe run does **not** constitute a historical archive or a `first_seen` timeline.
+   - **Evidence Document & Archive (Layer 1, R2):** An immutable, append-only captured document storage combining filesystem CAS (raw blobs addressed by SHA-256) and SQLite (`archive.db` in WAL mode with append-only triggers). Receipts track every attempt (including blocked, unverified, invalid, and timeout); revisions track content evolution along `(source_id, initial_url)` with parent lineage.
    - **Claim & Event Dossier (Layer 2, R3):** Verbatim quote, character anchors, normalized quantitative claims, and linkage to prediction markets.
 2. **Date Lineage & Null Semantics:**
-   - `published_at`, `updated_at`, `first_seen_at`, and `fetched_at` are distinct fields with explicit provenance and precision.
-   - If an official publication date cannot be proven from document content or authoritative metadata, `published_at` **must be `null`**. It must **never** be replaced with HTTP `Last-Modified` or `fetched_at`.
+   - `published_at`, `updated_at`, `first_seen_at`, `recorded_at`, and `fetch_started_at`/`fetch_completed_at` are distinct fields with explicit provenance and precision.
+   - If an official publication date cannot be proven from document content or authoritative metadata, `published_at` **must be `null`**. It must **never** be replaced with HTTP `Last-Modified` or `fetched_at`/`recorded_at`.
    - Date-only disclosures (e.g. `2026-10-16`) must record precision as `"day"`. The collector must **never** synthesize an artificial time of day (such as `00:00:00Z`) to fabricate second-level precision.
    - `first_seen_at` requires persistent chronological tracking across repeated collections; an isolated one-off probe cannot fabricate a historical `first_seen_at`.
+   - `recorded_at` is assigned exclusively by the archive in UTC at SQLite transaction commit time; caller-supplied timestamps are never substituted for archive recording time.
 3. **Verbatim & Original First:**
-   - The raw byte content is preserved verbatim.
+   - The raw byte content is preserved verbatim in filesystem CAS.
+   - Raw body is defined as the exact **content-decoded HTTP body** returned by `requests.iter_content` (transparent decompression of gzip/deflate), prior to any charset decoding (UTF-8, etc.) or parsing.
    - Translated text is strictly separated from original text and explicitly attributed to a translation engine and version.
 4. **Anonymous & Bounded Transport:**
    - All diagnostic probes and evidence collectors operate with anonymous transport: ambient environment credentials (`.netrc`, ambient proxy variables) are disabled (`trust_env = False`), cookie persistence and transmission are blocked, and TLS certificate verification is enforced.
    - Every source request is bounded by an **overall deadline of 15.0 seconds** (covering worker startup, DNS resolution, TCP/TLS connect, redirects, stream read, and complete IPC transmission) enforced strictly via an isolated short-lived worker process under parent deadline control via `subprocess.Popen` and `communicate(input=..., timeout=remaining)`. The worker receives JSON on `stdin`, communicates protocol-pure JSON with base64-encoded payload on `stdout`, and writes diagnostics strictly to `stderr`.
    - Parent calculates `deadline = monotonic() + budget` before `Popen`. After `communicate` returns, the parent validates process exit code, JSON schema, body bounds, and re-checks `elapsed <= budget` before accepting any response as valid; late responses even if well-formed are rejected as `network_error` with `null` hash and counters.
+   - The final parent deadline check and duration measurement occur **after** worker JSON decoding, base64 extraction, and strict schema validation, right before returning the finished `CaptureResult`. Disk write/archival is not part of transport budget.
    - On timeout, the parent enforces termination via a sequence of `terminate()` -> grace (0.15s) -> `kill()` (SIGKILL) -> `wait()` (reap) sharing a single bounded cleanup allowance of **<= 0.50 seconds** over the operational budget. All pipe handles are closed. `duration_ms` is strictly measured by parent monotonic clock covering startup, IPC, execution, and cleanup.
    - Streaming memory buffer is capped at **2 MiB** (2,097,152 bytes). An oversized response is immediately truncated at 2 MiB, closing the stream and invalidating the integrity hash (`body_sha256 = null`).
-   - If a worker process is forcibly killed by timeout or terminated unexpectedly before metric transmission, actual transferred byte counters cannot be fabricated; `bytes_received`, `bytes_stored`, and `http_status` are reported as `null` with a clear explanation in `reason`.
+   - If a worker process is forcibly killed by timeout or terminated unexpectedly before metric transmission, actual transferred byte counters cannot be fabricated; `bytes_received`, `bytes_stored`, `http_status`, and `final_url` are reported as `null` with a clear explanation in `reason`. Initial URL remains known, but is never substituted for `final_url`.
 5. **Zero Edge Assumption:**
-   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1 and R1.3 carries `usable_for_forecast: false`.
+   - Neither probe validity nor document storage implies trading edge or forecast usability. Every record in R1, R1.3, and R2 carries `usable_for_forecast: false`.
 
 ---
 
-## 2. Probe Result Contract (R1/R1.3 Diagnostic Layer)
+## 2. Probe Result Contract (Layer 0 Diagnostic Layer)
 
 A probe run tests whether an endpoint is reachable and conforms to expected transport and envelope schemas under strict bounds.
 
@@ -44,22 +48,22 @@ A probe run tests whether an endpoint is reachable and conforms to expected tran
 | `platform` | `string` | No | Publishing organization or platform. |
 | `family` | `string` (enum) | No | Domain classification: `"macro"` or `"ai"`. |
 | `initial_url` | `string` (URI) | No | Configured canonical URL requested by the probe. |
-| `final_url` | `string` (URI) | No | Destination URL after following redirects (max 3 allowed within domain allowlist). |
+| `final_url` | `string` (URI) | Yes | Destination URL after following redirects (max 3 allowed within domain allowlist). **Must be `null`** if network error occurred before response or worker was killed by timeout. |
 | `http_status` | `integer` | Yes | HTTP status code (e.g. `200`, `403`). `null` if network error occurred before response or worker was killed by timeout. |
 | `fetch_started_at` | `string` (ISO 8601 UTC) | No | UTC timestamp when request was initiated. |
 | `fetch_completed_at` | `string` (ISO 8601 UTC) | No | UTC timestamp when response stream closed or timed out. |
-| `duration_ms` | `float` | No | Elapsed request duration in milliseconds (bounded by overall 15.0s deadline + cleanup margin). |
+| `duration_ms` | `float` | No | Elapsed request duration in milliseconds (measured by parent clock, bounded by overall 15.0s deadline + cleanup margin). |
 | `bytes_received` | `integer` | Yes | Total bytes read from socket/stream up to truncation boundary, or `null` if worker process was forcibly terminated by timeout before counters could be reported. |
 | `bytes_stored` | `integer` | Yes | Bytes retained in buffer (strictly capped at 2 MiB / 2,097,152 bytes), or `null` if worker process was forcibly terminated by timeout. |
 | `content_type` | `string` | Yes | `Content-Type` header from response, or `null` if unavailable. |
-| `body_sha256` | `string` (hex 64) | Yes | SHA-256 of complete payload. **Must be `null`** if stream was truncated, interrupted, timed out, or unverified. |
+| `body_sha256` | `string` (hex 64) | Yes | SHA-256 of complete payload. **Must be `null`** if stream was truncated, interrupted, timed out, blocked, or unverified. (Raw integrity hash for blocked/unverified snapshots is preserved in Layer 1 CAS). |
 | `status` | `string` (enum) | No | Probe status (see §2.2). |
 | `validation_level` | `string` (enum) | No | Depth of check passed/attempted (see §2.3). |
 | `reason` | `string` | No | Clear, human-readable justification for the status and level. |
 | `item_count` | `integer` | Yes | Number of verified items/releases/records parsed (e.g. 5 refRates, 0 releases). `null` for unparsed HTML. |
-| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R1.3 probes. |
-| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r1.3/1.0`). |
-| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R1.3. |
+| `published_at` | `string` (ISO 8601 UTC) | Yes | Strictly `null` in R1/R2 probes. |
+| `checker_version` | `string` | No | Version of probe software (e.g. `pythia-probe-r2/1.0`). |
+| `usable_for_forecast` | `boolean` | No | Always `false` in R1/R2. |
 
 ### 2.2 Status Enumeration (`status`)
 
@@ -75,88 +79,99 @@ A probe run tests whether an endpoint is reachable and conforms to expected tran
 - `envelope`: Transport succeeded, and top-level format envelope was confirmed (e.g. valid JSON parsing, non-truncated XML ElementTree parse with supported `<rss>`/`<feed>` root, valid HTML `<html>` document). Truncated XML fails at this level.
 - `content`: Substantive inner structure, required field types, and entity identifiers were confirmed (e.g. `refRates` contains numeric `percentRate` and exact `EFFR` type; GitHub releases contain repo references; RSS contains expected category items with official domain links). Feed category mismatch fails at this level.
 
+### 2.4 Common Capture DTO (`CaptureResult`)
+
+A single fetch attempt produces a typed `CaptureResult` instance:
+
+```python
+@dataclass(frozen=True)
+class CaptureResult:
+    source_id: str
+    initial_url: str
+    final_url: Optional[str]        # Nullable if error/killed before response
+    body: bytes                     # Content-decoded raw HTTP body
+    status_code: Optional[int]
+    headers: Dict[str, str]         # Canonical lowercase response headers
+    fetch_started_at: str           # ISO 8601 UTC
+    fetch_completed_at: str         # ISO 8601 UTC
+    duration_ms: float              # Parent measured wall-clock milliseconds
+    bytes_received: Optional[int]
+    bytes_stored: Optional[int]
+    complete: bool                  # True strictly on clean EOF without error/overflow
+    limit_exceeded: bool
+    error_msg: Optional[str]
+    collector_version: str
+```
+
+Both Layer 0 (`SourceProbe.probe_single`) and Layer 1 (`EvidenceArchive.record_capture`) accept this single `CaptureResult`, preventing duplicate network fetches.
+
 ---
 
-## 3. Future Evidence Record Contract (R2+ Storage Layer)
+## 3. Evidence Archive Contract (Layer 1 Storage Layer, R2)
 
-When document archival is implemented in R2, documents will be stored append-only without mutation.
+The evidence archive is an immutable, append-only persistence layer combining filesystem content-addressable storage (CAS) and SQLite (`archive.db`).
 
-### 3.1 Core Record Fields
+### 3.1 Architecture Overview
 
-```typescript
-interface EvidenceRecord {
-  // Identification
-  evidence_id: string;               // UUIDv7 (time-ordered) or sha256-based canonical ID
-  source_id: string;                 // References source_registry.json
-  issuer: string;                    // Authoritative publishing entity (e.g. "Federal Reserve Bank of New York")
-  initial_url: string;               // Origin canonical URL requested
-  final_url: string;                 // Canonical resolved URL
-  document_type: "api_json" | "rss_feed" | "html_document" | "pdf_binary" | "plain_text";
-  language: string;                  // ISO 639-1 code ('en', 'zh') or 'multilingual' / 'unknown'
+- **State Directory (`state_dir`):** An explicitly configured isolated path (never production DB, never committed to git).
+  - `blobs/ab/cd/abcd...bin`: Content-addressable storage of full body payloads keyed by SHA-256. Fsynced and atomically renamed before SQLite transaction commit. Deduplicated across revisions and sources.
+  - `tmp/`: Same-filesystem scratch directory for atomic writes.
+  - `archive.db`: SQLite database in WAL mode (`journal_mode = WAL`, `synchronous = NORMAL`, `foreign_keys = ON`, `busy_timeout = 10000`).
+- **Append-Only Invariant:** SQLite triggers forbid `UPDATE` and `DELETE` on `receipts` and `revisions`.
+- **Idempotency & Conflicts:** Re-recording an identical `receipt_id` with matching capture payload returns the existing receipt. Re-recording a `receipt_id` with conflicting payload raises `ArchiveConflictError`.
+- **Point-in-Time Cutoff (`as_of_seq`):** Historical state queries filtered by monotonic sequence number `seq <= as_of_seq` render subsequent receipts and revisions invisible without knowledge leakage from the future.
+- **Usability Invariant:** Every receipt and revision in R2 carries `usable_for_forecast: false`.
 
-  // Integrity & Raw Storage
-  blob_ref: string;                  // Path or CAS address of raw verbatim payload (e.g. "blobs/2026/10/17/7deb...bin")
-  content_sha256: string;            // Exact SHA-256 of the complete preserved blob (computed only after verified EOF)
-  byte_size: number;                 // Exact byte length
-  http_metadata: {
-    status_code: number;
-    headers: Record<string, string>; // Canonical lowercase headers (etag, last-modified, content-type)
-    protocol_version: string;        // HTTP/1.1 or HTTP/2
-  };
-  collector_version: string;         // Pythia collector build identifier
-  extractor_version: string | null;  // Version of text extraction module, or null if raw only
+### 3.2 Attempt Receipt Schema (`receipts` table)
 
-  // Temporal Lineage (Explicit & Non-substitutable)
-  published_at_raw: string | null;   // Verbatim date string from source (e.g. "Fri, 16 Oct 2026 14:00:00 EST")
-  published_at: string | null;       // ISO 8601 UTC timestamp or date
-  published_at_precision: "second" | "minute" | "hour" | "day" | "month" | "year" | null;
-  published_at_tz: string | null;    // Original timezone offset or name (e.g. "EST", "-05:00", null if unstated)
-  published_at_provenance: "document_body" | "authoritative_api" | "http_header" | "unknown";
+Every completed fetch attempt (including blocked, unverified, invalid, and timeout) is recorded in the append-only `receipts` table:
 
-  updated_at_raw: string | null;     // Verbatim update string if stated
-  updated_at: string | null;         // ISO 8601 UTC timestamp or date
-  updated_at_precision: "second" | "minute" | "hour" | "day" | "month" | "year" | null;
-  updated_at_tz: string | null;
-  updated_at_provenance: "document_body" | "authoritative_api" | "http_header" | "unknown";
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `receipt_id` | `TEXT` | `PRIMARY KEY` | Unique attempt identifier (UUIDv7 or UUIDv4). |
+| `seq` | `INTEGER` | `NOT NULL UNIQUE` | Monotonic sequential attempt number assigned by SQLite. |
+| `source_id` | `TEXT` | `NOT NULL` | References one of the 8 canonical sources. |
+| `initial_url` | `TEXT` | `NOT NULL` | Requested canonical URL. |
+| `final_url` | `TEXT` | Nullable | Actually reached URL, or `NULL` if failed before response. |
+| `http_status` | `INTEGER` | Nullable | HTTP status code (e.g. 200, 403), or `NULL`. |
+| `headers_json` | `TEXT` | `NOT NULL` | JSON-encoded canonical response headers. |
+| `fetch_started_at` | `TEXT` | `NOT NULL` | UTC ISO 8601 when fetch began. |
+| `fetch_completed_at`| `TEXT` | `NOT NULL` | UTC ISO 8601 when fetch finished. |
+| `recorded_at` | `TEXT` | `NOT NULL` | UTC ISO 8601 assigned by archive at commit time. |
+| `duration_ms` | `REAL` | `NOT NULL` | Parent measured execution time in milliseconds. |
+| `bytes_received` | `INTEGER` | Nullable | Total stream bytes transferred, or `NULL`. |
+| `bytes_stored` | `INTEGER` | Nullable | Bytes retained in buffer (max 2 MiB), or `NULL`. |
+| `complete` | `INTEGER` | `NOT NULL` | 1 if clean EOF without error/overflow; 0 otherwise. |
+| `status` | `TEXT` | `NOT NULL` | Diagnostic status (`valid`, `blocked`, `invalid_content`, `network_error`, `unverified`). |
+| `validation_level` | `TEXT` | `NOT NULL` | Diagnostic depth (`transport`, `envelope`, `content`). |
+| `reason` | `TEXT` | `NOT NULL` | Human-readable explanation. |
+| `checker_version` | `TEXT` | `NOT NULL` | Collector/checker build version. |
+| `usable_for_forecast`| `INTEGER` | `NOT NULL DEFAULT 0` | Strictly 0 in R2. |
+| `blob_sha256` | `TEXT` | Nullable | SHA-256 foreign key into CAS blob. `NULL` for incomplete/timeout. |
+| `revision_id` | `TEXT` | Nullable | Foreign key into `revisions`. `NULL` for incomplete/timeout. |
 
-  first_seen_at: string;             // ISO 8601 UTC. First persistent observation by Pythia collector
-  fetched_at: string;                // ISO 8601 UTC. Exact timestamp when this specific fetch completed
+### 3.3 Document Revision Schema (`revisions` table)
 
-  // Content Separation
-  raw_content: string | null;        // Decoded UTF-8 text if textual, or null if binary
-  extracted_markdown: string | null; // Extracted structured text (Trafilatura/parser)
-  translation: {
-    language: string;
-    engine: string;                  // e.g. "local-qwen-mt-v1"
-    translated_text: string;
-    translated_at: string;
-  } | null;
+Tracks the sequential history of complete bodies keyed by `(source_id, initial_url)`:
 
-  // Revision & Syndication Lineage
-  revision_index: number;            // 0 for original, increments on revised document at same canonical URL
-  previous_evidence_id: string | null; // Pointer to preceding revision
-  is_syndicated_reprint: boolean;    // True if content is a wire-service or secondary aggregator reprint
-  origin_canonical_url: string | null; // Canonical source URL if syndicated
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `revision_id` | `TEXT` | `PRIMARY KEY` | Unique revision identifier. |
+| `source_id` | `TEXT` | `NOT NULL` | References canonical source. |
+| `initial_url` | `TEXT` | `NOT NULL` | Canonical origin URL. |
+| `blob_sha256` | `TEXT` | `NOT NULL` | SHA-256 of complete body stored in CAS. |
+| `byte_size` | `INTEGER` | `NOT NULL` | Exact byte length of body. |
+| `first_seen_at` | `TEXT` | `NOT NULL` | UTC ISO 8601 when this revision was first committed. |
+| `first_seen_seq` | `INTEGER` | `NOT NULL` | Sequence number of the first receipt introducing this revision. |
+| `prev_revision_id` | `TEXT` | Nullable | Foreign key to preceding revision along this chain (`NULL` for initial). |
+| `created_at` | `TEXT` | `NOT NULL` | UTC ISO 8601 creation timestamp. |
 
-  // Forward linkage to Layer 2 (Claim / Event) — unpopulated in R1/R2
-  claims: Array<{
-    claim_id: string;
-    verbatim_quote: string;          // Exact substring from extracted_markdown
-    quote_offset_start: number;      // Exact character start
-    quote_offset_end: number;        // Exact character end
-    quantitative_fact: {
-      metric: string;                // e.g. "effr_percent", "gdpnow_real_gdp_growth"
-      value: number;
-      unit: string;                  // e.g. "percent", "bps", "usd"
-      period: string;                // e.g. "2026-10-16", "2026-Q3"
-    } | null;
-    target_event_slug: string | null; // Prediction market event binding
-  }>;
+**Revision Lineage Rules:**
+1. A new fetch returning identical bytes adds a receipt pointing to the existing `revision_id`.
+2. A new fetch returning modified bytes creates a new `revision_id` pointing to `prev_revision_id`.
+3. An $A \to B \to A$ evolution produces 3 revisions and 2 CAS blobs.
+4. Incomplete, timed-out, or truncated attempts do not alter revision history.
 
-  // Safety & Gate Flag
-  usable_for_forecast: boolean;      // False by default; only true after R5 JEV gate passes
-}
-```
 
 ---
 
