@@ -1,0 +1,52 @@
+{
+  "all_demo_proofs_valid": true,
+  "bundle_digest": "eea9119c7b6275ae02c896584e2313f2eba487001f30541ed420624228f04805",
+  "bundle_file": "demo_dossier_bundle.json",
+  "claimed_independent_evidence": 0,
+  "cutoff_seq": 8,
+  "demo_version": "R3.0.1",
+  "dossier_version": "pythia-dossier-r3/0.2",
+  "extractor_version": "pythia-extractor-r3/0.2",
+  "fact_schema_version": "pythia-fact-r3/1.1",
+  "invalid_proofs": 0,
+  "metadata": {
+    "coverage_limitations": [
+      "Only 3 canonical sources supported in R3.0 (nyfed_effr, fed_monetary_rss, fed_speeches_rss).",
+      "Background and contextual evidence only; does not prove future FOMC decisions or rate targets.",
+      "Articles referenced in RSS feeds are not fetched or crawled in R3.0.",
+      "No probabilities, betting recommendations, or edge estimates provided.",
+      "No resolution text or market rules provided; contract_status is incomplete."
+    ],
+    "dossier_type": "context_only",
+    "evidence_status": "insufficient_direct_evidence",
+    "usable_for_forecast": false
+  },
+  "nyfed_canonical_url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json",
+  "origin_groups_count": 31,
+  "raw_bom_sources": [
+    "fed_monetary_rss",
+    "fed_speeches_rss"
+  ],
+  "receipt_ids": [
+    "c5a86df9-f433-4090-a6a0-af11f2d18643",
+    "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+    "65207891-9bef-4a74-af54-abe32ddf58ae"
+  ],
+  "source_proof_counts": {
+    "fed_monetary_rss": {
+      "total": 15,
+      "valid": 15
+    },
+    "fed_speeches_rss": {
+      "total": 15,
+      "valid": 15
+    },
+    "nyfed_effr": {
+      "total": 5,
+      "valid": 5
+    }
+  },
+  "total_facts": 35,
+  "utc": "2026-10-18T19:02:51.339467+00:00",
+  "valid_proofs": 35
+}

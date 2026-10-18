@@ -6,9 +6,11 @@ and explicit event descriptors into an immutable, point-in-time JSON dossier bun
 Enforces:
 1. Strict output-dir separation from raw archive directory.
 2. Content-addressable dossier bundle naming (dossier_<digest>.json).
-3. Idempotent publication with atomic replacement and no-clobber verification.
+3. Idempotent publication with atomic no-clobber hard link (os.link) and collision rejection.
 4. Non-predictive context_only metadata: usable_for_forecast is False.
-5. Multi-origin grouping preserving honest lineage across feeds and snapshots.
+5. Honest multi-origin grouping without fabricated independence counts.
+6. Explicit EventDescriptor validation (no empty IDs/questions, contract status consistency).
+7. Frozen extractor and schema versions even for zero-fact dossiers.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from python.evaluation.evidence_extract import (
+    EXTRACTOR_VERSION,
+    FACT_SCHEMA_VERSION,
     Fact,
     RejectionRecord,
     extract_facts_from_captures,
@@ -33,8 +37,9 @@ from python.evaluation.evidence_reader import (
     ReadOnlyArchiveReader,
     VerifiedCapture,
 )
+from python.evaluation.source_probe import CANONICAL_SOURCES
 
-DOSSIER_VERSION = "pythia-dossier-r3/0.1"
+DOSSIER_VERSION = "pythia-dossier-r3/0.2"
 
 
 class DossierError(Exception):
@@ -51,6 +56,22 @@ class EventDescriptor:
     rules: Optional[str] = None
     provenance: str = "fixture"
     contract_status: str = "incomplete"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.event_id, str) or not self.event_id.strip():
+            raise ValueError("event_id must be a non-empty string")
+        if not isinstance(self.question, str) or not self.question.strip():
+            raise ValueError("question must be a non-empty string")
+        if not isinstance(self.provenance, str) or not self.provenance.strip():
+            raise ValueError("provenance must be a non-empty string")
+        # Invariant: rules=None cannot be verified or complete
+        if self.rules is None and self.contract_status in ("verified", "complete"):
+            raise ValueError(
+                f"contract_status cannot be '{self.contract_status}' when rules is None; "
+                f"must be 'incomplete'."
+            )
+        if self.contract_status not in ("incomplete", "complete", "verified"):
+            raise ValueError(f"Invalid contract_status '{self.contract_status}'")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -70,12 +91,12 @@ def _normalize_article_url(url: str) -> str:
 
 
 def build_origin_groups(facts: List[Fact], captures: List[VerifiedCapture]) -> List[Dict[str, Any]]:
-    """Group facts and observations by honest origin entity to avoid artificial evidence inflation."""
-    # Mapping from origin_id -> group dict
+    """Group facts and observations by origin entity.
+    
+    Strictly avoids claiming that count of URLs equals count of independent evidence.
+    Does not emit independent_evidence_count field.
+    """
     groups: Dict[str, Dict[str, Any]] = {}
-
-    # Map receipt_id -> capture for quick lookup
-    cap_map = {c.receipt.receipt_id: c for c in captures}
 
     for fact in facts:
         if fact.source_id == "nyfed_effr":
@@ -85,12 +106,10 @@ def build_origin_groups(facts: List[Fact], captures: List[VerifiedCapture]) -> L
                     "origin_id": origin_id,
                     "publisher": "Federal Reserve Bank of New York",
                     "entity_type": "rate_series",
-                    "canonical_url": "https://markets.newyorkfed.org/api/rates/all/latest.json",
-                    "independent_evidence_count": 1,
+                    "canonical_url": CANONICAL_SOURCES.get("nyfed_effr", "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json"),
                     "notes": "Official Federal Reserve Bank of New York reference rate publication.",
                     "observations": [],
                 }
-            # Record observation
             obs = {
                 "fact_id": fact.fact_id,
                 "effective_date": fact.effective_date,
@@ -99,26 +118,25 @@ def build_origin_groups(facts: List[Fact], captures: List[VerifiedCapture]) -> L
                 "revision_ids": fact.revision_ids,
                 "blob_sha256": fact.blob_sha256,
             }
-            # Avoid duplicate observation records in origin group
             if obs not in groups[origin_id]["observations"]:
                 groups[origin_id]["observations"].append(obs)
 
         elif fact.source_id in ("fed_monetary_rss", "fed_speeches_rss"):
             article_url = fact.value.get("referenced_article_url", "")
-            norm_url = _normalize_article_url(article_url)
-            origin_id = f"origin:fed:article:{norm_url}" if norm_url else f"origin:fed:feed_item:{fact.fact_id}"
+            norm_url = _normalize_article_url(article_url) if article_url else ""
+            origin_id = f"origin:fed:article:{norm_url}" if norm_url else "origin:fed:article:unknown"
 
             if origin_id not in groups:
                 groups[origin_id] = {
                     "origin_id": origin_id,
                     "publisher": "Federal Reserve Board",
                     "entity_type": "referenced_article",
-                    "canonical_article_url": norm_url or article_url,
+                    "canonical_article_url": norm_url or "unknown",
                     "article_fetched": False,
-                    "independent_evidence_count": 1,
                     "notes": (
                         "Multiple mentions across feeds/snapshots represent the same underlying "
-                        "official article; article body has not been fetched or crawled."
+                        "official article; article body has not been fetched or crawled. "
+                        "Statistical independence is not claimed or assessed."
                     ),
                     "observations": [],
                 }
@@ -141,7 +159,6 @@ def build_origin_groups(facts: List[Fact], captures: List[VerifiedCapture]) -> L
     sorted_groups = []
     for oid in sorted(groups.keys()):
         g = groups[oid]
-        # Sort observations inside each group
         g["observations"] = sorted(
             g["observations"],
             key=lambda x: (x.get("fact_id", ""), json.dumps(x, sort_keys=True)),
@@ -164,7 +181,7 @@ def build_event_dossier(
         archive_dir: Path to existing archive state directory.
         as_of_seq: Sequence cutoff (integer >= 0).
         receipt_ids: Explicit list of receipt IDs to extract.
-        event_descriptor: Explicit event descriptor.
+        event_descriptor: Explicit validated event descriptor.
         output_dir: Output directory for published dossier bundles (must be separate from archive_dir).
         
     Returns:
@@ -172,8 +189,11 @@ def build_event_dossier(
         
     Raises:
         ValueError: On parameter validation failure.
-        DossierError: On directory collision or storage failure.
+        DossierError: On directory collision, publication race, or storage failure.
     """
+    if not isinstance(event_descriptor, EventDescriptor):
+        raise ValueError(f"event_descriptor must be an instance of EventDescriptor, got {type(event_descriptor)}")
+
     resolved_archive = Path(archive_dir).resolve()
     resolved_out = Path(output_dir).resolve()
 
@@ -223,6 +243,8 @@ def build_event_dossier(
                 "receipt_id": r.receipt_id,
                 "seq": r.seq,
                 "source_id": r.source_id,
+                "initial_url": r.initial_url,
+                "final_url": r.final_url,
                 "status": r.status,
                 "complete": r.complete,
                 "http_status": r.http_status,
@@ -237,6 +259,9 @@ def build_event_dossier(
 
     manifest = {
         "as_of_seq": as_of_seq,
+        "dossier_version": DOSSIER_VERSION,
+        "extractor_version": EXTRACTOR_VERSION,
+        "fact_schema_version": FACT_SCHEMA_VERSION,
         "requested_receipt_ids": unique_rids,
         "total_requested": len(unique_rids),
         "total_verified": len(verified_captures),
@@ -246,22 +271,30 @@ def build_event_dossier(
         "rejected_receipts": [rej.to_dict() for rej in rejections],
     }
 
+    # Coverage limitations tailored to descriptor
+    coverage_limitations = [
+        "Only 3 canonical sources supported in R3.0 (nyfed_effr, fed_monetary_rss, fed_speeches_rss).",
+        "Background and contextual evidence only; does not prove future FOMC decisions or rate targets.",
+        "Articles referenced in RSS feeds are not fetched or crawled in R3.0.",
+        "No probabilities, betting recommendations, or edge estimates provided.",
+    ]
+    if event_descriptor.rules is None:
+        coverage_limitations.append("No resolution text or market rules provided; contract_status is incomplete.")
+    if event_descriptor.deadline is None:
+        coverage_limitations.append("No event deadline specified in descriptor.")
+
     metadata = {
         "dossier_type": "context_only",
         "evidence_status": "insufficient_direct_evidence",
         "usable_for_forecast": False,
-        "coverage_limitations": [
-            "Only 3 canonical sources supported in R3.0 (nyfed_effr, fed_monetary_rss, fed_speeches_rss).",
-            "Background and contextual evidence only; does not prove future FOMC decisions or rate targets.",
-            "Articles referenced in RSS feeds are not fetched or crawled in R3.0.",
-            "No resolution text or Polymarket contract rules loaded; contract_status is incomplete.",
-            "No probabilities, betting recommendations, or edge estimates provided.",
-        ],
+        "coverage_limitations": coverage_limitations,
     }
 
-    # 5. Assemble payload for content digest (without self-referential bundle_digest, wall clocks, or paths)
+    # 5. Assemble payload for content digest (frozen versions always present)
     dossier_payload = {
         "dossier_version": DOSSIER_VERSION,
+        "extractor_version": EXTRACTOR_VERSION,
+        "fact_schema_version": FACT_SCHEMA_VERSION,
         "event_descriptor": event_descriptor.to_dict(),
         "as_of_seq": as_of_seq,
         "requested_receipt_ids": unique_rids,
@@ -289,27 +322,31 @@ def build_event_dossier(
 
     bundle_path = resolved_out / f"dossier_{content_digest}.json"
 
-    # Idempotent write
-    if bundle_path.exists():
-        existing_bytes = bundle_path.read_bytes()
-        if existing_bytes == bundle_bytes:
-            return bundle_path, bundle_data
-        raise DossierError(
-            f"Dossier bundle digest collision with different content at {bundle_path}"
-        )
-
-    # Atomic publication
+    # 7. Atomic no-clobber publication via hard link (os.link)
     fd, tmp_file = tempfile.mkstemp(prefix="dossier_", suffix=".tmp", dir=str(tmp_out))
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(bundle_bytes)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp_file, bundle_path)
-    except Exception:
+
+        # Attempt atomic no-clobber link to final destination
+        try:
+            os.link(tmp_file, str(bundle_path))
+        except FileExistsError:
+            # File already exists: check if content is identical (idempotent replay)
+            existing_bytes = bundle_path.read_bytes()
+            if existing_bytes == bundle_bytes:
+                return bundle_path, bundle_data
+            raise DossierError(
+                f"Atomic publication conflict: file already exists with different contents at {bundle_path}"
+            )
+    finally:
         if os.path.exists(tmp_file):
-            os.unlink(tmp_file)
-        raise
+            try:
+                os.unlink(tmp_file)
+            except OSError:
+                pass
 
     return bundle_path, bundle_data
 
@@ -338,7 +375,8 @@ def main() -> None:
     parser.add_argument(
         "--event-descriptor-json",
         type=str,
-        help="Path to JSON file containing EventDescriptor or inline JSON string",
+        required=True,
+        help="Path to JSON file containing EventDescriptor or inline JSON string (mandatory)",
     )
     parser.add_argument(
         "--output-dir",
@@ -349,20 +387,12 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Parse descriptor
-    if args.event_descriptor_json:
-        desc_path = Path(args.event_descriptor_json)
-        if desc_path.is_file():
-            desc_dict = json.loads(desc_path.read_text(encoding="utf-8"))
-        else:
-            desc_dict = json.loads(args.event_descriptor_json)
-        descriptor = EventDescriptor(**desc_dict)
+    desc_path = Path(args.event_descriptor_json)
+    if desc_path.is_file():
+        desc_dict = json.loads(desc_path.read_text(encoding="utf-8"))
     else:
-        descriptor = EventDescriptor(
-            event_id="fixture_fomc_default",
-            question="Will the Federal Reserve adjust the target federal funds rate?",
-            contract_status="incomplete",
-        )
+        desc_dict = json.loads(args.event_descriptor_json)
+    descriptor = EventDescriptor(**desc_dict)
 
     bundle_path, bundle_data = build_event_dossier(
         archive_dir=args.archive_dir,

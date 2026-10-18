@@ -1,0 +1,59 @@
+======================================================================
+Pythia R3.0.1 Offline Facts & Frozen Dossier Demonstration (Revision 1)
+======================================================================
+
+[Step 1] Verifying 32 blobs across 4 live archives BEFORE demo...
+Total blobs verified: 32; Healthy: True
+
+[Step 2] Creating consistent SQLite backup from /home/pythia/pythia-evidence-r2-data/live-r2-revision3/archive.db...
+Copying CAS blobs to temporary directory...
+
+[Step 3] Selecting explicit receipt IDs from snapshot...
+  Selected: seq=1 | source=nyfed_effr | receipt_id=c5a86df9-f433-4090-a6a0-af11f2d18643
+  Selected: seq=2 | source=fed_monetary_rss | receipt_id=39bf5ee5-5918-489f-b9e1-dfcfcfbce96b
+  Selected: seq=3 | source=fed_speeches_rss | receipt_id=65207891-9bef-4a74-af54-abe32ddf58ae
+
+[Step 4] Event Descriptor:
+{
+  "event_id": "fixture_fomc_202610_context",
+  "question": "Will the Federal Reserve adjust the target federal funds rate range at the October/November 2026 FOMC meeting?",
+  "deadline": "2026-11-04T18:00:00Z",
+  "rules": null,
+  "provenance": "fixture",
+  "contract_status": "incomplete"
+}
+
+[Step 5] Building frozen dossier in /tmp/pythia-r301-demo-g1oq4ekw/dossier_output (cutoff as_of_seq=8)...
+
+[Step 6] Dossier Published Successfully!
+  Bundle File:   dossier_eea9119c7b6275ae02c896584e2313f2eba487001f30541ed420624228f04805.json
+  Bundle Digest: eea9119c7b6275ae02c896584e2313f2eba487001f30541ed420624228f04805
+  As-Of Seq:     8
+  Requested:     3
+  Verified:      3
+  Facts Count:   35
+  Rejections:    0
+  Origin Groups: 31
+  Usable Forecast: False
+  Dossier Type:    context_only
+
+[Step 7] Verifying all 35 fact proofs against raw CAS blobs...
+  Total Facts: 35
+  Valid Proofs: 35 / 35
+  Sources with BOM: ['fed_monetary_rss', 'fed_speeches_rss']
+    - fed_monetary_rss: 15 / 15 valid
+    - fed_speeches_rss: 15 / 15 valid
+    - nyfed_effr: 5 / 5 valid
+
+[Step 8] Verifying origin groups contracts (F6)...
+  All origin groups conform to F6 contracts.
+
+[Step 9] Published bundle written to: /home/pythia/pythia-evidence-r3/docs/research/2026-10-18/r3/revision1/demo_dossier_bundle.json
+
+[Step 10] Verifying 32 blobs across 4 live archives AFTER demo...
+Total blobs verified: 32; Healthy: True
+All 32 original CAS blobs across all 4 live archives are 100% intact and unchanged.
+
+======================================================================
+DEMO COMPLETED SUCCESSFULLY: 35/35 PROOFS VALID, ZERO CLOBBER, ZERO NETWORK
+======================================================================

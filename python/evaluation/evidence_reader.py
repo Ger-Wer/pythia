@@ -2,12 +2,13 @@
 
 Strict, point-in-time, read-only reader for existing Pythia Evidence Archives.
 Enforces:
-1. Pure SQLite mode=ro connection (no DDL, no mkdir, no mutable PRAGMAs, no immutable=1).
+1. Pure SQLite mode=ro connection via properly encoded file URI (no DDL, no mkdir, no mutable PRAGMAs, no immutable=1).
 2. Schema v2 validation and SQLite quick_check.
 3. Strict as_of_seq cutoff enforcement.
 4. Independent CAS blob presence, size, and SHA-256 verification.
 5. Consistent linkage across receipts, revisions, and CAS blobs.
-6. Honest negative capture handling without failing on missing blobs.
+6. Honest negative capture handling without failing on missing blobs, while strictly
+   rejecting corrupted complete receipts with missing linkage as integrity errors.
 """
 
 from __future__ import annotations
@@ -127,9 +128,10 @@ class ReadOnlyArchiveReader:
     def _get_ro_connection(self) -> sqlite3.Connection:
         """Create a strictly read-only SQLite connection.
         
-        Uses mode=ro URI without immutable=1 to correctly observe WAL checkpoints.
+        Uses properly encoded file URI (via as_uri()) to prevent misinterpreting '?' or '#'
+        in file paths, and sets mode=ro without immutable=1 to observe WAL checkpoints.
         """
-        ro_uri = f"file:{self.db_path.resolve()}?mode=ro"
+        ro_uri = f"{self.db_path.resolve().as_uri()}?mode=ro"
         conn = sqlite3.connect(ro_uri, uri=True, timeout=10.0)
         conn.execute("PRAGMA busy_timeout = 10000;")
         return conn
@@ -263,20 +265,33 @@ class ReadOnlyArchiveReader:
                             f"Receipt '{rid}' (seq {rec.seq}) exceeds cutoff as_of_seq={as_of_seq}"
                         )
 
-                    # Negative receipt check
-                    if rec.blob_sha256 is None and rec.revision_id is None:
-                        # Legitimate negative receipt: no CAS blob, no revision
+                    has_blob = rec.blob_sha256 is not None
+                    has_rev = rec.revision_id is not None
+
+                    # If one is present and the other is missing, that is corrupt linkage
+                    if has_blob != has_rev:
+                        raise ReaderIntegrityError(
+                            f"Inconsistent linkage in receipt '{rid}': blob_sha256={rec.blob_sha256!r}, revision_id={rec.revision_id!r}"
+                        )
+
+                    # A complete clean HTTP 200 receipt without errors or limits MUST have blob & revision
+                    is_complete_clean_200 = (
+                        rec.complete
+                        and rec.http_status == 200
+                        and rec.error_msg is None
+                        and not rec.limit_exceeded
+                    )
+                    if is_complete_clean_200 and not has_blob:
+                        raise ReaderIntegrityError(
+                            f"Complete clean HTTP 200 receipt '{rid}' is missing mandatory CAS blob and revision linkage"
+                        )
+
+                    if not has_blob:
+                        # Legitimate negative capture without stored blob
                         verified_captures.append(
                             VerifiedCapture(receipt=rec, revision=None, blob_bytes=None)
                         )
                         continue
-
-                    # Contradictory linkage check
-                    if rec.blob_sha256 is None or rec.revision_id is None:
-                        raise ReaderIntegrityError(
-                            f"Inconsistent linkage in receipt '{rid}': blob_sha256={rec.blob_sha256!r}, "
-                            f"revision_id={rec.revision_id!r}"
-                        )
 
                     # Positive capture: fetch revision
                     cursor.execute(

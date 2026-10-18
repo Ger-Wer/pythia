@@ -2,15 +2,18 @@
 
 Extracts structured, provenance-backed facts and honest quotes from verified
 canonical evidence captures:
-- nyfed_effr: EFFR observations with exact decimal rates and day-precision effective dates.
+- nyfed_effr: EFFR observations with exact decimal rates (no float rounding)
+  and day-precision effective dates.
 - fed_monetary_rss, fed_speeches_rss: RSS 2.0 items with feed excerpts, article links,
   and validated timezone dates.
 
 Enforces:
 1. Exact raw proof spans and structural locators (JSONPointer / XPath).
-2. Separate parsed values from verbatim bytes (no fake reserialization quotes).
-3. Context-only role: usable_for_forecast is False; no probabilities or edge claims.
-4. Honest rejection records for unsupported sources, negative attempts, or malformed payloads.
+2. Verbatim quote text matching exact blob bytes (including UTF-8 BOM).
+3. Exact decimals parsed directly without intermediate float representation.
+4. Independent transport and content identity validation (not just stored status label).
+5. Context-only role: usable_for_forecast is False; no probabilities or edge claims.
+6. Honest rejection records for unsupported sources, negative attempts, or malformed payloads.
 """
 
 from __future__ import annotations
@@ -26,9 +29,10 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
 from python.evaluation.evidence_reader import VerifiedCapture
+from python.evaluation.source_probe import CANONICAL_SOURCES, SourceProbe
 
-EXTRACTOR_VERSION = "pythia-extractor-r3/0.1"
-FACT_SCHEMA_VERSION = "pythia-fact-r3/1.0"
+EXTRACTOR_VERSION = "pythia-extractor-r3/0.2"
+FACT_SCHEMA_VERSION = "pythia-fact-r3/1.1"
 SUPPORTED_SOURCES = ("nyfed_effr", "fed_monetary_rss", "fed_speeches_rss")
 
 
@@ -160,6 +164,7 @@ def extract_nyfed_effr(capture: VerifiedCapture) -> List[Fact]:
     """Extract EFFR rate observations from a verified NYFed capture.
     
     Strict requirements:
+    - Parse float tokens directly as Decimal (no intermediate Python float rounding).
     - Reject duplicate keys, NaN, Infinity, bools where numbers expected.
     - Validate calendar effectiveDate (precision='day').
     - Exact string decimal for percentRate; unit='percent'.
@@ -175,8 +180,11 @@ def extract_nyfed_effr(capture: VerifiedCapture) -> List[Fact]:
     except UnicodeDecodeError as exc:
         raise ValueError(f"NYFed blob is not valid UTF-8: {exc}") from exc
 
+    # Parse JSON with Decimal for float tokens to preserve exact precision without rounding
     data = json.loads(
         blob_text,
+        parse_float=Decimal,
+        parse_int=int,
         object_pairs_hook=_check_duplicate_keys_hook,
         parse_constant=_reject_json_constants,
     )
@@ -211,32 +219,33 @@ def extract_nyfed_effr(capture: VerifiedCapture) -> List[Fact]:
 
         # Calendar date validation
         try:
-            parsed_date = datetime.strptime(eff_date_raw, "%Y-%m-%d").date()
+            parts = eff_date_raw.split("-")
+            if len(parts) != 3:
+                raise ValueError("Date must have YYYY-MM-DD format")
+            year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+            parsed_date = datetime(year, month, day).date()
             eff_date_str = parsed_date.isoformat()
-        except ValueError as exc:
+        except Exception as exc:
             raise ValueError(f"Invalid calendar date '{eff_date_raw}' at index {idx}: {exc}") from exc
 
         rate_val = item.get("percentRate")
-        # Strict numeric type validation: reject bool, require int or float
-        if type(rate_val) is bool or not isinstance(rate_val, (int, float)):
+        # Strict numeric type validation: reject bool, require int, float, or Decimal
+        if isinstance(rate_val, bool) or not isinstance(rate_val, (int, float, Decimal)):
             raise ValueError(f"Invalid non-numeric percentRate at index {idx}: {rate_val!r}")
-        if math.isnan(rate_val) or math.isinf(rate_val):
-            raise ValueError(f"Forbidden non-finite percentRate at index {idx}: {rate_val!r}")
-
-        # Exact decimal representation without scientific notation
-        rate_decimal_str = f"{Decimal(str(rate_val)):f}"
+        if isinstance(rate_val, Decimal):
+            if not rate_val.is_finite():
+                raise ValueError(f"Forbidden non-finite percentRate at index {idx}: {rate_val!r}")
+            rate_decimal_str = str(rate_val)
+        else:
+            if math.isnan(rate_val) or math.isinf(rate_val):
+                raise ValueError(f"Forbidden non-finite percentRate at index {idx}: {rate_val!r}")
+            rate_decimal_str = str(rate_val)
 
         value = {
             "series": "EFFR",
             "rate": rate_decimal_str,
             "effective_date": eff_date_str,
         }
-        # Optional contextual percentiles if present
-        for optional_field in ("targetRateFrom", "targetRateTo", "volumeInBillions"):
-            if optional_field in item and item[optional_field] is not None:
-                val = item[optional_field]
-                if not isinstance(val, bool) and isinstance(val, (int, float)):
-                    value[optional_field] = f"{Decimal(str(val)):f}"
 
         locator = {"type": "json_pointer", "path": f"/refRates/{idx}"}
         fact_id = _compute_fact_id(
@@ -247,30 +256,34 @@ def extract_nyfed_effr(capture: VerifiedCapture) -> List[Fact]:
             value=value,
         )
 
-        facts.append(
-            Fact(
-                fact_id=fact_id,
-                source_id="nyfed_effr",
-                issuer="Federal Reserve Bank of New York",
-                extractor_version=EXTRACTOR_VERSION,
-                schema_version=FACT_SCHEMA_VERSION,
-                fact_type="rate_observation",
-                value=value,
-                unit="percent",
-                effective_date=eff_date_str,
-                effective_date_precision="day",
-                published_at=None,
-                published_at_reason="No publication timestamp field in NYFed rates API schema",
-                role="background/context",
-                claim_not_direct_evidence=True,
-                receipt_ids=[capture.receipt.receipt_id],
-                receipt_seqs=[capture.receipt.seq],
-                revision_ids=[capture.revision.revision_id] if capture.revision else [],
-                blob_sha256=blob_sha,
-                locator=locator,
-                proof=proof,
-            )
+        fact = Fact(
+            fact_id=fact_id,
+            source_id="nyfed_effr",
+            issuer="Federal Reserve Bank of New York",
+            extractor_version=EXTRACTOR_VERSION,
+            schema_version=FACT_SCHEMA_VERSION,
+            fact_type="rate_observation",
+            value=value,
+            unit="percent",
+            effective_date=eff_date_str,
+            effective_date_precision="day",
+            published_at=None,
+            published_at_reason="No publication timestamp field in NYFed rates API schema",
+            role="background/context",
+            claim_not_direct_evidence=True,
+            receipt_ids=[capture.receipt.receipt_id],
+            receipt_seqs=[capture.receipt.seq],
+            revision_ids=[capture.revision.revision_id] if capture.revision else [],
+            blob_sha256=blob_sha,
+            locator=locator,
+            proof=proof,
         )
+
+        # Independent proof verification prior to emitting
+        if not fact.proof.verify_against_blob(blob_bytes):
+            raise ExtractionError(f"Generated proof span failed verification against blob for {fact_id}")
+
+        facts.append(fact)
 
     return facts
 
@@ -279,8 +292,8 @@ def extract_fed_rss(capture: VerifiedCapture) -> List[Fact]:
     """Extract feed item facts from verified Fed Monetary or Fed Speeches RSS captures.
     
     Strict requirements:
-    - Real RSS 2.0 structure (rss -> channel -> item).
-    - Decodes UTF-8/UTF-8-SIG strictly.
+    - Real RSS 2.0 structure (rss version='2.0' -> channel -> item).
+    - Preserves exact raw quote text including UTF-8 BOM if present in raw blob.
     - Description/CDATA stored as feed_excerpt; linked article marked referenced_not_fetched.
     - pubDate normalized to UTC ISO-8601 only if timezone is explicitly proven.
     - Never substitute receipt time or HTTP Last-Modified.
@@ -289,18 +302,25 @@ def extract_fed_rss(capture: VerifiedCapture) -> List[Fact]:
     blob_bytes = capture.blob_bytes
     blob_sha = capture.receipt.blob_sha256 or hashlib.sha256(blob_bytes).hexdigest()
 
+    # Strict UTF-8 decode preserving BOM character if present
     try:
-        blob_text = blob_bytes.decode("utf-8-sig")
+        blob_text = blob_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError(f"RSS blob is not valid UTF-8: {exc}") from exc
 
+    # Parse XML (strip leading BOM character only for XML parser, raw_quote_text retains exact blob_text)
+    xml_text = blob_text[1:] if blob_text.startswith("\ufeff") else blob_text
     try:
-        root = ET.fromstring(blob_text)
+        root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         raise ValueError(f"Malformed XML in RSS feed: {exc}") from exc
 
     if root.tag != "rss":
         raise ValueError(f"Root XML tag is '{root.tag}', expected 'rss'")
+
+    rss_version = root.attrib.get("version")
+    if rss_version != "2.0":
+        raise ValueError(f"Unsupported RSS version '{rss_version}', expected '2.0'")
 
     channel = root.find("channel")
     if channel is None:
@@ -362,43 +382,51 @@ def extract_fed_rss(capture: VerifiedCapture) -> List[Fact]:
             value=value,
         )
 
-        facts.append(
-            Fact(
-                fact_id=fact_id,
-                source_id=capture.receipt.source_id,
-                issuer="Federal Reserve Board",
-                extractor_version=EXTRACTOR_VERSION,
-                schema_version=FACT_SCHEMA_VERSION,
-                fact_type="feed_item",
-                value=value,
-                unit=None,
-                effective_date=None,
-                effective_date_precision=None,
-                published_at=published_at,
-                published_at_reason=published_at_reason,
-                role="background/context",
-                claim_not_direct_evidence=True,
-                receipt_ids=[capture.receipt.receipt_id],
-                receipt_seqs=[capture.receipt.seq],
-                revision_ids=[capture.revision.revision_id] if capture.revision else [],
-                blob_sha256=blob_sha,
-                locator=locator,
-                proof=proof,
-            )
+        fact = Fact(
+            fact_id=fact_id,
+            source_id=capture.receipt.source_id,
+            issuer="Federal Reserve Board",
+            extractor_version=EXTRACTOR_VERSION,
+            schema_version=FACT_SCHEMA_VERSION,
+            fact_type="feed_item",
+            value=value,
+            unit=None,
+            effective_date=None,
+            effective_date_precision=None,
+            published_at=published_at,
+            published_at_reason=published_at_reason,
+            role="background/context",
+            claim_not_direct_evidence=True,
+            receipt_ids=[capture.receipt.receipt_id],
+            receipt_seqs=[capture.receipt.seq],
+            revision_ids=[capture.revision.revision_id] if capture.revision else [],
+            blob_sha256=blob_sha,
+            locator=locator,
+            proof=proof,
         )
+
+        # Independent proof verification prior to emitting
+        if not fact.proof.verify_against_blob(blob_bytes):
+            raise ExtractionError(f"Generated proof span failed verification against blob for {fact_id}")
+
+        facts.append(fact)
 
     return facts
 
 
 def extract_facts_from_captures(captures: List[VerifiedCapture]) -> ExtractionResult:
-    """Extract facts and honest rejection records from verified captures."""
+    """Extract facts and honest rejection records from verified captures.
+    
+    Enforces independent transport and content validation rather than blindly trusting
+    the stored status label.
+    """
     facts: List[Fact] = []
     rejections: List[RejectionRecord] = []
 
     for cap in captures:
         rec = cap.receipt
 
-        # Check negative capture
+        # 1. Check negative capture
         if cap.is_negative:
             rejections.append(
                 RejectionRecord(
@@ -411,7 +439,20 @@ def extract_facts_from_captures(captures: List[VerifiedCapture]) -> ExtractionRe
             )
             continue
 
-        # Check supported source
+        # 2. Check clean transport gate (HTTP status MUST be 200)
+        if rec.http_status != 200:
+            rejections.append(
+                RejectionRecord(
+                    receipt_id=rec.receipt_id,
+                    seq=rec.seq,
+                    source_id=rec.source_id,
+                    status=rec.status if rec.status != "valid" else "transport_error",
+                    reason=f"HTTP status is {rec.http_status} (expected 200 OK)",
+                )
+            )
+            continue
+
+        # 3. Check supported source
         if rec.source_id not in SUPPORTED_SOURCES:
             rejections.append(
                 RejectionRecord(
@@ -424,20 +465,57 @@ def extract_facts_from_captures(captures: List[VerifiedCapture]) -> ExtractionRe
             )
             continue
 
-        # Check validity and completeness
-        if rec.status != "valid" or not rec.complete or cap.blob_bytes is None:
+        # 4. Check completeness and blob presence
+        if not rec.complete or cap.blob_bytes is None or rec.limit_exceeded or rec.error_msg:
             rejections.append(
                 RejectionRecord(
                     receipt_id=rec.receipt_id,
                     seq=rec.seq,
                     source_id=rec.source_id,
                     status=rec.status,
-                    reason=f"Capture is not valid/complete (status={rec.status}, complete={rec.complete})",
+                    reason=f"Capture is not valid/complete (complete={rec.complete}, error={rec.error_msg})",
                 )
             )
             continue
 
-        # Dispatch extractor
+        # 5. Check canonical origin URL identity
+        expected_canonical = CANONICAL_SOURCES.get(rec.source_id)
+        if rec.initial_url != expected_canonical:
+            rejections.append(
+                RejectionRecord(
+                    receipt_id=rec.receipt_id,
+                    seq=rec.seq,
+                    source_id=rec.source_id,
+                    status="invalid_content",
+                    reason=f"Source URL '{rec.initial_url}' does not match canonical URL '{expected_canonical}'",
+                )
+            )
+            continue
+
+        # 6. Independent content identity validation via reference validator (do not trust stored label)
+        with SourceProbe() as probe:
+            content_status, _, content_reason, _ = probe.validate_content(
+                source_id=rec.source_id,
+                http_status=rec.http_status,
+                content_type=rec.headers.get("content-type", ""),
+                body=cap.blob_bytes,
+                limit_exceeded=rec.limit_exceeded,
+                error_msg=rec.error_msg,
+            )
+
+        if content_status != "valid":
+            rejections.append(
+                RejectionRecord(
+                    receipt_id=rec.receipt_id,
+                    seq=rec.seq,
+                    source_id=rec.source_id,
+                    status=content_status,
+                    reason=f"Content identity validation failed: {content_reason}",
+                )
+            )
+            continue
+
+        # 7. Dispatch extractor
         try:
             if rec.source_id == "nyfed_effr":
                 extracted = extract_nyfed_effr(cap)

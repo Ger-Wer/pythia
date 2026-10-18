@@ -6,6 +6,7 @@ Enforces zero-network policy via test-only socket guard, and covers:
 3. Negative & error paths: blocked, partial, corrupt/missing blobs, linkage errors, cutoff violations.
 4. Lineage & provenance: A->B->A, deduplication, shared article URLs, cutoff stability.
 5. Idempotency & contracts: bundle digest stability, permutation invariance, contract gaps, untouched raw archive.
+6. R3.0.1 fixes: exact decimals without float rounding, BOM quotes, content gates, read-only URIs, descriptor validation, no claimed independence, atomic publication.
 """
 
 from __future__ import annotations
@@ -14,6 +15,10 @@ import base64
 import hashlib
 import json
 import socket
+import sqlite3
+import subprocess
+import sys
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -33,12 +38,14 @@ from python.evaluation.evidence_reader import (
     ArchiveNotFoundError,
     CutoffViolationError,
     ReadOnlyReceipt,
+    ReaderError,
     ReaderIntegrityError,
     ReadOnlyArchiveReader,
     VerifiedCapture,
 )
 from python.evaluation.event_dossier import (
     DOSSIER_VERSION,
+    DossierError,
     EventDescriptor,
     build_event_dossier,
     build_origin_groups,
@@ -169,7 +176,6 @@ def test_nyfed_effr_rejection_of_duplicate_keys(tmp_path: Path):
 
 def test_nyfed_effr_rejection_of_bool_nan_infinity_and_bad_calendar_dates(tmp_path: Path):
     """EFFR extractor rejects bools, NaNs, infinities, and invalid calendar dates both at extraction and probe."""
-    # 1. Direct extractor unit tests with candidate capture
     dummy_rec = ReadOnlyReceipt(
         receipt_id="dummy",
         seq=1,
@@ -442,7 +448,7 @@ def test_origin_lineage_same_article_in_multiple_feeds_groups_together(tmp_path:
     assert og["publisher"] == "Federal Reserve Board"
     assert og["canonical_article_url"] == article_url
     assert og["article_fetched"] is False
-    assert og["independent_evidence_count"] == 1
+    assert "independent_evidence_count" not in og
     assert len(og["observations"]) == 2
 
 
@@ -542,3 +548,193 @@ def test_output_dir_cannot_be_inside_archive_dir(tmp_path: Path):
             event_descriptor=desc,
             output_dir=nested_out,
         )
+
+
+# -------------------------------------------------------------------------
+# 6. R3.0.1 Regression Tests (F1 - F7)
+# -------------------------------------------------------------------------
+
+def test_f1_exact_decimal_without_float_rounding(tmp_path: Path):
+    """F1: High-precision decimals and small exponents are parsed directly without float truncation."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+
+    raw_json = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.8800000000000001},{"type":"EFFR","effectiveDate":"2026-10-14","percentRate":1e-400}]}'
+    r = archive.record_capture(create_capture("nyfed_effr", raw_json), receipt_id="rec-f1")
+
+    reader = ReadOnlyArchiveReader(archive_dir)
+    verified = reader.read_receipts([r.receipt_id], as_of_seq=1)
+    res = extract_facts_from_captures(verified)
+
+    assert len(res.facts) == 2
+    assert res.facts[0].value["rate"] == "3.8800000000000001"
+    assert res.facts[1].value["rate"] == "1E-400"
+
+
+def test_f2_bom_preservation_and_verbatim_proof(tmp_path: Path):
+    """F2: Feeds with UTF-8 BOM preserve BOM in raw_quote_text and pass verify_against_blob."""
+    rss = b'<rss version="2.0"><channel><title>Federal Reserve Monetary Policy</title><link>https://www.federalreserve.gov/feeds/monetary.htm</link><item><title>FOMC statement</title><link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm</link><pubDate>Tue, 13 Oct 2026 18:00:00 GMT</pubDate><description><![CDATA[Original excerpt]]></description></item></channel></rss>'
+    bom_rss = b"\xef\xbb\xbf" + rss
+
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    r = archive.record_capture(create_capture("fed_monetary_rss", bom_rss), receipt_id="rec-f2")
+
+    reader = ReadOnlyArchiveReader(archive_dir)
+    verified = reader.read_receipts([r.receipt_id], as_of_seq=1)
+    res = extract_facts_from_captures(verified)
+
+    assert len(res.facts) == 1
+    f = res.facts[0]
+    assert f.proof.raw_quote_text is not None
+    assert f.proof.raw_quote_text.startswith("\ufeff")
+    assert f.proof.verify_against_blob(bom_rss) is True
+
+
+def test_f3_content_and_transport_gate_rejects_untrusted_valid_labels(tmp_path: Path):
+    """F3: Rejects HTTP 403, wrong feed identity, and unsupported RSS version even if status=valid."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    valid_diag = {"status": "valid", "validation_level": "content", "reason": "untrusted fixture", "checker_version": "review/1"}
+
+    # 1. HTTP 403 transport failure
+    effr_plain = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    r_403 = archive.record_capture(create_capture("nyfed_effr", effr_plain, status_code=403), receipt_id="rec-403", probe_result=valid_diag)
+
+    # 2. Altered feed identity
+    rss = b'<rss version="2.0"><channel><title>Unrelated Banking News</title><link>https://example.invalid</link><item><title>FOMC</title><link>https://example.invalid/item</link><description>text</description></item></channel></rss>'
+    r_ident = archive.record_capture(create_capture("fed_monetary_rss", rss), receipt_id="rec-ident", probe_result=valid_diag)
+
+    # 3. Unsupported RSS version
+    rss_v9 = b'<rss version="9.9"><channel><title>Federal Reserve Monetary Policy</title><link>https://www.federalreserve.gov/feeds/monetary.htm</link><item><title>FOMC</title><link>https://www.federalreserve.gov/item</link><description>text</description></item></channel></rss>'
+    r_v9 = archive.record_capture(create_capture("fed_monetary_rss", rss_v9), receipt_id="rec-v9")
+
+    reader = ReadOnlyArchiveReader(archive_dir)
+    verified = reader.read_receipts([r_403.receipt_id, r_ident.receipt_id, r_v9.receipt_id], as_of_seq=3)
+    res = extract_facts_from_captures(verified)
+
+    assert len(res.facts) == 0
+    assert len(res.rejections) == 3
+
+
+def test_f4_complete_clean_receipt_missing_mandatory_blob(tmp_path: Path):
+    """F4: Complete clean HTTP 200 receipt missing CAS blob/revision raises ReaderIntegrityError without publishing."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f4-missing")
+
+    # Corrupt receipts table: drop append-only triggers and set blob/revision to NULL
+    conn = sqlite3.connect(archive.db_path)
+    for (tname,) in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='receipts'").fetchall():
+        conn.execute(f'DROP TRIGGER "{tname}"')
+    conn.execute("UPDATE receipts SET blob_sha256=NULL, revision_id=NULL WHERE receipt_id=?", (r.receipt_id,))
+    conn.commit()
+    conn.close()
+
+    desc = EventDescriptor(event_id="f4_test", question="Test?")
+    with pytest.raises(ReaderIntegrityError, match="missing mandatory CAS blob and revision linkage"):
+        build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
+
+
+def test_f4_read_only_uri_escaping(tmp_path: Path):
+    """F4: Read-only SQLite URI escaping safely handles ? and # characters without creating sibling files."""
+    special_dir = tmp_path / "uri?fixture#special"
+    special_dir.mkdir()
+    archive = EvidenceArchive(special_dir)
+    body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f4-uri")
+
+    unexpected_sibling = tmp_path / "uri"
+    assert not unexpected_sibling.exists()
+
+    reader = ReadOnlyArchiveReader(special_dir)
+    caps = reader.read_receipts([r.receipt_id], as_of_seq=1)
+    assert len(caps) == 1
+    assert not unexpected_sibling.exists()
+
+
+def test_f5_descriptor_validation_and_frozen_versions_in_empty_dossier(tmp_path: Path):
+    """F5: Descriptor requires non-empty fields and consistent contract status; versions are frozen in empty dossiers."""
+    # 1. Empty event_id or question rejected
+    with pytest.raises(ValueError, match="event_id must be a non-empty string"):
+        EventDescriptor(event_id="", question="Question?")
+    with pytest.raises(ValueError, match="question must be a non-empty string"):
+        EventDescriptor(event_id="id", question="")
+
+    # 2. rules=None cannot be verified
+    with pytest.raises(ValueError, match="contract_status cannot be 'verified' when rules is None"):
+        EventDescriptor(event_id="id", question="Q?", rules=None, contract_status="verified")
+
+    # 3. All-rejected dossier preserves frozen versions
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    cap = create_capture("nyfed_effr", b"", complete=False, error_msg="Timeout")
+    r = archive.record_capture(cap, receipt_id="rec-f5-neg")
+
+    desc = EventDescriptor(event_id="f5_empty", question="Empty test?", contract_status="incomplete")
+    _, bundle = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
+
+    dossier = bundle["dossier"]
+    assert dossier["manifest"]["extractor_version"] == EXTRACTOR_VERSION
+    assert dossier["manifest"]["fact_schema_version"] == FACT_SCHEMA_VERSION
+    assert dossier["manifest"]["dossier_version"] == DOSSIER_VERSION
+    assert dossier["extractor_version"] == EXTRACTOR_VERSION
+    assert dossier["fact_schema_version"] == FACT_SCHEMA_VERSION
+    assert dossier["dossier_version"] == DOSSIER_VERSION
+    assert dossier["manifest"]["total_facts_extracted"] == 0
+    assert dossier["manifest"]["total_rejected"] == 1
+
+
+def test_f6_origin_groups_no_claimed_independence_and_correct_nyfed_url(tmp_path: Path):
+    """F6: Origin groups do not claim independent_evidence_count and use correct canonical NYFed endpoint."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f6")
+
+    desc = EventDescriptor(event_id="f6_test", question="Test?", contract_status="incomplete")
+    _, bundle = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, tmp_path / "out")
+
+    groups = bundle["dossier"]["origin_groups"]
+    assert len(groups) == 1
+    g = groups[0]
+    assert "independent_evidence_count" not in g
+    assert g["canonical_url"] == CANONICAL_SOURCES["nyfed_effr"]
+
+
+def test_f7_atomic_no_clobber_publication_and_collision_rejection(tmp_path: Path):
+    """F7: Competing files at destination are not clobbered and raise DossierError; identical bytes replay."""
+    archive_dir = tmp_path / "archive"
+    archive = EvidenceArchive(archive_dir)
+    body = b'{"refRates":[{"type":"EFFR","effectiveDate":"2026-10-15","percentRate":3.88}]}'
+    r = archive.record_capture(create_capture("nyfed_effr", body), receipt_id="rec-f7")
+
+    out_dir = tmp_path / "out"
+    desc = EventDescriptor(event_id="f7_test", question="Test?", contract_status="incomplete")
+
+    # First publication
+    p1, b1 = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, out_dir)
+    assert p1.is_file()
+
+    # Idempotent replay with identical content
+    p2, b2 = build_event_dossier(archive_dir, 1, [r.receipt_id], desc, out_dir)
+    assert p1 == p2
+    assert b1 == b2
+
+    # Collision test: competing pre-existing bytes must NOT be clobbered
+    out_dir_comp = tmp_path / "out_comp"
+    out_dir_comp.mkdir()
+    sentinel = b"pre-existing competing file"
+
+    # Pre-calculate content digest
+    canon = json.dumps(b1["dossier"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    digest = hashlib.sha256(canon).hexdigest()
+    competing_file = out_dir_comp / f"dossier_{digest}.json"
+    competing_file.write_bytes(sentinel)
+
+    with pytest.raises(DossierError, match="Atomic publication conflict"):
+        build_event_dossier(archive_dir, 1, [r.receipt_id], desc, out_dir_comp)
+
+    # Verify competing file was preserved
+    assert competing_file.read_bytes() == sentinel
