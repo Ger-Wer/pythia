@@ -1027,7 +1027,21 @@ def test_canonical_worker_loopback_gzip_and_single_get(archive: EvidenceArchive,
 
 
 def test_default_worker_ignores_ambient_loopback_env(tmp_path: Path):
-    """Default worker does not read PYTHIA_TEST_LOOPBACK_MAP; ambient env does not redirect default worker."""
+    """Default worker does not read PYTHIA_TEST_LOOPBACK_MAP; ambient env does not redirect default worker.
+    Uses test-only sitecustomize DNS guard: public getaddrinfo is rejected before network, confirms resolver entry."""
+    guard = tmp_path / "guard"
+    guard.mkdir()
+    marker = tmp_path / "resolver.json"
+    (guard / "sitecustomize.py").write_text('''import socket, json
+from pathlib import Path
+_real = socket.getaddrinfo
+def _guard(host, *args, **kwargs):
+    if host in ("127.0.0.1", "localhost", "::1"):
+        return _real(host, *args, **kwargs)
+    Path(''' + repr(str(marker)) + ''').write_text(json.dumps({"entered_public_resolver": True, "host": host}))
+    raise socket.gaierror("test-only: public DNS blocked before network")
+socket.getaddrinfo = _guard
+''')
     hits = [0]
 
     class MockHandler(http.server.BaseHTTPRequestHandler):
@@ -1051,20 +1065,30 @@ def test_default_worker_ignores_ambient_loopback_env(tmp_path: Path):
     os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps({
         "https://markets.newyorkfed.org": f"http://127.0.0.1:{server_port}"
     })
+    old_pp = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = str(guard) + os.pathsep + str(Path.cwd()) + (os.pathsep + old_pp if old_pp else "")
     try:
         # Default SourceProbe with default worker
-        # Use short timeout so test stays bounded and offline
-        with SourceProbe(timeout=0.10) as probe:
+        # 3.0s budget is generous enough for worker startup and entering resolver,
+        # while DNS guard ensures test stays strictly offline
+        with SourceProbe(timeout=3.0) as probe:
             capture = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
 
         # The ambient loopback server must NEVER be contacted by the default worker
         assert hits[0] == 0, f"Default worker unexpectedly routed request to ambient loopback server ({hits[0]} hits)"
+        state = json.loads(marker.read_text()) if marker.exists() else {}
+        assert state.get("host") == "markets.newyorkfed.org", "Worker did not reach resolver for canonical host"
+        assert capture.complete is False
         assert capture.body != b"{}"
     finally:
         if old_env is None:
             os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
         else:
             os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old_env
+        if old_pp is None:
+            os.environ.pop("PYTHONPATH", None)
+        else:
+            os.environ["PYTHONPATH"] = old_pp
         server.shutdown()
         server.server_close()
 
@@ -1314,7 +1338,7 @@ def test_legacy_schema_version_detection(tmp_path: Path):
 # -------------------------------------------------------------------------
 
 def test_cas_durability_barrier_trace_before_db_commit(tmp_path: Path):
-    """Trace confirms file, leaf prefix, parent prefix, and blobs directory barriers before DB commit."""
+    """Trace confirms file and all directory barriers from leaf prefix up to base ancestors before DB commit."""
     archive = EvidenceArchive(tmp_path / "barrier_trace")
     cap = make_capture(source_id="nyfed_effr", body=b'{"trace":1}')
     calls = []
@@ -1324,7 +1348,7 @@ def test_cas_durability_barrier_trace_before_db_commit(tmp_path: Path):
         target = Path(os.readlink(f"/proc/self/fd/{fd}"))
         calls.append({
             "directory": stat.S_ISDIR(os.fstat(fd).st_mode),
-            "path": str(target.relative_to(archive.state_dir)),
+            "path": str(target),
         })
         return real_fsync(fd)
 
@@ -1341,7 +1365,7 @@ def test_cas_durability_barrier_trace_before_db_commit(tmp_path: Path):
         os.fsync = real_fsync
 
     blob = archive._blob_path(rec.blob_sha256)
-    required = {str(p.relative_to(archive.state_dir)) for p in (blob.parent, blob.parent.parent, archive.blobs_dir)}
+    required = {str(p) for p in (blob.parent, blob.parent.parent, archive.blobs_dir, archive.state_dir, archive.state_dir.parent)}
     synced_dirs = {x["path"] for x in calls if x["directory"]}
 
     # All required directory entries must be fsynced
@@ -1349,11 +1373,11 @@ def test_cas_durability_barrier_trace_before_db_commit(tmp_path: Path):
     # File staging must be fsynced
     assert any(not x["directory"] for x in calls), "Staging file was not fsynced"
     # All barriers must occur before inside_db_tx_before_commit
-    assert hook_calls and hook_calls[0] >= 4, f"Fsync barriers did not complete before DB tx: {hook_calls}"
+    assert hook_calls and hook_calls[0] >= len(required) + 1, f"Fsync barriers did not complete before DB tx: {hook_calls}"
 
 
 def test_cas_durability_barrier_covers_fresh_prefix_parents(tmp_path: Path):
-    """Fresh state directory store blob ensures leaf, prefix parent, and root blobs directories are synced."""
+    """Fresh state directory store blob ensures leaf, prefix parent, blobs, and base parent directories are synced."""
     archive = EvidenceArchive(tmp_path / "fresh_parents")
     cap = make_capture(source_id="nyfed_effr", body=b'{"fresh_parents":1}')
     calls = []
@@ -1363,7 +1387,7 @@ def test_cas_durability_barrier_covers_fresh_prefix_parents(tmp_path: Path):
         target = Path(os.readlink(f"/proc/self/fd/{fd}"))
         calls.append({
             "directory": stat.S_ISDIR(os.fstat(fd).st_mode),
-            "path": str(target.relative_to(archive.state_dir)),
+            "path": str(target),
         })
         return real_fsync(fd)
 
@@ -1374,7 +1398,7 @@ def test_cas_durability_barrier_covers_fresh_prefix_parents(tmp_path: Path):
         os.fsync = real_fsync
 
     blob = archive._blob_path(rec.blob_sha256)
-    required = {str(p.relative_to(archive.state_dir)) for p in (blob.parent, blob.parent.parent, archive.blobs_dir)}
+    required = {str(p) for p in (blob.parent, blob.parent.parent, archive.blobs_dir, archive.state_dir, archive.state_dir.parent)}
     synced_dirs = {x["path"] for x in calls if x["directory"]}
     assert not (required - synced_dirs)
 
@@ -1500,7 +1524,20 @@ def test_reviewer_r21_defects_fixed(tmp_path: Path):
     )
     fixed_diag = {"status": "valid", "validation_level": "content", "reason": "fixture", "checker_version": "review/1"}
 
-    # Defect 1: ambient test routing cannot activate on default worker
+    # Defect 1: ambient test routing cannot activate on default worker (DNS guard confirms resolver entry)
+    guard = folder / "guard"
+    guard.mkdir(exist_ok=True)
+    marker = folder / "resolver.json"
+    (guard / "sitecustomize.py").write_text('''import socket, json
+from pathlib import Path
+_real = socket.getaddrinfo
+def _guard(host, *args, **kwargs):
+    if host in ("127.0.0.1", "localhost", "::1"):
+        return _real(host, *args, **kwargs)
+    Path(''' + repr(str(marker)) + ''').write_text(json.dumps({"entered_public_resolver": True, "host": host}))
+    raise socket.gaierror("test-only: public DNS blocked before network")
+socket.getaddrinfo = _guard
+''')
     hits = []
     class H(http.server.BaseHTTPRequestHandler):
         def log_message(self, *a): pass
@@ -1511,13 +1548,20 @@ def test_reviewer_r21_defects_fixed(tmp_path: Path):
     t = threading.Thread(target=srv.serve_forever, daemon=True); t.start()
     old = os.environ.get("PYTHIA_TEST_LOOPBACK_MAP")
     os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = json.dumps({"https://markets.newyorkfed.org": f"http://127.0.0.1:{srv.server_address[1]}"})
+    old_pp = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = str(guard) + os.pathsep + str(Path.cwd()) + (os.pathsep + old_pp if old_pp else "")
     try:
-        with SourceProbe(timeout=0.10) as probe:
+        with SourceProbe(timeout=3.0) as probe:
             res = probe.capture_source("nyfed_effr", CANONICAL_SOURCES["nyfed_effr"])
         assert len(hits) == 0, "Default worker routed to ambient loopback"
+        marker_data = json.loads(marker.read_text()) if marker.exists() else {}
+        assert marker_data.get("host") == "markets.newyorkfed.org", "Worker did not reach resolver for canonical host"
+        assert res.complete is False, "Capture should have failed due to blocked DNS"
     finally:
         if old is None: os.environ.pop("PYTHIA_TEST_LOOPBACK_MAP", None)
         else: os.environ["PYTHIA_TEST_LOOPBACK_MAP"] = old
+        if old_pp is None: os.environ.pop("PYTHONPATH", None)
+        else: os.environ["PYTHONPATH"] = old_pp
         srv.shutdown(); srv.server_close()
 
     # Defect 2: fresh prefix directory barriers
@@ -1525,7 +1569,7 @@ def test_reviewer_r21_defects_fixed(tmp_path: Path):
     calls = []
     real_fsync = os.fsync
     def trace_f(fd):
-        calls.append({"directory": stat.S_ISDIR(os.fstat(fd).st_mode), "path": str(Path(os.readlink(f"/proc/self/fd/{fd}")).relative_to(arch2.state_dir))})
+        calls.append({"directory": stat.S_ISDIR(os.fstat(fd).st_mode), "path": str(Path(os.readlink(f"/proc/self/fd/{fd}")))})
         return real_fsync(fd)
     os.fsync = trace_f
     try:
@@ -1533,7 +1577,7 @@ def test_reviewer_r21_defects_fixed(tmp_path: Path):
     finally:
         os.fsync = real_fsync
     b2 = arch2._blob_path(rec2.blob_sha256)
-    req2 = {str(p.relative_to(arch2.state_dir)) for p in (b2.parent, b2.parent.parent, arch2.blobs_dir)}
+    req2 = {str(p) for p in (b2.parent, b2.parent.parent, arch2.blobs_dir, arch2.state_dir, arch2.state_dir.parent)}
     synced2 = {x["path"] for x in calls if x["directory"]}
     assert not (req2 - synced2), f"Missing barriers: {req2 - synced2}"
 
@@ -1571,3 +1615,154 @@ def test_reviewer_r21_defects_fixed(tmp_path: Path):
     arch5 = EvidenceArchive(folder / "url")
     with pytest.raises(ValueError, match="final_url.*must be string"):
         arch5.record_capture(replace(cap, final_url=123), receipt_id="url", probe_result=fixed_diag)
+
+
+# -------------------------------------------------------------------------
+# 14. Reviewer R2.2 Defect Controls Resolution Suite (R2.3)
+# -------------------------------------------------------------------------
+
+def test_ipc_conflicting_case_variant_headers_yields_negative_receipt_without_revision(tmp_path: Path):
+    """Worker returning conflicting case-variant headers (e.g. ETag vs etag) yields a valid negative receipt and no revision."""
+    folder = tmp_path / "case_variant_headers"
+    folder.mkdir()
+    worker_file = folder / "worker.py"
+    payload = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json", "ETag": "v1", "etag": "v2"},
+        "body_b64": base64.b64encode(b"[]").decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": True,
+        "limit_exceeded": False,
+        "final_url": CANONICAL_SOURCES["github_deepseek_v3_releases"],
+        "error_msg": None,
+    }
+    worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+    with SourceProbe(worker_cmd=[sys.executable, str(worker_file)]) as probe:
+        cap = probe.capture_source("github_deepseek_v3_releases", CANONICAL_SOURCES["github_deepseek_v3_releases"])
+        diag = probe.probe_single({"source_id": "github_deepseek_v3_releases", "url": CANONICAL_SOURCES["github_deepseek_v3_releases"]}, capture=cap)
+
+    assert cap.complete is False
+    assert cap.error_msg is not None and "conflicting case-variant headers" in cap.error_msg.lower()
+    assert cap.final_url is None
+    assert cap.status_code is None
+    assert cap.headers == {}
+    assert cap.body == b""
+
+    archive = EvidenceArchive(folder / "archive")
+    receipt = archive.record_capture(cap, receipt_id="conflicting-headers-001", probe_result=diag)
+    assert receipt.receipt_id == "conflicting-headers-001"
+    assert receipt.blob_sha256 is None
+    assert receipt.revision_id is None
+    assert receipt.seq == 1
+    assert receipt.usable_for_forecast is False
+
+
+def test_ipc_invalid_incomplete_final_url_yields_negative_receipt_without_revision(tmp_path: Path):
+    """Worker returning complete=False with invalid final_url='' yields a valid negative receipt and no revision."""
+    folder = tmp_path / "invalid_incomplete"
+    folder.mkdir()
+    worker_file = folder / "worker.py"
+    payload = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json"},
+        "body_b64": base64.b64encode(b"[]").decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": False,
+        "limit_exceeded": False,
+        "final_url": "",
+        "error_msg": None,
+    }
+    worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+    with SourceProbe(worker_cmd=[sys.executable, str(worker_file)]) as probe:
+        cap = probe.capture_source("github_deepseek_v3_releases", CANONICAL_SOURCES["github_deepseek_v3_releases"])
+        diag = probe.probe_single({"source_id": "github_deepseek_v3_releases", "url": CANONICAL_SOURCES["github_deepseek_v3_releases"]}, capture=cap)
+
+    assert cap.complete is False
+    assert cap.error_msg is not None and ("final_url" in cap.error_msg or "Contradictory" in cap.error_msg or "error_msg" in cap.error_msg)
+    assert cap.final_url is None
+    assert cap.status_code is None
+    assert cap.body == b""
+
+    archive = EvidenceArchive(folder / "archive")
+    receipt = archive.record_capture(cap, receipt_id="invalid-incomplete-001", probe_result=diag)
+    assert receipt.receipt_id == "invalid-incomplete-001"
+    assert receipt.blob_sha256 is None
+    assert receipt.revision_id is None
+    assert receipt.seq == 1
+
+
+def test_cas_durability_barrier_covers_nested_state_dir_ancestry(tmp_path: Path):
+    """CAS durability barrier synchronizes entire directory ancestry chain from leaf up to root."""
+    t_dir = tmp_path / "T"
+    t_dir.mkdir()
+    state_dir = t_dir / "new-base" / "deep" / "state"
+    cap = make_capture(source_id="nyfed_effr", body=b'{"nested_ancestry":1}')
+
+    calls = []
+    real_fsync = os.fsync
+
+    def trace_fsync(fd):
+        target = Path(os.readlink(f"/proc/self/fd/{fd}"))
+        calls.append({
+            "directory": stat.S_ISDIR(os.fstat(fd).st_mode),
+            "path": str(target),
+        })
+        return real_fsync(fd)
+
+    os.fsync = trace_fsync
+    try:
+        archive = EvidenceArchive(state_dir)
+        rec = archive.record_capture(cap, receipt_id="nested-001")
+    finally:
+        os.fsync = real_fsync
+
+    blob = archive._blob_path(rec.blob_sha256)
+    required = [
+        blob.parent,
+        blob.parent.parent,
+        archive.blobs_dir,
+        archive.state_dir,
+        archive.state_dir.parent,
+        archive.state_dir.parent.parent,
+        t_dir,
+    ]
+    synced_dirs = {x["path"] for x in calls if x["directory"]}
+    for req in required:
+        assert str(req) in synced_dirs, f"Expected {req} to be fsynced, synced: {synced_dirs}"
+
+
+def test_cas_durability_barrier_parent_fsync_error_prevents_db_commit_and_retry_commits(tmp_path: Path):
+    """Fsync error on state_dir.parent prevents receipt commit; retry passes barrier and commits."""
+    state_dir = tmp_path / "base" / "deep" / "state"
+    archive = EvidenceArchive(state_dir)
+    cap = make_capture(source_id="nyfed_effr", body=b'{"parent_fsync_err":1}')
+
+    real_fsync = os.fsync
+    target_to_fail = str(archive.state_dir.parent)
+
+    def failing_fsync(fd):
+        path = os.readlink(f"/proc/self/fd/{fd}")
+        if path == target_to_fail:
+            raise OSError(5, f"Simulated I/O error on {target_to_fail}")
+        return real_fsync(fd)
+
+    os.fsync = failing_fsync
+    try:
+        with pytest.raises(OSError, match="Simulated I/O error on"):
+            archive.record_capture(cap, receipt_id="fail-parent-001")
+    finally:
+        os.fsync = real_fsync
+
+    # No receipt committed
+    assert archive.get_receipt("fail-parent-001") is None
+    assert len(archive.query_receipts()) == 0
+
+    # Retry succeeds, commits receipt, and verify_integrity passes
+    rec = archive.record_capture(cap, receipt_id="retry-parent-001")
+    assert rec.seq == 1
+    assert rec.receipt_id == "retry-parent-001"
+    assert len(archive.query_receipts()) == 1
+    integ = archive.verify_integrity()
+    assert integ["healthy"] is True

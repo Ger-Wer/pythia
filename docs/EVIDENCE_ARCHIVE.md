@@ -132,9 +132,10 @@ CREATE TABLE revisions (
 2. **Atomic No-Clobber Publication & CAS Durability Barrier (`_fsync_cas_barrier`):**
    - Raw body is written to a temporary staging file in `tmp/`, flushed, and fsynced with `os.fsync(fd)`.
    - The file is published to the target CAS destination using `os.link` (atomic no-clobber publish). If destination already exists due to a race, the appearing file is verified for size and SHA-256.
-   - Durability barrier: on all three CAS paths (new publish, existing blob reuse, concurrent race loser), file bytes and all required directory entries (`blobs/aa/bb`, `blobs/aa`, `blobs`) are synchronized via `_fsync_cas_barrier` before returning from `_store_blob` and before beginning the SQLite database transaction.
+   - Durability barrier: on all three CAS paths (new publish, existing blob reuse, concurrent race loser), file bytes and all directory entries along the entire ancestry chain from the leaf directory (`blobs/aa/bb`) up to the filesystem root (`/`) — including `blobs/aa`, `blobs`, `state_dir`, and all base ancestor directories — are synchronized via `_fsync_cas_barrier` before returning from `_store_blob` and before beginning the SQLite database transaction.
    - If an error occurs during directory fsync, no receipt or revision is committed to SQLite.
-   - *Fixture-Only Routing:* Production worker runtime (`source_probe_worker.py`) does not read ambient environment mappings. Test HTTP redirects and loopback adapters are isolated strictly to test fixtures via explicit `worker_cmd`.
+   - *Candidate Validation & Uniform Contract:* Candidate results from worker IPC are validated against `validate_capture_result` including incomplete captures; header collisions are detected before lowercase conversion. Protocol errors cleanly yield negative receipts without creating revisions or CAS blobs.
+   - *Fixture-Only Routing:* Production worker runtime (`source_probe_worker.py`) does not read ambient environment mappings. Test HTTP redirects and loopback adapters are isolated strictly to test fixtures via explicit `worker_cmd`. Default worker offline safety is verified via test-only DNS guard.
 3. **SQLite WAL & Durability Guarantees:**
    - Database operates with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = FULL;`, `PRAGMA foreign_keys = ON;`, and `busy_timeout = 10000;`.
    - **Crash Guarantee:** If a writer process crashes (SIGKILL) after CAS publish but before SQLite commit, an orphaned uncommitted blob remains in `blobs/`, but SQLite contains no receipt or revision. The archive remains 100% healthy.

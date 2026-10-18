@@ -197,6 +197,8 @@ def validate_capture_result(capture: Any) -> None:
                 f"Contradictory CaptureResult: counter mismatch (received={capture.bytes_received}, stored={capture.bytes_stored}, len={len(capture.body)})"
             )
     else:
+        if not capture.limit_exceeded and (capture.error_msg is None or not capture.error_msg):
+            raise ValueError("Contradictory CaptureResult: complete=False requires non-empty error_msg or limit_exceeded=True")
         if capture.bytes_stored is not None and capture.bytes_stored != len(capture.body):
             raise ValueError(
                 f"Inconsistent CaptureResult: bytes_stored ({capture.bytes_stored}) != len(body) ({len(capture.body)})"
@@ -651,11 +653,10 @@ class SourceProbe:
                         except Exception:
                             pass
 
-        elapsed = time.monotonic() - start_monotonic
-        duration_ms = elapsed * 1000.0
-        completed_at = utc_now_iso()
-
-        if timed_out:
+        def make_negative_capture(reason: str) -> CaptureResult:
+            elapsed_neg = time.monotonic() - start_monotonic
+            duration_ms_neg = elapsed_neg * 1000.0
+            completed_at_neg = utc_now_iso()
             return CaptureResult(
                 source_id=source_id,
                 initial_url=initial_url,
@@ -664,75 +665,36 @@ class SourceProbe:
                 status_code=None,
                 headers={},
                 fetch_started_at=started_at,
-                fetch_completed_at=completed_at,
-                duration_ms=duration_ms,
+                fetch_completed_at=completed_at_neg,
+                duration_ms=duration_ms_neg,
                 bytes_received=None,
                 bytes_stored=None,
                 complete=False,
                 limit_exceeded=False,
-                error_msg=f"Overall source deadline exceeded ({self.timeout}s); worker process terminated.",
+                error_msg=reason,
                 collector_version=COLLECTOR_VERSION,
+            )
+
+        if timed_out or time.monotonic() > deadline:
+            return make_negative_capture(
+                f"Overall source deadline exceeded ({self.timeout}s); worker process terminated."
             )
 
         if proc is not None and proc.returncode != 0:
             err_text = stderr_bytes.decode("utf-8", errors="replace").strip()
-            return CaptureResult(
-                source_id=source_id,
-                initial_url=initial_url,
-                final_url=None,
-                body=b"",
-                status_code=None,
-                headers={},
-                fetch_started_at=started_at,
-                fetch_completed_at=completed_at,
-                duration_ms=duration_ms,
-                bytes_received=None,
-                bytes_stored=None,
-                complete=False,
-                limit_exceeded=False,
-                error_msg=f"Worker process terminated unexpectedly (exit code {proc.returncode}): {err_text[:200]}",
-                collector_version=COLLECTOR_VERSION,
+            return make_negative_capture(
+                f"Worker process terminated unexpectedly (exit code {proc.returncode}): {err_text[:200]}"
             )
 
         try:
             worker_result = json.loads(stdout_bytes.decode("utf-8"))
         except Exception as exc:
-            return CaptureResult(
-                source_id=source_id,
-                initial_url=initial_url,
-                final_url=None,
-                body=b"",
-                status_code=None,
-                headers={},
-                fetch_started_at=started_at,
-                fetch_completed_at=completed_at,
-                duration_ms=duration_ms,
-                bytes_received=None,
-                bytes_stored=None,
-                complete=False,
-                limit_exceeded=False,
-                error_msg=f"Failed to parse worker output as JSON: {type(exc).__name__}: {str(exc)}",
-                collector_version=COLLECTOR_VERSION,
+            return make_negative_capture(
+                f"Failed to parse worker output as JSON: {type(exc).__name__}: {str(exc)}"
             )
 
         if not isinstance(worker_result, dict):
-            return CaptureResult(
-                source_id=source_id,
-                initial_url=initial_url,
-                final_url=None,
-                body=b"",
-                status_code=None,
-                headers={},
-                fetch_started_at=started_at,
-                fetch_completed_at=completed_at,
-                duration_ms=duration_ms,
-                bytes_received=None,
-                bytes_stored=None,
-                complete=False,
-                limit_exceeded=False,
-                error_msg="Worker output JSON must be an object.",
-                collector_version=COLLECTOR_VERSION,
-            )
+            return make_negative_capture("Worker output JSON must be an object.")
 
         MANDATORY_WORKER_KEYS = {
             "status_code",
@@ -746,126 +708,145 @@ class SourceProbe:
             "error_msg",
         }
         missing_keys = [k for k in sorted(MANDATORY_WORKER_KEYS) if k not in worker_result]
-        schema_err: Optional[str] = None
         if missing_keys:
-            schema_err = f"Worker protocol error: missing required key(s): {', '.join(missing_keys)}"
+            return make_negative_capture(
+                f"Worker protocol error: missing required key(s): {', '.join(missing_keys)}"
+            )
 
         raw_complete = worker_result.get("complete")
         if type(raw_complete) is not bool:
-            schema_err = schema_err or f"Worker 'complete' must be boolean, got {type(raw_complete).__name__}"
-            complete = False
-        else:
-            complete = raw_complete
+            return make_negative_capture(
+                f"Worker 'complete' must be boolean, got {type(raw_complete).__name__}"
+            )
 
         raw_limit = worker_result.get("limit_exceeded")
         if type(raw_limit) is not bool:
-            schema_err = schema_err or f"Worker 'limit_exceeded' must be boolean, got {type(raw_limit).__name__}"
-            limit_exceeded = False
-        else:
-            limit_exceeded = raw_limit
+            return make_negative_capture(
+                f"Worker protocol error: 'limit_exceeded' must be boolean, got {type(raw_limit).__name__}"
+            )
 
         raw_status = worker_result.get("status_code")
         if raw_status is not None and (type(raw_status) is not int or isinstance(raw_status, bool)):
-            schema_err = schema_err or f"Worker 'status_code' must be integer or null, got {type(raw_status).__name__}"
-            status_code = None
-        else:
-            status_code = raw_status
+            return make_negative_capture(
+                f"Worker protocol error: 'status_code' must be integer or null, got {type(raw_status).__name__}"
+            )
 
         raw_final_url = worker_result.get("final_url")
-        if raw_final_url is not None and type(raw_final_url) is not str:
-            schema_err = schema_err or f"Worker 'final_url' must be string or null, got {type(raw_final_url).__name__}"
-            final_url = None
-        else:
-            final_url = raw_final_url
+        if raw_final_url is not None and (type(raw_final_url) is not str or not raw_final_url):
+            return make_negative_capture(
+                f"Worker protocol error: 'final_url' must be non-empty string or null, got {raw_final_url!r}"
+            )
 
         raw_headers = worker_result.get("headers")
+        if raw_headers is None:
+            return make_negative_capture("Worker protocol error: 'headers' cannot be null")
+        if type(raw_headers) is not dict:
+            return make_negative_capture(
+                f"Worker protocol error: 'headers' must be dict, got {type(raw_headers).__name__}"
+            )
+
         headers: Dict[str, str] = {}
-        if raw_headers is not None:
-            if type(raw_headers) is not dict or not all(type(k) is str and type(v) is str for k, v in raw_headers.items()):
-                schema_err = schema_err or "Worker 'headers' must be an object with string keys and values"
-            else:
-                for hk, hv in raw_headers.items():
-                    headers[hk.lower()] = hv
-        else:
-            schema_err = schema_err or "Worker 'headers' cannot be null"
+        for hk, hv in raw_headers.items():
+            if type(hk) is not str or type(hv) is not str:
+                return make_negative_capture(
+                    "Worker protocol error: 'headers' must be an object with string keys and values"
+                )
+            hk_lower = hk.lower()
+            if hk_lower in headers:
+                if headers[hk_lower] != hv:
+                    return make_negative_capture(
+                        f"Worker protocol error: conflicting case-variant headers for key '{hk_lower}': '{headers[hk_lower]}' vs '{hv}'"
+                    )
+            headers[hk_lower] = hv
 
         raw_received = worker_result.get("bytes_received")
         if raw_received is not None and (type(raw_received) is not int or isinstance(raw_received, bool) or raw_received < 0):
-            schema_err = schema_err or f"Worker 'bytes_received' must be non-negative integer or null, got {raw_received!r}"
-            bytes_received = None
-        else:
-            bytes_received = raw_received
+            return make_negative_capture(
+                f"Worker protocol error: 'bytes_received' must be non-negative integer or null, got {raw_received!r}"
+            )
 
         raw_stored = worker_result.get("bytes_stored")
         if raw_stored is not None and (type(raw_stored) is not int or isinstance(raw_stored, bool) or raw_stored < 0):
-            schema_err = schema_err or f"Worker 'bytes_stored' must be non-negative integer or null, got {raw_stored!r}"
-            bytes_stored = None
-        else:
-            bytes_stored = raw_stored
+            return make_negative_capture(
+                f"Worker protocol error: 'bytes_stored' must be non-negative integer or null, got {raw_stored!r}"
+            )
 
         body_b64 = worker_result.get("body_b64")
-        body = b""
         if type(body_b64) is not str:
-            schema_err = schema_err or f"Worker 'body_b64' must be str, got {type(body_b64).__name__}"
-        else:
-            try:
-                body = base64.b64decode(body_b64, validate=True)
-            except Exception as exc:
-                schema_err = schema_err or f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}"
+            return make_negative_capture(
+                f"Worker protocol error: 'body_b64' must be str, got {type(body_b64).__name__}"
+            )
+        try:
+            body = base64.b64decode(body_b64, validate=True)
+        except Exception as exc:
+            return make_negative_capture(
+                f"Failed to decode worker body base64: {type(exc).__name__}: {str(exc)}"
+            )
 
         raw_error_msg = worker_result.get("error_msg")
-        if raw_error_msg is not None and type(raw_error_msg) is not str:
-            schema_err = schema_err or f"Worker 'error_msg' must be string or null, got {type(raw_error_msg).__name__}"
-            worker_error_msg = None
-        else:
-            worker_error_msg = raw_error_msg
+        if raw_error_msg is not None and (type(raw_error_msg) is not str or not raw_error_msg):
+            return make_negative_capture(
+                f"Worker protocol error: 'error_msg' must be non-empty string or null, got {raw_error_msg!r}"
+            )
 
-        if not schema_err:
-            if bytes_stored is not None and bytes_stored != len(body):
-                schema_err = f"Worker counter inconsistency: bytes_stored ({bytes_stored}) != len(body) ({len(body)})"
-            elif bytes_received is not None and bytes_stored is not None and bytes_stored > bytes_received:
-                schema_err = f"Worker counter inconsistency: bytes_stored ({bytes_stored}) > bytes_received ({bytes_received})"
+        if raw_stored is not None and raw_stored != len(body):
+            return make_negative_capture(
+                f"Worker counter inconsistency: bytes_stored ({raw_stored}) != len(body) ({len(body)})"
+            )
+        if raw_received is not None and raw_stored is not None and raw_stored > raw_received:
+            return make_negative_capture(
+                f"Worker counter inconsistency: bytes_stored ({raw_stored}) > bytes_received ({raw_received})"
+            )
 
-        if complete:
-            if schema_err is not None:
-                complete = False
-            elif limit_exceeded:
-                schema_err = "Worker response marked complete=True cannot have limit_exceeded=True"
-                complete = False
-            elif worker_error_msg is not None:
-                schema_err = f"Worker response marked complete=True cannot have error_msg: {worker_error_msg}"
-                complete = False
-            elif status_code is None or not (100 <= status_code < 600):
-                schema_err = f"Worker response marked complete=True must have valid HTTP status code, got {status_code}"
-                complete = False
-            elif final_url is None or not final_url:
-                schema_err = "Worker response marked complete=True must have non-empty final_url"
-                complete = False
-            elif bytes_received is None or bytes_stored is None:
-                schema_err = "Worker response marked complete=True must have non-null byte counters"
-                complete = False
-            elif bytes_received != bytes_stored or bytes_stored != len(body):
-                schema_err = f"Worker response marked complete=True counter mismatch: received={bytes_received}, stored={bytes_stored}, len={len(body)}"
-                complete = False
-            elif len(body) == 0:
-                if not (bytes_received == 0 and bytes_stored == 0 and status_code is not None and not limit_exceeded and worker_error_msg is None):
-                    schema_err = "Empty body without explicit zero counters cannot be complete"
-                    complete = False
+        if raw_complete:
+            if raw_limit:
+                return make_negative_capture(
+                    "Worker protocol error: response marked complete=True cannot have limit_exceeded=True"
+                )
+            if raw_error_msg is not None:
+                return make_negative_capture(
+                    f"Worker protocol error: response marked complete=True cannot have error_msg: {raw_error_msg}"
+                )
+            if raw_status is None or not (100 <= raw_status < 600):
+                return make_negative_capture(
+                    f"Worker protocol error: response marked complete=True must have valid HTTP status code, got {raw_status}"
+                )
+            if raw_final_url is None:
+                return make_negative_capture(
+                    "Worker protocol error: response marked complete=True must have non-empty final_url"
+                )
+            if raw_received is None or raw_stored is None:
+                return make_negative_capture(
+                    "Worker protocol error: response marked complete=True must have non-null byte counters"
+                )
+            if raw_received != raw_stored or raw_stored != len(body):
+                return make_negative_capture(
+                    f"Worker protocol error: response marked complete=True counter mismatch: received={raw_received}, stored={raw_stored}, len={len(body)}"
+                )
+            if len(body) == 0:
+                if not (raw_received == 0 and raw_stored == 0 and raw_status is not None and not raw_limit and raw_error_msg is None):
+                    return make_negative_capture(
+                        "Worker protocol error: empty body without explicit zero counters cannot be complete"
+                    )
+
+        limit_exceeded = raw_limit
+        complete = raw_complete
+        final_url = raw_final_url
+        status_code = raw_status
+        bytes_received = raw_received
+        bytes_stored = raw_stored
+        worker_error_msg = raw_error_msg
 
         if len(body) > self.max_bytes:
             limit_exceeded = True
             complete = False
             body = body[: self.max_bytes]
-            schema_err = schema_err or f"Stream limit exceeded ({self.max_bytes} bytes)"
-
-        error_msg = schema_err or worker_error_msg
-        if schema_err:
-            complete = False
-
-        if not complete and (status_code is None or error_msg is not None):
-            final_url = None
+            bytes_stored = len(body)
+            worker_error_msg = f"Stream limit exceeded ({self.max_bytes} bytes)"
 
         if not complete:
+            if status_code is None or worker_error_msg is not None:
+                final_url = None
             if bytes_stored is not None and bytes_stored != len(body):
                 bytes_stored = len(body)
             if bytes_received is not None and bytes_stored is not None and bytes_stored > bytes_received:
@@ -877,25 +858,11 @@ class SourceProbe:
         completed_at = utc_now_iso()
 
         if elapsed > self.timeout:
-            return CaptureResult(
-                source_id=source_id,
-                initial_url=initial_url,
-                final_url=None,
-                body=b"",
-                status_code=None,
-                headers={},
-                fetch_started_at=started_at,
-                fetch_completed_at=completed_at,
-                duration_ms=duration_ms,
-                bytes_received=None,
-                bytes_stored=None,
-                complete=False,
-                limit_exceeded=False,
-                error_msg=f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.3f}s; response rejected.",
-                collector_version=COLLECTOR_VERSION,
+            return make_negative_capture(
+                f"Overall source deadline exceeded ({self.timeout}s): elapsed {elapsed:.3f}s; response rejected."
             )
 
-        return CaptureResult(
+        candidate = CaptureResult(
             source_id=source_id,
             initial_url=initial_url,
             final_url=final_url,
@@ -909,9 +876,16 @@ class SourceProbe:
             bytes_stored=bytes_stored,
             complete=complete,
             limit_exceeded=limit_exceeded,
-            error_msg=error_msg,
+            error_msg=worker_error_msg,
             collector_version=COLLECTOR_VERSION,
         )
+
+        try:
+            validate_capture_result(candidate)
+        except ValueError as exc:
+            return make_negative_capture(f"Worker protocol error: {exc}")
+
+        return candidate
 
     def _fetch_bounded(
         self,

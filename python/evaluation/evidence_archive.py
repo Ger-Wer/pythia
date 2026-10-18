@@ -261,8 +261,9 @@ class EvidenceArchive:
     def _fsync_cas_barrier(self, dest_path: Path, sync_file: bool = False) -> None:
         """Durable filesystem barrier for CAS before SQLite transaction commit.
 
-        Synchronizes the blob file (if requested) and all required prefix directory
-        entries (leaf prefix, parent prefix, and base blobs directory).
+        Synchronizes the blob file (if requested) and all required directory
+        entries along the entire ancestry chain from the CAS leaf prefix directory
+        up to the filesystem root.
         """
         if sync_file:
             file_fd = os.open(str(dest_path), os.O_RDONLY)
@@ -271,13 +272,16 @@ class EvidenceArchive:
             finally:
                 os.close(file_fd)
 
-        dirs_to_sync = [dest_path.parent, dest_path.parent.parent, self.blobs_dir]
-        for d in dirs_to_sync:
-            dir_fd = os.open(str(d), os.O_RDONLY)
+        cur = dest_path.resolve().parent
+        while True:
+            dir_fd = os.open(str(cur), os.O_RDONLY)
             try:
                 os.fsync(dir_fd)
             finally:
                 os.close(dir_fd)
+            if cur.parent == cur:
+                break
+            cur = cur.parent
 
     def _store_blob(self, body: bytes) -> str:
         """Store bytes into filesystem CAS atomically with fsync and no-clobber semantics.
