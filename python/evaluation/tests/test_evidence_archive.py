@@ -1766,3 +1766,149 @@ def test_cas_durability_barrier_parent_fsync_error_prevents_db_commit_and_retry_
     assert len(archive.query_receipts()) == 1
     integ = archive.verify_integrity()
     assert integ["healthy"] is True
+
+
+# -------------------------------------------------------------------------
+# 15. Reviewer R2.3 Defect Controls Resolution Suite (R2.4 — Post-Validation Deadline)
+# -------------------------------------------------------------------------
+
+def test_post_validation_deadline_positive_fixture_without_delay_remains_complete(tmp_path: Path):
+    """Positive fixture without delay remains complete=True, records exact bytes and hash."""
+    folder = tmp_path / "post_val_positive"
+    folder.mkdir()
+    sid = "github_deepseek_v3_releases"
+    worker_file = folder / "worker.py"
+    payload = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json"},
+        "body_b64": base64.b64encode(b"[]").decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": True,
+        "limit_exceeded": False,
+        "final_url": CANONICAL_SOURCES[sid],
+        "error_msg": None,
+    }
+    worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+    with SourceProbe(timeout=2.0, worker_cmd=[sys.executable, str(worker_file)]) as probe:
+        cap = probe.capture_source(sid, CANONICAL_SOURCES[sid])
+        diag = probe.probe_single({"source_id": sid, "url": CANONICAL_SOURCES[sid]}, capture=cap)
+
+    assert cap.complete is True
+    assert cap.error_msg is None
+    assert cap.body == b"[]"
+    assert cap.duration_ms > 0.0
+
+    archive = EvidenceArchive(folder / "archive")
+    receipt = archive.record_capture(cap, receipt_id="post-val-pos-001", probe_result=diag)
+    assert receipt.receipt_id == "post-val-pos-001"
+    assert receipt.revision_id is not None
+    assert receipt.blob_sha256 == hashlib.sha256(b"[]").hexdigest()
+    assert receipt.usable_for_forecast is False
+    assert receipt.status == "valid"
+
+
+def test_post_validation_deadline_crossed_inside_shared_validation_yields_negative_receipt(tmp_path: Path):
+    """When deadline is crossed inside shared validation, returns negative capture, persists receipt without revision."""
+    folder = tmp_path / "post_val_timeout"
+    folder.mkdir()
+    sid = "github_deepseek_v3_releases"
+    worker_file = folder / "worker.py"
+    payload = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json"},
+        "body_b64": base64.b64encode(b"[]").decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": True,
+        "limit_exceeded": False,
+        "final_url": CANONICAL_SOURCES[sid],
+        "error_msg": None,
+    }
+    worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+
+    from python.evaluation import source_probe as sp
+    orig_validator = sp.validate_capture_result
+    validator_calls = []
+
+    def delayed_validator(candidate):
+        orig_validator(candidate)
+        validator_calls.append("validator_executed")
+        time.sleep(0.6)
+
+    sp.validate_capture_result = delayed_validator
+    try:
+        with SourceProbe(timeout=0.4, worker_cmd=[sys.executable, str(worker_file)]) as probe:
+            cap = probe.capture_source(sid, CANONICAL_SOURCES[sid])
+            diag = probe.probe_single({"source_id": sid, "url": CANONICAL_SOURCES[sid]}, capture=cap)
+    finally:
+        sp.validate_capture_result = orig_validator
+
+    assert len(validator_calls) == 1, "Expected real validator to be called"
+    assert cap.complete is False
+    assert cap.error_msg is not None and "Overall source deadline exceeded" in cap.error_msg
+    assert cap.final_url is None
+    assert cap.status_code is None
+    assert cap.body == b""
+    assert cap.duration_ms >= 500.0, f"Duration {cap.duration_ms}ms should include validation delay"
+
+    archive = EvidenceArchive(folder / "archive")
+    receipt = archive.record_capture(cap, receipt_id="post-val-neg-001", probe_result=diag)
+    assert receipt.receipt_id == "post-val-neg-001"
+    assert receipt.revision_id is None
+    assert receipt.blob_sha256 is None
+    assert receipt.status == "network_error"
+    assert receipt.seq == 1
+    integ = archive.verify_integrity()
+    assert integ["healthy"] is True
+
+
+def test_post_validation_deadline_sufficient_budget_with_controlled_delay_remains_complete(tmp_path: Path):
+    """When budget is sufficient under controlled validation delay, response remains complete with updated duration."""
+    folder = tmp_path / "post_val_sufficient"
+    folder.mkdir()
+    sid = "github_deepseek_v3_releases"
+    worker_file = folder / "worker.py"
+    payload = {
+        "status_code": 200,
+        "headers": {"content-type": "application/json"},
+        "body_b64": base64.b64encode(b"[]").decode("ascii"),
+        "bytes_received": 2,
+        "bytes_stored": 2,
+        "complete": True,
+        "limit_exceeded": False,
+        "final_url": CANONICAL_SOURCES[sid],
+        "error_msg": None,
+    }
+    worker_file.write_text("import json,sys\nsys.stdin.read()\nprint(" + repr(json.dumps(payload)) + ")\n")
+
+    from python.evaluation import source_probe as sp
+    orig_validator = sp.validate_capture_result
+    validator_calls = []
+
+    def delayed_validator(candidate):
+        orig_validator(candidate)
+        validator_calls.append("validator_executed")
+        time.sleep(0.15)
+
+    sp.validate_capture_result = delayed_validator
+    try:
+        with SourceProbe(timeout=2.0, worker_cmd=[sys.executable, str(worker_file)]) as probe:
+            cap = probe.capture_source(sid, CANONICAL_SOURCES[sid])
+            diag = probe.probe_single({"source_id": sid, "url": CANONICAL_SOURCES[sid]}, capture=cap)
+    finally:
+        sp.validate_capture_result = orig_validator
+
+    assert len(validator_calls) == 1
+    assert cap.complete is True
+    assert cap.error_msg is None
+    assert cap.body == b"[]"
+    assert cap.duration_ms >= 140.0, f"Duration {cap.duration_ms}ms should include 150ms delay"
+    assert cap.duration_ms < 2000.0
+
+    archive = EvidenceArchive(folder / "archive")
+    receipt = archive.record_capture(cap, receipt_id="post-val-suff-001", probe_result=diag)
+    assert receipt.receipt_id == "post-val-suff-001"
+    assert receipt.revision_id is not None
+    assert receipt.blob_sha256 == hashlib.sha256(b"[]").hexdigest()
+    assert receipt.status == "valid"

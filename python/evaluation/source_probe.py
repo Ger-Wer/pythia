@@ -26,7 +26,7 @@ import sys
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -885,7 +885,18 @@ class SourceProbe:
         except ValueError as exc:
             return make_negative_capture(f"Worker protocol error: {exc}")
 
-        return candidate
+        # POST-VALIDATION FINAL DEADLINE CHECK & DURATION UPDATE:
+        final_elapsed = time.monotonic() - start_monotonic
+        if final_elapsed > self.timeout:
+            return make_negative_capture(
+                f"Overall source deadline exceeded ({self.timeout}s): elapsed {final_elapsed:.3f}s; response rejected."
+            )
+
+        return replace(
+            candidate,
+            fetch_completed_at=utc_now_iso(),
+            duration_ms=final_elapsed * 1000.0,
+        )
 
     def _fetch_bounded(
         self,
