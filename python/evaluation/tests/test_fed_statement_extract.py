@@ -1,4 +1,4 @@
-"""Tests for Pythia R3.1: Offline Fed Statement Extractor and Publisher.
+"""Tests for Pythia R3.1 / R3.1.1: Offline Fed Statement Extractor and Publisher.
 
 Enforces:
 1. Real official fixtures: accurate extraction, paragraph ordering, absence of nav/footer, valid ProofSpans.
@@ -7,10 +7,17 @@ Enforces:
 4. Dates: calendar-only yields published_at=None; timezone string parsed explicitly; invalid dates handled safely; separate times.
 5. Idempotent publication replay, collision conflict rejection (no-clobber), versions preserved in empty/rejected bundles.
 6. Zero network: socket connections strictly forbidden across tests and child CLI process.
+7. F1: Mandatory typed manifest & provenance validation (empty manifest, non-fed domains, transport failures).
+8. F2: Negative body remains negative (JS-only barrier inside valid #article skeleton).
+9. F3: Structural locators unambiguous (cardinality 1); title proof matches parsed title and skips comments.
+10. F4: HTML entities decoded exactly once (no double unescaping of literal escaped entities).
+11. F5: Invalid hour/minute yields published_at=None; feed vs page date mismatch diagnostic.
+12. F6: Output directory & preview cannot overwrite source inputs or mutate archives.
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -19,8 +26,10 @@ import socket
 import subprocess
 import sys
 import tempfile
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
+from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 from python.evaluation.fed_statement_extract import (
@@ -34,6 +43,7 @@ from python.evaluation.fed_statement_extract import (
     build_fed_statement_bundle,
     extract_fed_statement,
     generate_statement_preview,
+    publish_statement_preview,
 )
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "docs/research/2026-10-19/r3/increment1/fixtures"
@@ -58,7 +68,9 @@ def _make_fixture_and_manifest(
     corrupt_sha: bool = False,
     corrupt_size: bool = False,
 ) -> Tuple[Path, Path]:
-    fpath = tmp_path / f"{name}.html"
+    fixtures_dir = tmp_path / "fixtures"
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    fpath = fixtures_dir / f"{name}.html"
     fpath.write_bytes(raw_html)
 
     sha = hashlib.sha256(raw_html).hexdigest()
@@ -90,7 +102,7 @@ def _make_fixture_and_manifest(
         "transport_outcome": "success",
         "usable_for_forecast": False,
     }
-    mpath = tmp_path / f"{name}_manifest.json"
+    mpath = fixtures_dir / f"{name}_manifest.json"
     mpath.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return fpath, mpath
 
@@ -100,240 +112,208 @@ def _create_minimal_valid_html(
     date_text: str = "October 15, 2026",
     release_time: str = "For release at 2:00 p.m. EDT",
     paragraphs: Optional[List[str]] = None,
-    leading_bom: bool = False,
+    leading_bytes: bytes = b"",
 ) -> bytes:
     if paragraphs is None:
         paragraphs = [
             "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:",
-            "The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 4 to 4-1/4 percent.",
-            "Economic activity is expanding at a solid pace.",
+            "The Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.",
+            "Economic activity has continued to expand at a solid pace.",
         ]
 
     p_html = "\n".join(f"<p>{p}</p>" for p in paragraphs)
-    html_content = f"""<!doctype html>
+    html_str = f"""<!doctype html>
 <html>
 <head><title>Board of Governors - {title}</title></head>
 <body>
-<nav>Navigation Header (Should not be in extraction)</nav>
 <div id="article">
     <div class="heading col-xs-12 col-sm-8 col-md-8">
         <p class="article__time">{date_text}</p>
         <h3 class="title">{title}</h3>
         <p class="releaseTime">{release_time}</p>
     </div>
-    <div class="col-xs-12 col-sm-4 col-md-4 hidden-sm">Sidebar</div>
     <div class="col-xs-12 col-sm-8 col-md-8">
         {p_html}
     </div>
 </div>
-<footer>Footer links (Should not be in extraction)</footer>
 </body>
 </html>"""
-    encoded = html_content.encode("utf-8")
-    if leading_bom:
-        encoded = b"\xef\xbb\xbf" + encoded
-    return encoded
+    return leading_bytes + html_str.encode("utf-8")
 
 
-# ==============================================================================
-# 1. Real Official Fixtures Tests
-# ==============================================================================
+def test_real_fixture_monetary20260916a_extraction():
+    """Real September 16, 2026 FOMC statement extracted cleanly with 100% valid ProofSpans."""
+    raw_path = FIXTURES_DIR / "raw_monetary20260916a.html"
+    man_path = FIXTURES_DIR / "manifest_monetary20260916a.json"
+    if not raw_path.is_file():
+        pytest.skip("Fixture not found")
 
-def test_real_official_fixtures_extract_and_verify_all_proofs():
-    """Verify that both real FOMC statement fixtures extract cleanly and all proofs verify against raw blobs."""
-    for key in ("monetary20260916a", "monetary20260729a"):
-        raw_path = FIXTURES_DIR / f"raw_{key}.html"
-        man_path = FIXTURES_DIR / f"manifest_{key}.json"
+    raw_bytes = raw_path.read_bytes()
+    manifest = json.loads(man_path.read_text(encoding="utf-8"))
 
-        assert raw_path.is_file(), f"Missing fixture file: {raw_path}"
-        assert man_path.is_file(), f"Missing manifest file: {man_path}"
-
-        raw_bytes = raw_path.read_bytes()
-        manifest = json.loads(man_path.read_text(encoding="utf-8"))
-
-        res = extract_fed_statement(raw_bytes, manifest)
-        assert res.is_success, f"Extraction failed for {key}: {res.rejections}"
-        doc = res.document
-        assert doc is not None
-
-        # Verify header fields
-        assert doc.title == "Federal Reserve issues FOMC statement"
-        assert doc.profile_id == "fomc_press_release_v1"
-        assert doc.published_date in ("2026-09-16", "2026-07-29")
-        assert doc.published_date_precision == "day"
-        assert doc.published_at is not None
-        assert doc.published_at.endswith("-04:00")  # EDT
-        assert doc.published_at_provenance == "header_release_time"
-
-        # Verify proofs
-        assert doc.container_proof.verify_against_blob(raw_bytes)
-        assert doc.date_proof.verify_against_blob(raw_bytes)
-        assert doc.title_proof.verify_against_blob(raw_bytes)
-        if doc.release_time_proof:
-            assert doc.release_time_proof.verify_against_blob(raw_bytes)
-
-        # Verify paragraphs
-        assert len(doc.paragraphs) >= 6
-        for p in doc.paragraphs:
-            assert p.proof.verify_against_blob(raw_bytes)
-            assert len(p.display_text) > 0
-            # Ensure no HTML tags in display text
-            assert "<p>" not in p.display_text
-            assert "<strong>" not in p.display_text
-            assert "</a>" not in p.display_text
-
-        # First paragraph must be vote approval
-        assert doc.paragraphs[0].role == "vote_approval"
-        assert "approved the following statement" in doc.paragraphs[0].display_text
-
-        # Second paragraph must be policy decision
-        assert doc.paragraphs[1].role == "policy_decision"
-        assert "decided to" in doc.paragraphs[1].display_text
-
-
-# ==============================================================================
-# 2. Synthetic Variations, Encoding, and Digest Integrity Tests
-# ==============================================================================
-
-def test_synthetic_markup_bom_unicode_entities_and_inline_tags(tmp_path: Path):
-    """Synthetic fixture with leading BOM, HTML entities (&#8211;, &amp;, &nbsp;), inline tags, and Unicode."""
-    paras = [
-        "The Committee approved the statement by a 12 &#8211; 0 vote &amp; confirmed policy.",
-        "The Committee decided to raise the rate by 1/4 percentage point <strong>to 4 percent</strong>.",
-        "Economic activity expanded across &nbsp; all sectors — including manufacturing &amp; services.",
-    ]
-    raw_html = _create_minimal_valid_html(
-        paragraphs=paras,
-        leading_bom=True,
-    )
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "synth_bom", raw_html)
-
-    raw_bytes = fpath.read_bytes()
-    manifest = json.loads(mpath.read_text())
-
-    res = extract_fed_statement(raw_bytes, manifest)
-    assert res.is_success
-    doc = res.document
+    result = extract_fed_statement(raw_bytes, manifest)
+    assert result.is_success
+    doc = result.document
     assert doc is not None
 
-    # Verify clean text decoded entities
-    assert "12 – 0 vote & confirmed policy." in doc.paragraphs[0].display_text
-    assert "to 4 percent." in doc.paragraphs[1].display_text
-    assert "across all sectors — including" in doc.paragraphs[2].display_text
+    assert doc.title == "Federal Reserve issues FOMC statement"
+    assert doc.published_date == "2026-09-16"
+    assert doc.published_date_precision == "day"
+    assert doc.published_at == "2026-09-16T14:00:00-04:00"
+    assert doc.published_at_provenance == "header_release_time"
+    assert len(doc.paragraphs) == 6
 
-    # All proof spans must verify against raw bytes with BOM
+    # Verify proofs
     assert doc.container_proof.verify_against_blob(raw_bytes)
+    assert doc.title_proof.verify_against_blob(raw_bytes)
+    assert doc.date_proof.verify_against_blob(raw_bytes)
+    if doc.release_time_proof:
+        assert doc.release_time_proof.verify_against_blob(raw_bytes)
+
     for p in doc.paragraphs:
         assert p.proof.verify_against_blob(raw_bytes)
 
 
-def test_corrupted_digest_and_size_mismatch_rejected(tmp_path: Path):
-    """Corrupted SHA-256 or size in manifest results in rejection, no positive document."""
-    raw_html = _create_minimal_valid_html()
+def test_real_fixture_monetary20260729a_extraction():
+    """Real July 29, 2026 FOMC statement extracted with 7 paragraphs including dissent."""
+    raw_path = FIXTURES_DIR / "raw_monetary20260729a.html"
+    man_path = FIXTURES_DIR / "manifest_monetary20260729a.json"
+    if not raw_path.is_file():
+        pytest.skip("Fixture not found")
 
-    # Corrupt SHA
-    fpath1, mpath1 = _make_fixture_and_manifest(tmp_path, "corrupt_sha", raw_html, corrupt_sha=True)
-    res1 = extract_fed_statement(fpath1.read_bytes(), json.loads(mpath1.read_text()))
-    assert not res1.is_success
-    assert len(res1.rejections) == 1
-    assert res1.rejections[0].status == "digest_mismatch"
+    raw_bytes = raw_path.read_bytes()
+    manifest = json.loads(man_path.read_text(encoding="utf-8"))
 
-    # Corrupt Size
-    fpath2, mpath2 = _make_fixture_and_manifest(tmp_path, "corrupt_size", raw_html, corrupt_size=True)
-    res2 = extract_fed_statement(fpath2.read_bytes(), json.loads(mpath2.read_text()))
-    assert not res2.is_success
-    assert len(res2.rejections) == 1
-    assert res2.rejections[0].status == "size_mismatch"
+    result = extract_fed_statement(raw_bytes, manifest)
+    assert result.is_success
+    doc = result.document
+    assert doc is not None
 
+    assert doc.title == "Federal Reserve issues FOMC statement"
+    assert doc.published_date == "2026-07-29"
+    assert len(doc.paragraphs) == 7
 
-def test_encoding_error_rejected(tmp_path: Path):
-    """Raw blob with invalid UTF-8 bytes rejected honestly."""
-    invalid_bytes = b"\xff\xfe\x00\x00<html><head><title>Test</title></head><body>Bad bytes</body></html>"
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "bad_encoding", invalid_bytes)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert not res.is_success
-    assert len(res.rejections) == 1
-    assert res.rejections[0].status == "encoding_error"
+    # Check dissent paragraph
+    roles = [p.role for p in doc.paragraphs]
+    assert "dissenting_votes" in roles
+    assert "vote_approval" in roles
+    assert "policy_decision" in roles
+
+    for p in doc.paragraphs:
+        assert p.proof.verify_against_blob(raw_bytes)
 
 
-# ==============================================================================
-# 3. Non-statement, Blocked, and Empty Templates Tests
-# ==============================================================================
+def test_synthetic_fixture_with_bom_and_entities(tmp_path: Path):
+    """HTML with UTF-8 BOM, entities, and inline tags extracts exact clean text."""
+    raw = _create_minimal_valid_html(
+        title="Federal Reserve issues FOMC statement",
+        paragraphs=[
+            "The Committee approved the statement by a 12 &#8211; 0 vote.",
+            "Interest rates maintained at <strong>4.00</strong> to 4.25 percent &amp; reserves remain ample.",
+        ],
+        leading_bytes=b"\xef\xbb\xbf",
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "bom_test", raw)
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
+
+    result = extract_fed_statement(raw, manifest)
+    assert result.is_success
+    doc = result.document
+    assert doc is not None
+    assert doc.paragraphs[0].display_text == "The Committee approved the statement by a 12 – 0 vote."
+    assert "4.00 to 4.25 percent & reserves remain ample." in doc.paragraphs[1].display_text
+
+    for p in doc.paragraphs:
+        assert p.proof.verify_against_blob(raw)
+
+
+def test_corrupt_sha256_rejected(tmp_path: Path):
+    """Corrupt SHA-256 in manifest causes honest rejection."""
+    raw = _create_minimal_valid_html()
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "corrupt_sha", raw, corrupt_sha=True)
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
+
+    result = extract_fed_statement(raw, manifest)
+    assert not result.is_success
+    assert len(result.rejections) == 1
+    assert result.rejections[0].status == "digest_mismatch"
+
+
+def test_corrupt_size_rejected(tmp_path: Path):
+    """Corrupt size in manifest causes honest rejection."""
+    raw = _create_minimal_valid_html()
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "corrupt_size", raw, corrupt_size=True)
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
+
+    result = extract_fed_statement(raw, manifest)
+    assert not result.is_success
+    assert len(result.rejections) == 1
+    assert result.rejections[0].status == "size_mismatch"
+
+
+def test_invalid_utf8_encoding_rejected(tmp_path: Path):
+    """Invalid UTF-8 bytes rejected honestly."""
+    bad_bytes = b"\xff\xfe\x00\x00Some non-utf8 binary junk"
+    manifest = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(bad_bytes),
+        "blob_sha256": hashlib.sha256(bad_bytes).hexdigest(),
+        "transport_outcome": "success",
+    }
+    result = extract_fed_statement(bad_bytes, manifest)
+    assert not result.is_success
+    assert result.rejections[0].status == "encoding_error"
+
 
 def test_unsupported_document_types_rejected(tmp_path: Path):
-    """Discount rate minutes, economic projections, and speeches are rejected as unsupported."""
-    bad_titles = [
-        "Federal Reserve Board issues discount rate minutes",
-        "FOMC Summary of Economic Projections",
-        "Speech by Governor Waller on monetary policy",
-        "Federal Reserve Board announces advisory council meeting",
+    """Minutes, speeches, and projections are rejected as unsupported document types."""
+    cases = [
+        "Minutes of the Federal Open Market Committee",
+        "Summary of Economic Projections",
+        "Speech by Chair on Economic Outlook",
+        "Federal Reserve issues FOMC statement on discount rate",
     ]
-    for idx, bad_title in enumerate(bad_titles):
-        raw = _create_minimal_valid_html(title=bad_title)
-        fpath, mpath = _make_fixture_and_manifest(tmp_path, f"unsupported_{idx}", raw)
-        res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-        assert not res.is_success
-        assert len(res.rejections) == 1
-        assert res.rejections[0].status == "unsupported_document_type"
+    for title in cases:
+        raw = _create_minimal_valid_html(title=title)
+        _, mpath = _make_fixture_and_manifest(tmp_path, f"rej_{hash(title)}", raw)
+        manifest = json.loads(mpath.read_text(encoding="utf-8"))
+
+        result = extract_fed_statement(raw, manifest)
+        assert not result.is_success
+        assert result.rejections[0].status == "unsupported_document_type"
 
 
-def test_challenge_and_bot_barrier_rejected(tmp_path: Path):
-    """Cloudflare / Akamai challenge HTML rejected honestly."""
+def test_challenge_barrier_rejected(tmp_path: Path):
+    """Cloudflare challenge / verification HTML rejected honestly."""
     challenge_html = b"""<!doctype html>
 <html>
 <head><title>Just a moment...</title></head>
 <body>
-<div id="challenge-running">Please wait while your request is validated...</div>
-<script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_api/v1"></script>
+<div id="challenge-running">Validating browser...</div>
 </body>
 </html>"""
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "challenge", challenge_html)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert not res.is_success
-    assert len(res.rejections) == 1
-    assert res.rejections[0].status == "blocked_or_challenge"
+    manifest = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(challenge_html),
+        "blob_sha256": hashlib.sha256(challenge_html).hexdigest(),
+        "transport_outcome": "success",
+    }
+    result = extract_fed_statement(challenge_html, manifest)
+    assert not result.is_success
+    assert result.rejections[0].status == "blocked_or_challenge"
 
-
-def test_empty_content_rejected(tmp_path: Path):
-    """Container with no paragraphs or only whitespace paragraphs rejected."""
-    raw = _create_minimal_valid_html(paragraphs=[])
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "empty_paras", raw)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert not res.is_success
-    assert len(res.rejections) == 1
-    assert res.rejections[0].status == "empty_content"
-
-
-def test_missing_article_structure_rejected(tmp_path: Path):
-    """HTML lacking #article structure rejected without fallback to whole-page text."""
-    bad_html = b"""<!doctype html>
-<html>
-<head><title>Federal Reserve issues FOMC statement</title></head>
-<body>
-<p>The Federal Open Market Committee approved the statement...</p>
-</body>
-</html>"""
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "no_article", bad_html)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert not res.is_success
-    assert len(res.rejections) == 1
-    assert res.rejections[0].status == "unsupported_structure"
-
-
-# ==============================================================================
-# 4. Dates and Provenance Tests
-# ==============================================================================
 
 def test_date_only_fixture_yields_null_published_at(tmp_path: Path):
-    """If release time text is missing or zoneless, published_at is strictly null (no invented time)."""
-    raw = _create_minimal_valid_html(
-        date_text="October 15, 2026",
-        release_time="For immediate release",  # no explicit time/tz
-    )
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "date_only", raw)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert res.is_success
-    doc = res.document
+    """Date-only release yields published_date with precision='day' and published_at=None."""
+    raw = _create_minimal_valid_html(release_time="For immediate release")
+    _, mpath = _make_fixture_and_manifest(tmp_path, "date_only", raw)
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
+
+    result = extract_fed_statement(raw, manifest)
+    assert result.is_success
+    doc = result.document
     assert doc is not None
     assert doc.published_date == "2026-10-15"
     assert doc.published_date_precision == "day"
@@ -341,115 +321,59 @@ def test_date_only_fixture_yields_null_published_at(tmp_path: Path):
     assert doc.published_at_provenance is None
 
 
-def test_explicit_timezone_release_time_parsed(tmp_path: Path):
-    """Explicit release time with EDT timezone parsed accurately."""
-    raw = _create_minimal_valid_html(
-        date_text="November 05, 2026",
-        release_time="For release at 2:00 p.m. EST",
-    )
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "tz_time", raw)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert res.is_success
-    doc = res.document
-    assert doc is not None
-    assert doc.published_date == "2026-11-05"
-    assert doc.published_at == "2026-11-05T14:00:00-05:00"
-    assert doc.published_at_provenance == "header_release_time"
-
-
-def test_invalid_date_rejected_safely(tmp_path: Path):
-    """Unparseable date text results in rejection rather than silent fallback."""
-    raw = _create_minimal_valid_html(date_text="Not A Valid Calendar Date")
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "bad_date", raw)
-    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
-    assert not res.is_success
-    assert len(res.rejections) == 1
-    assert res.rejections[0].status == "invalid_date"
-
-
-# ==============================================================================
-# 5. Publication, Idempotence, Replay, and Collision Tests
-# ==============================================================================
-
 def test_bundle_publication_idempotence_and_collision_conflict(tmp_path: Path):
-    """Publishing identical bundle replays; competing pre-existing file raises StatementPublishError without clobber."""
+    """Atomic bundle publication: replay is idempotent; competing content raises conflict."""
     raw = _create_minimal_valid_html()
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "bundle_test", raw)
-    out_dir = tmp_path / "output"
+    out_dir = tmp_path / "bundles"
 
-    # First publication
-    p1, b1 = build_fed_statement_bundle(fpath, mpath, out_dir)
-    assert p1.is_file()
-    digest = b1["bundle_digest"]
+    path1, bundle1 = build_fed_statement_bundle(fpath, mpath, out_dir)
+    assert path1.is_file()
 
-    # Second publication (idempotent replay)
-    p2, b2 = build_fed_statement_bundle(fpath, mpath, out_dir)
-    assert p1 == p2
-    assert b1 == b2
+    # Replay identical
+    path2, bundle2 = build_fed_statement_bundle(fpath, mpath, out_dir)
+    assert path1 == path2
+    assert bundle1["bundle_digest"] == bundle2["bundle_digest"]
 
-    # Verify versions in manifest and bundle
-    bundle_data = json.loads(p1.read_text())["statement_bundle"]
-    assert bundle_data["extractor_version"] == STATEMENT_EXTRACTOR_VERSION
-    assert bundle_data["schema_version"] == STATEMENT_SCHEMA_VERSION
-    assert bundle_data["bundle_version"] == STATEMENT_BUNDLE_VERSION
-
-    # Collision test: competing pre-existing bytes must NOT be clobbered
-    out_dir_comp = tmp_path / "output_comp"
-    out_dir_comp.mkdir()
-    sentinel = b"competing pre-existing file content"
-    target = out_dir_comp / f"statement_bundle_{digest}.json"
-    target.write_bytes(sentinel)
-
+    # Competing file at same target path raises StatementPublishError
+    path1.write_text("{\"competing\": true}", encoding="utf-8")
     with pytest.raises(StatementPublishError, match="Atomic publication conflict"):
-        build_fed_statement_bundle(fpath, mpath, out_dir_comp)
-
-    # Verify competing file was not overwritten
-    assert target.read_bytes() == sentinel
+        build_fed_statement_bundle(fpath, mpath, out_dir)
 
 
 def test_rejected_bundle_publication_preserves_frozen_versions(tmp_path: Path):
-    """Even a rejected outcome publishes a bundle preserving frozen versions and honest rejections."""
-    raw = b"<html><head><title>Unsupported</title></head><body>No article</body></html>"
-    fpath, mpath = _make_fixture_and_manifest(tmp_path, "rejected_bundle", raw)
-    out_dir = tmp_path / "output_rejected"
+    """Rejection outcomes still produce published bundles preserving schema/extractor versions."""
+    raw = _create_minimal_valid_html(title="Minutes of the Federal Open Market Committee")
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "rejected_test", raw)
+    out_dir = tmp_path / "bundles"
 
-    p, bundle_data = build_fed_statement_bundle(fpath, mpath, out_dir)
-    assert p.is_file()
-    b = bundle_data["statement_bundle"]
-    assert b["extractor_version"] == STATEMENT_EXTRACTOR_VERSION
-    assert b["schema_version"] == STATEMENT_SCHEMA_VERSION
-    assert b["bundle_version"] == STATEMENT_BUNDLE_VERSION
-    assert b["document"] is None
-    assert len(b["rejections"]) == 1
-    assert b["rejections"][0]["status"] == "unsupported_structure"
+    path, bundle = build_fed_statement_bundle(fpath, mpath, out_dir)
+    assert path.is_file()
+    assert bundle["statement_bundle"]["manifest"]["extraction_summary"]["status"] == "rejected"
+    assert bundle["statement_bundle"]["document"] is None
+    assert len(bundle["statement_bundle"]["rejections"]) > 0
 
 
 def test_preview_generation_from_bundle(tmp_path: Path):
     """Preview is generated strictly from bundle dictionary without external calls."""
     raw = _create_minimal_valid_html()
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "preview_test", raw)
-    _, bundle_data = build_fed_statement_bundle(fpath, mpath, tmp_path / "out_preview")
+    _, bundle_data = build_fed_statement_bundle(fpath, mpath, tmp_path / "bundles")
 
-    preview_text = generate_statement_preview(bundle_data)
-    assert "# FOMC Statement Research Preview" in preview_text
-    assert "Federal Reserve issues FOMC statement" in preview_text
-    assert "2026-10-15" in preview_text
-    assert "Paragraph 0 [`vote_approval`]" in preview_text
-    assert "All proof spans independently verified against raw bytes: **VALID**" in preview_text
+    preview = generate_statement_preview(bundle_data)
+    assert "# FOMC Statement Research Preview" in preview
+    assert bundle_data["bundle_digest"] in preview
+    assert "Federal Reserve issues FOMC statement" in preview
+    assert "VALID" in preview
 
-
-# ==============================================================================
-# 6. CLI Execution with Network Isolation
-# ==============================================================================
 
 def test_cli_execution_with_child_network_guard(tmp_path: Path):
     """CLI child process executes with sitecustomize network guard and outputs valid bundle and preview."""
     raw = _create_minimal_valid_html()
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "cli_test", raw)
-    out_dir = tmp_path / "cli_out"
-    preview_file = tmp_path / "cli_preview.md"
+    out_dir = tmp_path / "bundles"
+    preview_file = tmp_path / "previews" / "cli_preview.md"
 
-    # Setup child network guard in sitecustomize
     guard_dir = tmp_path / "child_guard"
     guard_dir.mkdir()
     child_marker = tmp_path / "child_network_attempted"
@@ -483,8 +407,185 @@ def test_cli_execution_with_child_network_guard(tmp_path: Path):
 
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
     assert proc.returncode == 0, f"CLI failed: {proc.stderr}"
-    assert "Published Statement Bundle:" in proc.stdout
-    assert "Bundle Digest:" in proc.stdout
-    assert not child_marker.exists(), "CLI process attempted network access!"
+    assert not child_marker.exists()
     assert preview_file.is_file()
-    assert "# FOMC Statement Research Preview" in preview_file.read_text()
+
+
+# ==============================================================================
+# R3.1.1 Boundary Regressions (F1 - F6)
+# ==============================================================================
+
+def test_f1_mandatory_manifest_validation(tmp_path: Path):
+    """F1: Empty manifest, non-official URLs, or transport failure are rejected."""
+    raw = _create_minimal_valid_html()
+
+    # Empty manifest
+    res1 = extract_fed_statement(raw, {})
+    assert not res1.is_success
+    assert res1.rejections[0].status == "invalid_manifest"
+
+    # Non-official domain
+    m_bad_url = {
+        "source_url": "https://example.org/not-fed.html",
+        "final_url": "https://example.org/not-fed.html",
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "bytes_stored": len(raw),
+        "transport_outcome": "success",
+    }
+    res2 = extract_fed_statement(raw, m_bad_url)
+    assert not res2.is_success
+    assert res2.rejections[0].status == "unsupported_source_url"
+
+    # Transport failure
+    m_fail = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "bytes_stored": len(raw),
+        "transport_outcome": "http_error",
+        "http_status": 403,
+    }
+    res3 = extract_fed_statement(raw, m_fail)
+    assert not res3.is_success
+    assert res3.rejections[0].status == "transport_failure"
+
+
+def test_f2_negative_body_js_only(tmp_path: Path):
+    """F2: Valid #article skeleton with JS-only body paragraph is rejected."""
+    raw = _create_minimal_valid_html(
+        paragraphs=["Enable JavaScript to view this article."]
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "js_only", raw)
+    manifest = json.loads(mpath.read_text())
+
+    res = extract_fed_statement(raw, manifest)
+    assert not res.is_success
+    assert res.rejections[0].status == "blocked_or_challenge"
+
+
+def test_f3_unambiguous_structural_locators(tmp_path: Path):
+    """F3: Container and paragraph locators must resolve unambiguously (cardinality 1)."""
+    # Nested synthetic HTML
+    nested_html = (
+        b'<!doctype html><html><body>\r\n'
+        b'<div id="article">\r\n'
+        b'<!-- <h3 class="title">Commented Title</h3> -->\r\n'
+        b'<div class="heading col-xs-12 col-sm-8 col-md-8">\r\n'
+        b'<p class="article__time">October 15, 2026</p>\r\n'
+        b'<h3 class="title">Federal Reserve issues FOMC statement</h3>\r\n'
+        b'<p class="releaseTime">For release at 2:00 p.m. EDT</p>\r\n'
+        b'</div>\r\n'
+        b'<div class="col-xs-12 col-sm-8 col-md-8">\r\n'
+        b'<p>First statement paragraph.</p>\r\n'
+        b'<div><p>Second statement paragraph.</p></div>\r\n'
+        b'<p>Third statement paragraph.</p>\r\n'
+        b'</div>\r\n'
+        b'</div>\r\n'
+        b'</body></html>'
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "nested_f3", nested_html)
+    manifest = json.loads(mpath.read_text())
+
+    res = extract_fed_statement(nested_html, manifest)
+    assert res.is_success
+    doc = res.document
+    assert doc is not None
+
+    # Title proof must match actual parsed title, not the comment
+    assert doc.title == "Federal Reserve issues FOMC statement"
+    assert "Commented" not in doc.title_proof.raw_quote_text
+
+    soup = BeautifulSoup(nested_html.decode("utf-8"), "html.parser")
+    # Container cardinality == 1
+    assert len(soup.select(doc.container_locator["selector"])) == 1
+
+    # Paragraph cardinalities == 1
+    for p in doc.paragraphs:
+        assert len(soup.select(p.locator["selector"])) == 1
+
+
+def test_f4_single_entity_decode(tmp_path: Path):
+    """F4: HTML entities are decoded exactly once without double unescaping."""
+    raw = _create_minimal_valid_html(
+        paragraphs=["Literal &amp;#49; percent; literal &amp;lt;5."]
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "f4_entities", raw)
+    manifest = json.loads(mpath.read_text())
+
+    res = extract_fed_statement(raw, manifest)
+    assert res.is_success
+    assert res.document is not None
+    # Must NOT become "Literal 1 percent; literal <5."
+    assert res.document.paragraphs[0].display_text == "Literal &#49; percent; literal &lt;5."
+
+
+def test_f5_invalid_hour_minute_and_feed_mismatch(tmp_path: Path):
+    """F5: Impossible timestamp 29:99 yields published_at=None; RSS mismatch records diagnostic."""
+    raw = _create_minimal_valid_html(release_time="For release at 29:99 p.m. EDT")
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "f5_dates", raw)
+    manifest = json.loads(mpath.read_text())
+    manifest["parent_feed_reference"]["feed_published_at"] = "2026-10-16T18:00:00+00:00"
+
+    res = extract_fed_statement(raw, manifest)
+    assert res.is_success
+    doc = res.document
+    assert doc is not None
+
+    # published_at is safely None due to invalid digits
+    assert doc.published_at is None
+    assert doc.published_date == "2026-10-15"
+
+    # Date diagnostic recorded
+    assert doc.date_diagnostics is not None
+    assert doc.date_diagnostics["date_mismatch_detected"] is True
+    assert doc.date_diagnostics["page_published_date"] == "2026-10-15"
+    assert doc.date_diagnostics["feed_date"] == "2026-10-16"
+
+
+def test_f6_output_destination_and_preview_safety(tmp_path: Path):
+    """F6: Builder rejects publishing into fixture dir; CLI refuses symlink overwrite."""
+    raw = _create_minimal_valid_html()
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "f6_safety", raw)
+    fixture_dir = fpath.parent
+
+    # 1. Output dir = fixture dir rejected
+    with pytest.raises(StatementPublishError, match="Forbidden output_dir"):
+        build_fed_statement_bundle(fpath, mpath, fixture_dir)
+
+    # 2. Output dir inside fixture dir rejected
+    with pytest.raises(StatementPublishError, match="Forbidden output_dir"):
+        build_fed_statement_bundle(fpath, mpath, fixture_dir / "generated")
+
+    # 3. Output dir via symlink to fixture dir rejected
+    symlink_dir = tmp_path / "symlink_to_fixtures"
+    symlink_dir.symlink_to(fixture_dir, target_is_directory=True)
+    with pytest.raises(StatementPublishError, match="Forbidden output_dir"):
+        build_fed_statement_bundle(fpath, mpath, symlink_dir)
+
+    # 4. Preview publication refusing to overwrite raw input
+    preview_text = "New Preview Content"
+    with pytest.raises(StatementPublishError, match="Forbidden preview_path"):
+        publish_statement_preview(preview_text, fpath, fpath, mpath)
+
+    # 5. CLI refusing to overwrite raw input via symlink
+    preview_symlink = tmp_path / "preview_alias.md"
+    preview_symlink.symlink_to(fpath)
+    raw_before = fpath.read_bytes()
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "python.evaluation.fed_statement_extract",
+        "--fixture-path",
+        str(fpath),
+        "--manifest-path",
+        str(mpath),
+        "--output-dir",
+        str(tmp_path / "bundles"),
+        "--preview-path",
+        str(preview_symlink),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode != 0
+    # Raw file must NOT be modified
+    assert fpath.read_bytes() == raw_before

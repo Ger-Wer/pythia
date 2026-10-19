@@ -1,0 +1,265 @@
+{
+  "bundle_digest": "0d1ead37ba74cfda73e9d3dc735eef304aee2ab9fe5c4d7d1aba607f320dfaa0",
+  "statement_bundle": {
+    "bundle_version": "pythia-statement-bundle-r3/0.1.1",
+    "document": {
+      "container_locator": {
+        "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading)",
+        "type": "css_selector"
+      },
+      "container_proof": {
+        "byte_end": 73558,
+        "byte_start": 71890,
+        "quote_sha256": "6b120158dff9b5ffd010ca0f8e343f314c1d867289217e3c12f3fc8d5cd39ca5",
+        "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+        "raw_quote_text": "<div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n                \r\n                \r\n\r\n                \r\n                              \r\n                \r\n                <p>The Federal Open Market Committee approved the following statement for release by a 9 – 3 vote:</p>\r\n\r\n<p>The Committee decided to maintain the target range for the federal funds rate at 3-1/2 to 3-3/4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.</p>\r\n\r\n<p>Economic activity is expanding at a solid pace despite elevated uncertainty that owes, in part, to the conflict in the Middle East. Productivity growth and capital investment are strong. Job gains have kept pace with the workforce, and the unemployment rate has changed little.</p>\r\n\r\n<p>Inflation remains elevated relative to the Committee's 2 percent goal, in part reflecting supply shocks that have driven price increases in certain sectors, including energy. The Committee will deliver price stability.</p>\r\n\r\n<p>&nbsp;</p>\r\n\r\n<p>Voting against the monetary policy action were Beth M. Hammack, Neel Kashkari, and Lorie K. Logan, who preferred to raise the target range for the federal funds rate by 1/4 percentage point at this meeting.</p>\r\n\r\n<p>For media inquiries, please email <a href=\"/cdn-cgi/l/email-protection#69040c0d0008290f1b0b470e061f\"><span class=\"__cf_email__\" data-cfemail=\"e9848c8d8088a98f9b8bc78e869f\">[email&#160;protected]</span></a> or call 202-452-2955.</p>\r\n\r\n<p><a href=\"/newsevents/pressreleases/monetary20260729a1.htm\">Implementation Note issued July 29, 2026</a></p>\r\n                 \r\n            </div>"
+      },
+      "date_diagnostics": {
+        "date_mismatch_detected": false,
+        "feed_date": "2026-07-29",
+        "feed_published_at": "2026-07-29T18:00:00+00:00",
+        "page_published_date": "2026-07-29",
+        "time_diagnostic": null
+      },
+      "date_locator": {
+        "selector": "#article > div.heading p.article__time",
+        "type": "css_selector"
+      },
+      "date_proof": {
+        "byte_end": 69036,
+        "byte_start": 68994,
+        "quote_sha256": "2b601c872ad1a80b85df6ba70f229b85268e0173cd1cc8b19d395fc4025788fc",
+        "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+        "raw_quote_text": "<p class=\"article__time\">July 29, 2026</p>"
+      },
+      "issuer": "Federal Reserve Board",
+      "page_date_raw": "July 29, 2026",
+      "paragraphs": [
+        {
+          "display_text": "The Federal Open Market Committee approved the following statement for release by a 9 – 3 vote:",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(1)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 0,
+          "proof": {
+            "byte_end": 72159,
+            "byte_start": 72055,
+            "quote_sha256": "bd9340ea0d4e4a33f3531ac72255cf925f8f03b69773154607ea68e07d379777",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>The Federal Open Market Committee approved the following statement for release by a 9 – 3 vote:</p>"
+          },
+          "role": "vote_approval"
+        },
+        {
+          "display_text": "The Committee decided to maintain the target range for the federal funds rate at 3-1/2 to 3-3/4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(2)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 1,
+          "proof": {
+            "byte_end": 72416,
+            "byte_start": 72163,
+            "quote_sha256": "ef2f0c9bf7b2a57b94f0a9453e6a1d8e7daf2104b212bc46df10a937aa55a38d",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>The Committee decided to maintain the target range for the federal funds rate at 3-1/2 to 3-3/4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.</p>"
+          },
+          "role": "policy_decision"
+        },
+        {
+          "display_text": "Economic activity is expanding at a solid pace despite elevated uncertainty that owes, in part, to the conflict in the Middle East. Productivity growth and capital investment are strong. Job gains have kept pace with the workforce, and the unemployment rate has changed little.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(3)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 2,
+          "proof": {
+            "byte_end": 72704,
+            "byte_start": 72420,
+            "quote_sha256": "aa9573d504741532137a97efcdd3a47771e593e89d644b00355f164996373361",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>Economic activity is expanding at a solid pace despite elevated uncertainty that owes, in part, to the conflict in the Middle East. Productivity growth and capital investment are strong. Job gains have kept pace with the workforce, and the unemployment rate has changed little.</p>"
+          },
+          "role": "economic_assessment"
+        },
+        {
+          "display_text": "Inflation remains elevated relative to the Committee's 2 percent goal, in part reflecting supply shocks that have driven price increases in certain sectors, including energy. The Committee will deliver price stability.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(4)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 3,
+          "proof": {
+            "byte_end": 72933,
+            "byte_start": 72708,
+            "quote_sha256": "47f72f2cfdbc406ced93d67054d8f893b138b668d103baab19c7e2290dd70799",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>Inflation remains elevated relative to the Committee's 2 percent goal, in part reflecting supply shocks that have driven price increases in certain sectors, including energy. The Committee will deliver price stability.</p>"
+          },
+          "role": "inflation_mandate"
+        },
+        {
+          "display_text": "Voting against the monetary policy action were Beth M. Hammack, Neel Kashkari, and Lorie K. Logan, who preferred to raise the target range for the federal funds rate by 1/4 percentage point at this meeting.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(6)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 4,
+          "proof": {
+            "byte_end": 73167,
+            "byte_start": 72954,
+            "quote_sha256": "417150afcea0b1c00c10b853603e3fe0724774f5c5208e8906843ec1c04a42b1",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>Voting against the monetary policy action were Beth M. Hammack, Neel Kashkari, and Lorie K. Logan, who preferred to raise the target range for the federal funds rate by 1/4 percentage point at this meeting.</p>"
+          },
+          "role": "dissenting_votes"
+        },
+        {
+          "display_text": "For media inquiries, please email [email protected] or call 202-452-2955.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(7)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 5,
+          "proof": {
+            "byte_end": 73405,
+            "byte_start": 73171,
+            "quote_sha256": "a49feb11ab2b3e970f1e9b170621d07d90d37fd000fe64463a724ef6af5ec726",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p>For media inquiries, please email <a href=\"/cdn-cgi/l/email-protection#69040c0d0008290f1b0b470e061f\"><span class=\"__cf_email__\" data-cfemail=\"e9848c8d8088a98f9b8bc78e869f\">[email&#160;protected]</span></a> or call 202-452-2955.</p>"
+          },
+          "role": "media_inquiries"
+        },
+        {
+          "display_text": "Implementation Note issued July 29, 2026",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(8)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 6,
+          "proof": {
+            "byte_end": 73519,
+            "byte_start": 73409,
+            "quote_sha256": "4d6eea0ede1adada9164b696fbd8988c32fe0755772cbf779c4db656431ea23f",
+            "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+            "raw_quote_text": "<p><a href=\"/newsevents/pressreleases/monetary20260729a1.htm\">Implementation Note issued July 29, 2026</a></p>"
+          },
+          "role": "implementation_note"
+        }
+      ],
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-23bc4c0fc0243b9e",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[7]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-07-29T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 29 Jul 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "profile_id": "fomc_press_release_v1",
+      "published_at": "2026-07-29T14:00:00-04:00",
+      "published_at_provenance": "header_release_time",
+      "published_date": "2026-07-29",
+      "published_date_precision": "day",
+      "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+      "release_time_locator": {
+        "selector": "#article > div.heading p.releaseTime",
+        "type": "css_selector"
+      },
+      "release_time_proof": {
+        "byte_end": 72159,
+        "byte_start": 69164,
+        "quote_sha256": "41bd4dcb49d357c502efe5c5ea07d5908644cec869e731084d598f48a250709b",
+        "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+        "raw_quote_text": "<p class=\"releaseTime\">For release at 2:00 p.m. EDT                     \r\n                \r\n                <ul class=\"list-unstyled\">\r\n                    <li class=\"share btn-group\">\r\n                        <a class='dropdown-toggle shareLink' aria-labelledby=\"shareMenu\" role=\"button\" data-toggle=\"dropdown\" title=\"Share\" href=\"#\">Share<span class=\"icon icon__sm icon-share icon--right\"></span></a>\r\n                        <ul role=\"menu\" class=\"dropdown-menu shareDL__dropdown shareDL__dropdown--inline shareDL__dropdown--right\" id=\"shareMenu\">\r\n                            \r\n\r\n\r\n    \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://twitter.com/share?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm&text=Federal Reserve issues FOMC statement&via=FederalReserve\">\r\n                        <span class=\"icon icon__sm icon--centered icon-twitter-color\"></span>\r\n                </a>\r\n            </li>\r\n            \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://www.facebook.com/sharer.php?u=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm&name=Federal Reserve issues FOMC statement\">\r\n                        <span class=\"icon icon__sm icon--centered icon-facebook-color\"></span>\r\n                </a>\r\n            </li>\r\n            \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://www.linkedin.com/shareArticle?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm&title=Federal Reserve issues FOMC statement&mini=true\">\r\n                        <span class=\"icon icon__sm icon--centered icon-linkedin-color\"></span>\r\n                </a>\r\n            </li>\r\n            \r\n            <li class='shareDL__item'>\r\n            \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"/cdn-cgi/l/email-protection#69560b060d1054011d1d191a5346461e1e1e470f0c0d0c1b08051b0c1a0c1b1f0c470e061f46070c1e1a0c1f0c071d1a46191b0c1a1a1b0c050c081a0c1a460406070c1d081b105b595b5f595e5b500847011d044f1a1c0b030c0a1d542f0c0d0c1b0805493b0c1a0c1b1f0c49001a1a1c0c1a492f26242a491a1d081d0c040c071d\">\r\n                        <span class=\"icon icon__sm icon--centered icon-email-color\"></span>\r\n                </a>\r\n            </li>\r\n                    \r\n    \r\n \r\n \r\n                        </ul>\r\n                    </li>\r\n                </ul>\r\n \r\n            </div>\r\n            <div class=\"col-xs-12 col-sm-4 col-md-4 hidden-sm\"></div>\r\n            <div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n                \r\n                \r\n\r\n                \r\n                              \r\n                \r\n                <p>The Federal Open Market Committee approved the following statement for release by a 9 – 3 vote:</p>"
+      },
+      "release_time_raw": "For release at 2:00 p.m. EDT",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "statement_id": "stmt-6575f374f7cf20f7",
+      "substantive_statement_text": "The Federal Open Market Committee approved the following statement for release by a 9 – 3 vote:\n\nThe Committee decided to maintain the target range for the federal funds rate at 3-1/2 to 3-3/4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.\n\nEconomic activity is expanding at a solid pace despite elevated uncertainty that owes, in part, to the conflict in the Middle East. Productivity growth and capital investment are strong. Job gains have kept pace with the workforce, and the unemployment rate has changed little.\n\nInflation remains elevated relative to the Committee's 2 percent goal, in part reflecting supply shocks that have driven price increases in certain sectors, including energy. The Committee will deliver price stability.\n\nVoting against the monetary policy action were Beth M. Hammack, Neel Kashkari, and Lorie K. Logan, who preferred to raise the target range for the federal funds rate by 1/4 percentage point at this meeting.",
+      "title": "Federal Reserve issues FOMC statement",
+      "title_locator": {
+        "selector": "#article > div.heading h3.title",
+        "type": "css_selector"
+      },
+      "title_proof": {
+        "byte_end": 69114,
+        "byte_start": 69054,
+        "quote_sha256": "814ead7cbf96e6e128a32b19750703db005ea0ed5411388297dd2d92c9e694f9",
+        "raw_blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+        "raw_quote_text": "<h3 class=\"title\">Federal Reserve issues FOMC statement</h3>"
+      }
+    },
+    "extractor_version": "pythia-statement-extractor-r3/0.1.1",
+    "manifest": {
+      "blob_sha256": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+      "bytes_stored": 83318,
+      "collected_at": "2026-10-19T07:47:16.283731+00:00",
+      "content_type": "text/html",
+      "duration_ms": 219.363,
+      "error_msg": null,
+      "extraction_summary": {
+        "rejection_count": 0,
+        "status": "extracted",
+        "total_paragraphs": 7
+      },
+      "fetch_completed_at": "2026-10-19T07:47:16.283731+00:00",
+      "fetch_started_at": "2026-10-19T07:47:16.064380+00:00",
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "fixture_key": "monetary20260729a",
+      "http_status": 200,
+      "issuer": "Federal Reserve Board",
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-23bc4c0fc0243b9e",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[7]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-07-29T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 29 Jul 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "redirect_count": 0,
+      "research_provenance": "research_fixture",
+      "response_headers": {
+        "CF-Cache-Status": "HIT",
+        "CF-Ray": "a4ce2c79da0a01e7-ZRH",
+        "Connection": "keep-alive",
+        "Content-Encoding": "gzip",
+        "Content-Type": "text/html",
+        "Date": "Mon, 19 Oct 2026 07:47:16 GMT",
+        "Last-Modified": "Wed, 29 Jul 2026 18:00:15 GMT",
+        "Server": "cloudflare",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "Transfer-Encoding": "chunked",
+        "X-Frame-Options": "SAMEORIGIN"
+      },
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "transport_outcome": "success",
+      "usable_for_forecast": false
+    },
+    "rejections": [],
+    "research_metadata": {
+      "article_collection_status": "research_sample_only_not_runtime_collected",
+      "notes": "Research extraction bundle for official FOMC statement text. Acquired via bounded research fixture acquisition, not runtime R2 collector. Does not constitute verified production evidence or market outcome proof.",
+      "provenance_class": "research_fixture",
+      "statement_profile": "fomc_press_release_v1",
+      "usable_for_forecast": false
+    },
+    "schema_version": "pythia-statement-schema-r3/1.1"
+  }
+}

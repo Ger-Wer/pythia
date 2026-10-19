@@ -1,0 +1,48 @@
+{
+  "blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+  "bytes_stored": 84741,
+  "collected_at": "2026-10-19T07:47:16.063714+00:00",
+  "content_type": "text/html",
+  "duration_ms": 199.305,
+  "error_msg": null,
+  "fetch_completed_at": "2026-10-19T07:47:16.063714+00:00",
+  "fetch_started_at": "2026-10-19T07:47:15.864408+00:00",
+  "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+  "fixture_key": "monetary20260916a",
+  "http_status": 200,
+  "issuer": "Federal Reserve Board",
+  "parent_feed_reference": {
+    "archive_name": "live-r2-revision3",
+    "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+    "feed_fact_id": "fact-b7cdc057cc6ec28d",
+    "feed_item_locator": {
+      "path": "/rss/channel/item[3]",
+      "type": "xml_xpath"
+    },
+    "feed_published_at": "2026-09-16T18:00:00+00:00",
+    "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT",
+    "parent_bundle_as_of_seq": 8,
+    "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+    "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+    "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+    "seq": 2
+  },
+  "redirect_count": 0,
+  "research_provenance": "research_fixture",
+  "response_headers": {
+    "CF-Cache-Status": "HIT",
+    "CF-Ray": "a4ce2c788f4431a4-ZRH",
+    "Connection": "keep-alive",
+    "Content-Encoding": "gzip",
+    "Content-Type": "text/html",
+    "Date": "Mon, 19 Oct 2026 07:47:16 GMT",
+    "Last-Modified": "Wed, 16 Sep 2026 18:00:17 GMT",
+    "Server": "cloudflare",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "Transfer-Encoding": "chunked",
+    "X-Frame-Options": "SAMEORIGIN"
+  },
+  "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+  "transport_outcome": "success",
+  "usable_for_forecast": false
+}

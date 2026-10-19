@@ -1,0 +1,79 @@
+{
+  "bundle_version": "pythia-statement-bundle-r3/0.1.1",
+  "controls_verified": [
+    {
+      "control": "F1_empty_manifest_rejected",
+      "rejection": "invalid_manifest",
+      "status": "PASS"
+    },
+    {
+      "control": "F1_non_fed_domain_rejected",
+      "rejection": "unsupported_source_url",
+      "status": "PASS"
+    },
+    {
+      "control": "F1_transport_failure_rejected",
+      "rejection": "transport_failure",
+      "status": "PASS"
+    },
+    {
+      "control": "F2_js_only_body_rejected",
+      "rejection": "blocked_or_challenge",
+      "status": "PASS"
+    },
+    {
+      "control": "F3_unambiguous_locators_and_comment_skip",
+      "status": "PASS"
+    },
+    {
+      "control": "F4_single_entity_decode_preserved",
+      "status": "PASS"
+    },
+    {
+      "control": "F5_invalid_time_and_feed_mismatch",
+      "status": "PASS"
+    },
+    {
+      "control": "F6_destination_protection_and_no_clobber",
+      "status": "PASS"
+    }
+  ],
+  "demo_version": "R3.1.1 (Revision 1)",
+  "extractor_version": "pythia-statement-extractor-r3/0.1.1",
+  "live_archives_healthy": true,
+  "network_attempts": 0,
+  "original_archives_unchanged": true,
+  "proofs_all_valid": true,
+  "real_statement_bundles": [
+    {
+      "bundle_digest": "c5d4fa8c368fbcc0d97fb383f51ba2901f2744cbe6e91ea812d6e7a276277da7",
+      "bundle_file": "statement_bundle_c5d4fa8c368fbcc0d97fb383f51ba2901f2744cbe6e91ea812d6e7a276277da7.json",
+      "fixture_key": "monetary20260916a",
+      "issuer": "Federal Reserve Board",
+      "locators_unambiguous": true,
+      "paragraphs_count": 6,
+      "preview_file": "statement_preview_monetary20260916a.md",
+      "proofs_verified": 10,
+      "published_at": "2026-09-16T14:00:00-04:00",
+      "published_date": "2026-09-16",
+      "title": "Federal Reserve issues FOMC statement"
+    },
+    {
+      "bundle_digest": "0d1ead37ba74cfda73e9d3dc735eef304aee2ab9fe5c4d7d1aba607f320dfaa0",
+      "bundle_file": "statement_bundle_0d1ead37ba74cfda73e9d3dc735eef304aee2ab9fe5c4d7d1aba607f320dfaa0.json",
+      "fixture_key": "monetary20260729a",
+      "issuer": "Federal Reserve Board",
+      "locators_unambiguous": true,
+      "paragraphs_count": 7,
+      "preview_file": "statement_preview_monetary20260729a.md",
+      "proofs_verified": 11,
+      "published_at": "2026-07-29T14:00:00-04:00",
+      "published_date": "2026-07-29",
+      "title": "Federal Reserve issues FOMC statement"
+    }
+  ],
+  "schema_version": "pythia-statement-schema-r3/1.1",
+  "supported_profile": "fomc_press_release_v1",
+  "total_proofs_verified": 21,
+  "utc": "2026-10-19T08:47:14.666742+00:00"
+}
