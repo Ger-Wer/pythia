@@ -1,0 +1,68 @@
+{
+  "acquisition_verification_status": "PARTIAL",
+  "bundle_version": "pythia-statement-bundle-r3/0.1.3",
+  "controls_verified": [
+    {
+      "control": "F1_typed_manifest_and_lineage_validation",
+      "status": "PASS"
+    },
+    {
+      "control": "F2_statement_profile_and_taskforce_rejection",
+      "status": "PASS"
+    },
+    {
+      "control": "F3_comment_closing_boundaries_and_full_text",
+      "status": "PASS"
+    },
+    {
+      "control": "F4_single_entity_decode_preserved",
+      "status": "PASS"
+    },
+    {
+      "control": "F5_same_instant_and_invalid_time_handling",
+      "status": "PASS"
+    },
+    {
+      "control": "F6_destination_and_temp_symlink_protection",
+      "status": "PASS"
+    }
+  ],
+  "demo_version": "R3.1.3 (Revision 3)",
+  "extractor_version": "pythia-statement-extractor-r3/0.1.3",
+  "live_archives_healthy": true,
+  "network_attempts": 0,
+  "original_archives_unchanged": true,
+  "proofs_all_valid": true,
+  "real_statement_bundles": [
+    {
+      "acquisition_verification_status": "PARTIAL",
+      "bundle_digest": "376d7e6dcdcd710b7853ec2e5e3ebdd2b63853989eb4746d554010d500892bc4",
+      "bundle_file": "statement_bundle_376d7e6dcdcd710b7853ec2e5e3ebdd2b63853989eb4746d554010d500892bc4.json",
+      "key": "monetary20260916a",
+      "paragraphs": 6,
+      "preview_file": "statement_preview_monetary20260916a.md",
+      "published_at": "2026-09-16T14:00:00-04:00",
+      "published_date": "2026-09-16",
+      "statement_id": "stmt-bf54fb45de736e7d",
+      "title": "Federal Reserve issues FOMC statement",
+      "total_proofs": 10
+    },
+    {
+      "acquisition_verification_status": "PARTIAL",
+      "bundle_digest": "225567ae364d195532ca354d021dd9470ade500861e34c861878efa1dafb0d8d",
+      "bundle_file": "statement_bundle_225567ae364d195532ca354d021dd9470ade500861e34c861878efa1dafb0d8d.json",
+      "key": "monetary20260729a",
+      "paragraphs": 7,
+      "preview_file": "statement_preview_monetary20260729a.md",
+      "published_at": "2026-07-29T14:00:00-04:00",
+      "published_date": "2026-07-29",
+      "statement_id": "stmt-6575f374f7cf20f7",
+      "title": "Federal Reserve issues FOMC statement",
+      "total_proofs": 11
+    }
+  ],
+  "schema_version": "pythia-statement-schema-r3/1.2",
+  "supported_profile": "fomc_press_release_v1",
+  "total_proofs_verified": 21,
+  "utc": "2026-10-19T13:56:20.814589+00:00"
+}

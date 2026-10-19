@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 
-STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.2"
+STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.3"
 STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.2"
-STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.2"
+STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.3"
 SUPPORTED_PROFILE = "fomc_press_release_v1"
 
 OFFICIAL_DOMAINS = {"federalreserve.gov", "www.federalreserve.gov"}
@@ -258,29 +258,47 @@ def _parse_release_time(
     return iso_published_at, "header_release_time", None
 
 
-def _find_matching_closing_div(blob: bytes, open_pos: int) -> int:
-    """Find the exact closing </div> matching opening <div at open_pos in blob."""
+def _find_closing_tag(blob: bytes, open_pos: int, tag_name: bytes) -> int:
+    """Find the exact closing </tag_name> matching opening <tag_name at open_pos in blob.
+
+    Correctly ignores any tag occurrences inside HTML comments (<!-- ... -->).
+    Returns the byte offset immediately following </tag_name>, or -1 if not found.
+    """
     tag_end = blob.find(b">", open_pos)
     if tag_end == -1:
         return -1
 
-    depth = 1
     pos = tag_end + 1
-    div_pattern = re.compile(rb"</?div(?:\s[^>]*)?>", re.IGNORECASE)
+    depth = 1
+    pattern = re.compile(rb"</?" + tag_name + rb"(?:\s[^>]*)?>", re.IGNORECASE)
 
     while depth > 0:
-        match = div_pattern.search(blob, pos)
+        match = pattern.search(blob, pos)
         if not match:
             return -1
-        tag = match.group(0).lower()
-        if tag.startswith(b"</div"):
+
+        # Check for HTML comments starting before this match
+        c_start = blob.find(b"<!--", pos)
+        if c_start != -1 and c_start < match.start():
+            c_end = blob.find(b"-->", c_start + 4)
+            if c_end == -1:
+                return -1  # Malformed unclosed comment
+            pos = c_end + 3
+            continue
+
+        tag_bytes = match.group(0).lower()
+        if tag_bytes.startswith(b"</" + tag_name.lower()):
             depth -= 1
-            pos = match.end()
-        else:
+        elif not tag_bytes.endswith(b"/>"):
             depth += 1
-            pos = match.end()
+        pos = match.end()
 
     return pos
+
+
+def _find_matching_closing_div(blob: bytes, open_pos: int) -> int:
+    """Find the exact closing </div> matching opening <div at open_pos in blob."""
+    return _find_closing_tag(blob, open_pos, b"div")
 
 
 def _node_byte_start(node: Any, lines: List[str], line_offsets: List[int]) -> int:
@@ -486,40 +504,6 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    issuer_val = manifest.get("issuer")
-    if issuer_val is not None:
-        if not isinstance(issuer_val, str) or issuer_val not in ("Federal Reserve Board", "Federal Open Market Committee"):
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason=f"Contradictory or unsupported issuer in manifest: {issuer_val!r}",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
-                    )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
-
-    parent_feed_val = manifest.get("parent_feed_reference")
-    if parent_feed_val is not None:
-        if not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason="parent_feed_reference must be a non-empty dictionary when provided",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
-                    )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
-
     # URL scheme and official domain validation
     parsed_source = urllib.parse.urlsplit(source_url)
     parsed_final = urllib.parse.urlsplit(final_url)
@@ -556,16 +540,38 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    if not (
-        parsed_source.path.startswith("/newsevents/pressreleases/monetary")
-        or "/pressreleases/monetary" in parsed_source.path
-    ):
+    for url_label, url_obj in [("source_url", parsed_source), ("final_url", parsed_final)]:
+        if not (
+            url_obj.path.startswith("/newsevents/pressreleases/monetary")
+            or "/pressreleases/monetary" in url_obj.path
+        ):
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="unsupported_source_url",
+                        reason=f"{url_label} path '{url_obj.path}' does not match official FOMC press release statement endpoint",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+    is_synthetic = (
+        manifest.get("research_provenance") == "synthetic_fixture"
+        or manifest.get("synthetic_fixture") is True
+    )
+
+    issuer_val = manifest.get("issuer")
+    if issuer_val is None or not isinstance(issuer_val, str) or not issuer_val.strip():
         return ExtractionResult(
             document=None,
             rejections=[
                 RejectionRecord(
-                    status="unsupported_source_url",
-                    reason=f"URL path '{parsed_source.path}' does not match official FOMC press release statement endpoint",
+                    status="invalid_manifest",
+                    reason="Manifest must contain non-empty string 'issuer' (inventing default issuer from missing data is forbidden)",
                     source_url=source_url,
                     raw_blob_sha256=actual_sha,
                 )
@@ -573,6 +579,88 @@ def extract_fed_statement(
             extractor_version=STATEMENT_EXTRACTOR_VERSION,
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
+
+    if issuer_val not in ("Federal Reserve Board", "Federal Open Market Committee"):
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"Contradictory or unsupported issuer in manifest: {issuer_val!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    parent_feed_val = manifest.get("parent_feed_reference")
+    if is_synthetic:
+        if parent_feed_val is not None:
+            if not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason="parent_feed_reference must be a non-empty dictionary when provided",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+            if parent_feed_val.get("label") == "not a feed reference" and not any(
+                k in parent_feed_val for k in ("fixture_kind", "source_id", "feed_fact_id", "synthetic")
+            ):
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason="parent_feed_reference lacks valid lineage attributes",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+        else:
+            parent_feed_val = {"fixture_kind": "synthetic_fixture"}
+    else:
+        if parent_feed_val is None or not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason="Real research manifest missing required 'parent_feed_reference' provenance linkage",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+        required_lineage = ["archive_name", "feed_blob_sha256", "feed_fact_id", "feed_item_locator", "parent_bundle_digest"]
+        missing_lineage = [k for k in required_lineage if k not in parent_feed_val or not parent_feed_val[k]]
+        if missing_lineage:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"parent_feed_reference missing required typed lineage fields: {missing_lineage}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
 
     # Verify blob integrity against manifest
     manifest_sha = manifest["blob_sha256"]
@@ -880,10 +968,9 @@ def extract_fed_statement(
     date_start = _node_byte_start(date_elem, raw_lines, line_byte_offsets)
     if date_start == -1:
         raise StatementIntegrityError("Failed to calculate date element byte start position")
-    date_end = raw_bytes.find(b"</p>", date_start)
+    date_end = _find_closing_tag(raw_bytes, date_start, b"p")
     if date_end == -1:
         raise StatementIntegrityError("Failed to locate closing </p> for date element in raw bytes")
-    date_end += 4
     date_slice = raw_bytes[date_start:date_end]
     date_proof = ProofSpan(
         byte_start=date_start,
@@ -898,11 +985,9 @@ def extract_fed_statement(
     title_start = _node_byte_start(title_elem, raw_lines, line_byte_offsets)
     if title_start == -1:
         raise StatementIntegrityError("Failed to calculate title element byte start position")
-    close_title_tag = f"</{title_elem.name}>".encode("utf-8")
-    title_end = raw_bytes.find(close_title_tag, title_start)
+    title_end = _find_closing_tag(raw_bytes, title_start, title_elem.name.encode("utf-8"))
     if title_end == -1:
         raise StatementIntegrityError(f"Failed to locate closing </{title_elem.name}> for title element in raw bytes")
-    title_end += len(close_title_tag)
     title_slice = raw_bytes[title_start:title_end]
     title_proof = ProofSpan(
         byte_start=title_start,
@@ -922,9 +1007,12 @@ def extract_fed_statement(
     if release_time_elem:
         rel_start = _node_byte_start(release_time_elem, raw_lines, line_byte_offsets)
         if rel_start != -1:
-            rel_end = raw_bytes.find(b"</p>", rel_start)
+            rel_end = _find_closing_tag(raw_bytes, rel_start, b"p")
+            if rel_end == -1:
+                rel_fallback = raw_bytes.find(b"</p>", rel_start)
+                if rel_fallback != -1:
+                    rel_end = rel_fallback + 4
             if rel_end != -1:
-                rel_end += 4
                 rel_slice = raw_bytes[rel_start:rel_end]
                 release_time_proof = ProofSpan(
                     byte_start=rel_start,
@@ -980,12 +1068,18 @@ def extract_fed_statement(
         p_start = _node_byte_start(p_dom, raw_lines, line_byte_offsets)
         if p_start == -1:
             raise StatementIntegrityError(f"Failed to calculate paragraph {idx} byte start position")
-        p_end = raw_bytes.find(b"</p>", p_start)
+        p_end = _find_closing_tag(raw_bytes, p_start, b"p")
         if p_end == -1:
             raise StatementIntegrityError(f"Failed to locate closing </p> for paragraph {idx}")
-        p_end += 4
         p_raw = raw_bytes[p_start:p_end]
         display_text = _clean_display_text(p_raw)
+
+        # Verify paragraph display text matches DOM node text completely
+        dom_display = _clean_display_text(str(p_dom).encode("utf-8"))
+        if display_text != dom_display:
+            raise StatementIntegrityError(
+                f"Paragraph {idx} display text does not match DOM node text: {display_text!r} vs {dom_display!r}"
+            )
 
         p_proof = ProofSpan(
             byte_start=p_start,
@@ -1025,6 +1119,13 @@ def extract_fed_statement(
         if p_role not in ("media_inquiries", "implementation_note"):
             substantive_paras.append(display_text)
 
+    # Verify all paragraph spans are fully contained within container span
+    for p in paragraphs:
+        if not (container_proof.byte_start <= p.proof.byte_start < p.proof.byte_end <= container_proof.byte_end):
+            raise StatementIntegrityError(
+                f"Paragraph span [{p.proof.byte_start}, {p.proof.byte_end}] is not fully contained within container span [{container_proof.byte_start}, {container_proof.byte_end}]"
+            )
+
     # 9. Negative Body Validation: Check for JS-only barriers and unsupported document types
     body_text_lower = " ".join(p.display_text.lower() for p in paragraphs)
     if (
@@ -1047,14 +1148,31 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    # Reject unsupported document bodies (e.g. discount rate minutes, projections, speeches)
+    # Reject unsupported document bodies (e.g. task force, supervision, minutes, projections, speeches)
     unsupported_body_markers = [
+        "task force",
+        "taskforce",
+        "task-force",
+        "bank supervision",
+        "supervision on bank",
+        "vice chair for supervision",
+        "announced the formation",
+        "formation of a task force",
+        "announced the appointment",
+        "appointed",
+        "enforcement action",
+        "regulatory enforcement",
         "discount rate meetings",
         "discount rate minutes",
         "minutes of the board of governors",
         "minutes of the federal open market committee",
         "summary of economic projections",
         "advisory council meeting",
+        "community advisory council",
+        "testimony of",
+        "statement before the",
+        "joint press release",
+        "joint agency",
     ]
     for marker in unsupported_body_markers:
         if marker in body_text_lower:
@@ -1116,7 +1234,7 @@ def extract_fed_statement(
         statement_id=statement_id,
         profile_id=SUPPORTED_PROFILE,
         source_url=source_url,
-        issuer=manifest.get("issuer", "Federal Reserve Board"),
+        issuer=issuer_val,
         title=title_text,
         title_locator=title_locator,
         title_proof=title_proof,
@@ -1135,7 +1253,7 @@ def extract_fed_statement(
         paragraphs=paragraphs,
         substantive_statement_text=substantive_text,
         raw_blob_sha256=actual_sha,
-        parent_feed_reference=manifest.get("parent_feed_reference"),
+        parent_feed_reference=parent_feed_val,
         date_diagnostics=date_diagnostics,
     )
 
@@ -1211,22 +1329,47 @@ def build_fed_statement_bundle(
         "schema_version": STATEMENT_SCHEMA_VERSION,
         "manifest": {
             **manifest_data,
-            "acquisition_verification_status": acquisition_verification_status,
+            "acquisition_verification_status": (
+                "NOT_APPLICABLE_SYNTHETIC"
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else acquisition_verification_status
+            ),
             "extraction_summary": extraction_summary,
         },
         "document": extraction.document.to_dict() if extraction.document else None,
         "rejections": [r.to_dict() for r in extraction.rejections],
         "research_metadata": {
-            "provenance_class": manifest_data.get("research_provenance", "research_fixture"),
+            "provenance_class": (
+                "synthetic_fixture"
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else manifest_data.get("research_provenance", "research_fixture")
+            ),
             "usable_for_forecast": False,
             "statement_profile": SUPPORTED_PROFILE,
-            "acquisition_verification_status": acquisition_verification_status,
-            "historical_acquisition_status": "PARTIAL",
-            "article_collection_status": "research_sample_only_not_runtime_collected",
+            "acquisition_verification_status": (
+                "NOT_APPLICABLE_SYNTHETIC"
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else acquisition_verification_status
+            ),
+            "historical_acquisition_status": (
+                "NOT_APPLICABLE_SYNTHETIC"
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else "PARTIAL"
+            ),
+            "article_collection_status": (
+                "synthetic_fixture_test_only"
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else "research_sample_only_not_runtime_collected"
+            ),
             "notes": (
-                "Research extraction bundle for official FOMC statement text. "
-                "Acquired via bounded research fixture acquisition, not runtime R2 collector. "
-                "Historical acquisition status is PARTIAL; does not constitute verified production evidence or market outcome proof."
+                "Synthetic research fixture for offline test and parser verification. "
+                "Not acquired from live web or runtime collector; no live acquisition claims."
+                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                else (
+                    "Research extraction bundle for official FOMC statement text. "
+                    "Acquired via bounded research fixture acquisition, not runtime R2 collector. "
+                    "Historical acquisition status is PARTIAL; does not constitute verified production evidence or market outcome proof."
+                )
             ),
         },
     }

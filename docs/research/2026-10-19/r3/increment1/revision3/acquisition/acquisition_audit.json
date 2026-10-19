@@ -1,0 +1,61 @@
+{
+  "audit_version": "pythia-acquisition-audit-r312/1.0",
+  "audit_utc": "2026-10-19T13:00:00Z",
+  "verdict": "PARTIAL",
+  "summary": "Initial research acquisition script and stdout recovered verbatim from execution transcript. TLS verification, HTTPS enforcement, official domain whitelist, anonymous session, requests-level 20s timeout, max 2 redirects, and 2 MiB byte limits are confirmed in recovered code. However, the recovered script did not implement a hard process-level supervisor (such as SIGALRM or asyncio timeout wrapping redirects and response body streaming), and trust_env=False did not explicitly disable the requests.Session cookie jar across redirects. Additionally, initial manifest schema omitted explicit boolean eof_complete and discrete attempt counters. Per R3.1.2 instructions, no synthetic values are invented; historical acquisition proof is honestly declared PARTIAL. The offline statement extractor operates purely on saved bytes and does not rely on or claim runtime acquisition completeness.",
+  "recovered_execution": {
+    "script_file": "original_acquisition_script.py",
+    "execution_timestamp": "2026-10-19T07:47:12Z",
+    "server": "amper",
+    "user": "pythia",
+    "exit_code": 0,
+    "stdout": "[Acquiring] https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm...\n  Success: 84741 bytes, sha256=8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f\n  Saved to: raw_monetary20260916a.html and manifest_monetary20260916a.json\n[Acquiring] https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm...\n  Success: 83318 bytes, sha256=f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49\n  Saved to: raw_monetary20260729a.html and manifest_monetary20260729a.json\nDone! Summary written to /home/pythia/pythia-evidence-r31/docs/research/2026-10-19/r3/increment1/fixtures/fixtures_summary.json"
+  },
+  "proven_facts": {
+    "exact_urls_requested": [
+      "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm"
+    ],
+    "https_enforced": true,
+    "tls_verify": true,
+    "anonymous_session": true,
+    "trust_env_false": true,
+    "allowed_domains": [
+      "federalreserve.gov",
+      "www.federalreserve.gov"
+    ],
+    "max_bytes_limit": 2097152,
+    "timeout_seconds": 20.0,
+    "max_redirects_limit": 2,
+    "bytes_received_monetary20260916a": 84741,
+    "bytes_received_monetary20260729a": 83318,
+    "raw_sha256_monetary20260916a": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+    "raw_sha256_monetary20260729a": "f3cfa831daa2e63b0c370bd0de3b58cccc30439ee3e8378bc0a6c2dbf650ef49",
+    "html_ends_with_closing_tag": true,
+    "live_archives_unmodified": true
+  },
+  "unproven_or_missing_manifest_fields": {
+    "eof_complete": {
+      "status": "UNKNOWN_NOT_RECORDED",
+      "notes": "requests.Response.iter_content stream completed without throwing limit/timeout exceptions, but no discrete boolean eof_complete=True was stored in manifest."
+    },
+    "attempt_counter": {
+      "status": "UNKNOWN_NOT_RECORDED",
+      "notes": "Single-pass execution loop, but discrete attempt_count field was not in initial manifest schema."
+    },
+    "process_supervisor": {
+      "status": "NOT_IMPLEMENTED_IN_HISTORIC_SCRIPT",
+      "notes": "Recovered script passed timeout=20.0 to requests.get() but lacked an overarching process-level deadline or timeout wrapping multiple redirects and chunked body iteration. Elapsed time was only measured post-hoc via perf_counter()."
+    },
+    "redirect_cookie_isolation": {
+      "status": "NOT_EXPLICITLY_DISABLED",
+      "notes": "While trust_env=False prevented ambient environment credentials, the in-memory requests.Session cookie jar was not explicitly cleared on intermediate redirects."
+    }
+  },
+  "offline_parser_status": {
+    "status": "100%_PASS",
+    "total_tests_passed": 240,
+    "proofspans_valid": "100%",
+    "zero_network_enforced": true
+  }
+}

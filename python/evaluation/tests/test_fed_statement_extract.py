@@ -46,7 +46,7 @@ from python.evaluation.fed_statement_extract import (
     publish_statement_preview,
 )
 
-FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "docs/research/2026-10-19/r3/increment1/fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "docs/research/2026-10-19/r3/increment1/revision2/fixtures"
 
 
 @pytest.fixture(autouse=True)
@@ -94,7 +94,9 @@ def _make_fixture_and_manifest(
         "duration_ms": 1000.0,
         "collected_at": "2026-10-19T10:00:01+00:00",
         "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
         "parent_feed_reference": {
+            "fixture_kind": "synthetic_fixture",
             "source_id": "fed_monetary_rss",
             "feed_fact_id": "fact-synthetic-test",
             "feed_receipt_id": "receipt-synthetic-test",
@@ -265,6 +267,8 @@ def test_invalid_utf8_encoding_rejected(tmp_path: Path):
         "transport_outcome": "success",
         "http_status": 200,
         "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+        "parent_feed_reference": {"fixture_kind": "synthetic_fixture"},
     }
     result = extract_fed_statement(bad_bytes, manifest)
     assert not result.is_success
@@ -306,6 +310,8 @@ def test_challenge_barrier_rejected(tmp_path: Path):
         "transport_outcome": "success",
         "http_status": 200,
         "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+        "parent_feed_reference": {"fixture_kind": "synthetic_fixture"},
     }
     result = extract_fed_statement(challenge_html, manifest)
     assert not result.is_success
@@ -816,3 +822,188 @@ def test_f6_temp_symlink_preserves_input(tmp_path: Path):
         publish_statement_preview(preview_text, final, fpath, mpath)
     after = fpath.read_bytes()
     assert before == after
+
+
+# ==============================================================================
+# R3.1.3 Contract Boundaries (F1, F2, F3)
+# ==============================================================================
+
+def test_f1_mandatory_issuer_no_invention():
+    """F1: Missing, null, or unsupported issuer must be rejected honestly."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
+        "parent_feed_reference": {"fixture_kind": "synthetic_fixture"},
+    }
+
+    # Missing issuer
+    res_missing = extract_fed_statement(raw, base_man)
+    assert not res_missing.is_success
+    assert res_missing.rejections[0].status == "invalid_manifest"
+
+    # Explicit null issuer
+    man_null = {**base_man, "issuer": None}
+    res_null = extract_fed_statement(raw, man_null)
+    assert not res_null.is_success
+    assert res_null.rejections[0].status == "invalid_manifest"
+
+    # Unsupported issuer
+    man_bad = {**base_man, "issuer": "Random Organization"}
+    res_bad = extract_fed_statement(raw, man_bad)
+    assert not res_bad.is_success
+    assert res_bad.rejections[0].status == "invalid_manifest"
+
+    # Supported issuer preserved
+    man_ok = {**base_man, "issuer": "Federal Reserve Board"}
+    res_ok = extract_fed_statement(raw, man_ok)
+    assert res_ok.is_success
+    assert res_ok.document.issuer == "Federal Reserve Board"
+
+
+def test_f1_typed_parent_lineage_validation():
+    """F1: Real research manifests require typed parent lineage; non-typed parent rejected."""
+    raw = _create_minimal_valid_html()
+    real_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+
+    # Missing parent_feed_reference on real manifest
+    res_missing = extract_fed_statement(raw, real_man)
+    assert not res_missing.is_success
+    assert res_missing.rejections[0].status == "invalid_manifest"
+
+    # Non-typed dummy parent reference
+    man_dummy = {**real_man, "parent_feed_reference": {"label": "not a feed reference"}}
+    res_dummy = extract_fed_statement(raw, man_dummy)
+    assert not res_dummy.is_success
+    assert res_dummy.rejections[0].status == "invalid_manifest"
+
+    # Complete typed parent reference accepted
+    man_typed = {
+        **real_man,
+        "parent_feed_reference": {
+            "archive_name": "live-r2-revision3",
+            "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+            "feed_fact_id": "fact-b7cdc057cc6ec28d",
+            "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+            "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        },
+    }
+    res_typed = extract_fed_statement(raw, man_typed)
+    assert res_typed.is_success
+    assert res_typed.document.parent_feed_reference["feed_fact_id"] == "fact-b7cdc057cc6ec28d"
+
+
+def test_f1_final_url_path_profile_matching():
+    """F1: final_url path must match official statement endpoint prefix."""
+    raw = _create_minimal_valid_html()
+    man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/aboutthefed.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+        "parent_feed_reference": {"fixture_kind": "synthetic_fixture"},
+    }
+    res = extract_fed_statement(raw, man)
+    assert not res.is_success
+    assert res.rejections[0].status == "unsupported_source_url"
+
+
+def test_f1_synthetic_metadata_honesty(tmp_path: Path):
+    """F1: Synthetic bundles must not claim bounded research fixture acquisition."""
+    raw = _create_minimal_valid_html()
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "synth_honesty", raw)
+    out_dir = tmp_path / "out"
+    path, bundle = build_fed_statement_bundle(fpath, mpath, out_dir)
+
+    payload = bundle["statement_bundle"]
+    assert payload["research_metadata"]["provenance_class"] == "synthetic_fixture"
+    assert payload["research_metadata"]["acquisition_verification_status"] == "NOT_APPLICABLE_SYNTHETIC"
+    assert "bounded research fixture acquisition" not in payload["research_metadata"]["notes"]
+
+    preview = generate_statement_preview(bundle)
+    assert "- **Provenance Class:** `synthetic_fixture`" in preview
+    assert "- **Acquisition Verification Status:** `NOT_APPLICABLE_SYNTHETIC`" in preview
+
+
+def test_f2_taskforce_body_rejected_under_statement_skeleton(tmp_path: Path):
+    """F2: Task force on bank supervision body under statement skeleton rejected."""
+    raw = _create_minimal_valid_html(
+        paragraphs=["The Federal Reserve Board announced the formation of a task force on bank supervision, chaired by the Vice Chair for Supervision."]
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "taskforce_body", raw)
+    res = extract_fed_statement(raw, json.loads(mpath.read_text()))
+    assert not res.is_success
+    assert res.rejections[0].status == "unsupported_document_type"
+
+
+def test_f3_comment_closing_p_preserves_full_statement(tmp_path: Path):
+    """F3: Inline comment with closing tag decoy does not truncate statement text."""
+    p_html = "<p>The Committee decided <!-- </p> --> to maintain the range at 4 to 5 percent.</p>"
+    raw = (
+        b"<!doctype html><html><body>\r\n"
+        b"<div id=\"article\">\r\n"
+        b"<div class=\"heading col-xs-12 col-sm-8 col-md-8\">\r\n"
+        b"<p class=\"article__time\">September 16, 2026</p>\r\n"
+        b"<h3 class=\"title\">Federal Reserve issues FOMC statement</h3>\r\n"
+        b"<p class=\"releaseTime\">For release at 2:00 p.m. EDT</p>\r\n"
+        b"</div>\r\n"
+        b"<div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n"
+        + p_html.encode("utf-8") +
+        b"</div>\r\n"
+        b"</div>\r\n"
+        b"</body></html>"
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "comment_p", raw)
+    res = extract_fed_statement(raw, json.loads(mpath.read_text()))
+    assert res.is_success
+    doc = res.document
+    assert len(doc.paragraphs) == 1
+    assert doc.paragraphs[0].display_text == "The Committee decided to maintain the range at 4 to 5 percent."
+    assert "4 to 5 percent" in doc.paragraphs[0].proof.raw_quote_text
+    assert doc.paragraphs[0].proof.verify_against_blob(raw)
+
+
+def test_f3_comment_closing_div_preserves_container_containment(tmp_path: Path):
+    """F3: Inline comment with closing div decoy does not truncate container or break containment."""
+    body_html = (
+        "<!-- </div> --><p>The Committee decided to maintain the range at 4 to 5 percent.</p>"
+    )
+    raw = (
+        b"<!doctype html><html><body>\r\n"
+        b"<div id=\"article\">\r\n"
+        b"<div class=\"heading col-xs-12 col-sm-8 col-md-8\">\r\n"
+        b"<p class=\"article__time\">September 16, 2026</p>\r\n"
+        b"<h3 class=\"title\">Federal Reserve issues FOMC statement</h3>\r\n"
+        b"<p class=\"releaseTime\">For release at 2:00 p.m. EDT</p>\r\n"
+        b"</div>\r\n"
+        b"<div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n"
+        + body_html.encode("utf-8") +
+        b"</div>\r\n"
+        b"</div>\r\n"
+        b"</body></html>"
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "comment_div", raw)
+    res = extract_fed_statement(raw, json.loads(mpath.read_text()))
+    assert res.is_success
+    doc = res.document
+    assert len(doc.paragraphs) == 1
+    assert doc.container_proof.byte_start <= doc.paragraphs[0].proof.byte_start
+    assert doc.paragraphs[0].proof.byte_end <= doc.container_proof.byte_end
