@@ -1,4 +1,4 @@
-"""Pythia R3.1.1: Pure Offline Parser and Extractor for Official FOMC Statements.
+"""Pythia R3.1.2: Pure Offline Parser and Extractor for Official FOMC Statements.
 
 Extracts structured FOMC statement content from raw HTML fixtures with exact ProofSpan linkages:
 - Document profile: fomc_press_release_v1
@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 
-STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.1"
-STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.1"
-STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.1"
+STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.2"
+STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.2"
+STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.2"
 SUPPORTED_PROFILE = "fomc_press_release_v1"
 
 OFFICIAL_DOMAINS = {"federalreserve.gov", "www.federalreserve.gov"}
@@ -169,7 +169,7 @@ class ExtractionResult:
 
 def _clean_display_text(raw_html_fragment: bytes) -> str:
     """Clean and normalize HTML fragment into human-readable display text.
-    
+
     BeautifulSoup get_text() handles HTML entities decoding exactly once.
     Do NOT apply secondary html.unescape() which would corrupt literal escaped entities.
     """
@@ -218,7 +218,7 @@ def _parse_release_time(
     published_date: Optional[str],
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Parse release time string if it contains explicit time and timezone.
-    
+
     Returns (iso_published_at, provenance, diagnostic_reason).
     """
     if not release_str or not published_date:
@@ -283,6 +283,15 @@ def _find_matching_closing_div(blob: bytes, open_pos: int) -> int:
     return pos
 
 
+def _node_byte_start(node: Any, lines: List[str], line_offsets: List[int]) -> int:
+    """Calculate exact UTF-8 byte start offset of a BeautifulSoup Tag in raw bytes."""
+    line_idx = getattr(node, "sourceline", None)
+    col_idx = getattr(node, "sourcepos", None)
+    if line_idx is None or col_idx is None or line_idx < 1 or line_idx > len(lines):
+        return -1
+    return line_offsets[line_idx - 1] + len(lines[line_idx - 1][:col_idx].encode("utf-8"))
+
+
 def _build_element_selector(el: Any, root_selector: str, root_elem: Any) -> str:
     """Build an unambiguous, hierarchical CSS selector from root_elem down to el."""
     parts = []
@@ -292,7 +301,8 @@ def _build_element_selector(el: Any, root_selector: str, root_elem: Any) -> str:
         if parent is None:
             break
         siblings = [c for c in parent.children if getattr(c, "name", None) == curr.name]
-        idx = siblings.index(curr) + 1
+        # Use object identity 'is' rather than structural equality '==' to avoid duplicate identical siblings sharing index
+        idx = next(i for i, c in enumerate(siblings) if c is curr) + 1
         parts.append(f"{curr.name}:nth-of-type({idx})")
         curr = parent
     parts.reverse()
@@ -306,7 +316,7 @@ def extract_fed_statement(
     manifest: Dict[str, Any],
 ) -> ExtractionResult:
     """Pure offline extraction of official FOMC statement from raw HTML and manifest.
-    
+
     Enforces exact ProofSpan byte offsets, independent proof verification, strict
     document profile matching, unambiguous locators, and explicit provenance.
     """
@@ -328,7 +338,15 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    required_fields = ["source_url", "final_url", "blob_sha256", "bytes_stored", "transport_outcome"]
+    required_fields = [
+        "source_url",
+        "final_url",
+        "blob_sha256",
+        "bytes_stored",
+        "transport_outcome",
+        "http_status",
+        "research_provenance",
+    ]
     missing_fields = [f for f in required_fields if f not in manifest or manifest[f] is None]
     if missing_fields:
         return ExtractionResult(
@@ -337,7 +355,7 @@ def extract_fed_statement(
                 RejectionRecord(
                     status="invalid_manifest",
                     reason=f"Manifest missing mandatory fields: {missing_fields}",
-                    source_url=manifest.get("source_url"),
+                    source_url=manifest.get("source_url") if isinstance(manifest.get("source_url"), str) else None,
                     raw_blob_sha256=actual_sha,
                 )
             ],
@@ -348,9 +366,178 @@ def extract_fed_statement(
     source_url = manifest["source_url"]
     final_url = manifest["final_url"]
 
-    # Validate official identity of source and final URLs
+    # Type validation: URLs must be string
+    if not isinstance(source_url, str) or not isinstance(final_url, str):
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"URL fields must be strings, got source_url={type(source_url).__name__}, final_url={type(final_url).__name__}",
+                    source_url=None,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    # Type validation: bytes_stored must be integer
+    bytes_stored = manifest["bytes_stored"]
+    if type(bytes_stored) is not int:
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"Manifest 'bytes_stored' must be integer, got {type(bytes_stored).__name__}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    # Type validation: http_status must be int and 200
+    http_status = manifest["http_status"]
+    if type(http_status) is not int or http_status != 200:
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="transport_failure",
+                    reason=f"Transport failed or incomplete: http_status must be 200, got {http_status!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    # Check transport outcome
+    transport_outcome = manifest["transport_outcome"]
+    if transport_outcome != "success":
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="transport_failure",
+                    reason=f"Incomplete/failed acquisition: transport_outcome='{transport_outcome}'",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    # Explicit transport completeness flags
+    if manifest.get("complete") is False or manifest.get("eof_complete") is False:
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="transport_failure",
+                    reason="Manifest explicitly indicates incomplete transport (complete=False or eof_complete=False)",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    # Validate provenance and reject contradictory metadata
+    usable_for_forecast = manifest.get("usable_for_forecast")
+    if usable_for_forecast is True:
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason="usable_for_forecast cannot be True for offline research fixture",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    research_provenance = manifest["research_provenance"]
+    if not isinstance(research_provenance, str) or research_provenance not in (
+        "downloaded_research_fixture",
+        "synthetic_fixture",
+        "research_fixture",
+    ):
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"Invalid or contradictory research_provenance: {research_provenance!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    issuer_val = manifest.get("issuer")
+    if issuer_val is not None:
+        if not isinstance(issuer_val, str) or issuer_val not in ("Federal Reserve Board", "Federal Open Market Committee"):
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"Contradictory or unsupported issuer in manifest: {issuer_val!r}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+    parent_feed_val = manifest.get("parent_feed_reference")
+    if parent_feed_val is not None:
+        if not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason="parent_feed_reference must be a non-empty dictionary when provided",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+    # URL scheme and official domain validation
     parsed_source = urllib.parse.urlsplit(source_url)
     parsed_final = urllib.parse.urlsplit(final_url)
+    if parsed_source.scheme.lower() != "https" or parsed_final.scheme.lower() != "https":
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="unsupported_source_url",
+                    reason=f"URL scheme must be 'https', got source scheme='{parsed_source.scheme}', final scheme='{parsed_final.scheme}'",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
     if (
         parsed_source.netloc.lower() not in OFFICIAL_DOMAINS
         or parsed_final.netloc.lower() not in OFFICIAL_DOMAINS
@@ -369,16 +556,16 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    # Check transport outcome
-    transport_outcome = manifest.get("transport_outcome")
-    http_status = manifest.get("http_status", 200)
-    if transport_outcome != "success" or (http_status is not None and http_status != 200):
+    if not (
+        parsed_source.path.startswith("/newsevents/pressreleases/monetary")
+        or "/pressreleases/monetary" in parsed_source.path
+    ):
         return ExtractionResult(
             document=None,
             rejections=[
                 RejectionRecord(
-                    status="transport_failure",
-                    reason=f"Incomplete/failed acquisition: transport_outcome='{transport_outcome}', http_status={http_status}",
+                    status="unsupported_source_url",
+                    reason=f"URL path '{parsed_source.path}' does not match official FOMC press release statement endpoint",
                     source_url=source_url,
                     raw_blob_sha256=actual_sha,
                 )
@@ -437,6 +624,11 @@ def extract_fed_statement(
             extractor_version=STATEMENT_EXTRACTOR_VERSION,
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
+
+    raw_lines = raw_text.splitlines(keepends=True)
+    line_byte_offsets = [0]
+    for line in raw_lines:
+        line_byte_offsets.append(line_byte_offsets[-1] + len(line.encode("utf-8")))
 
     # 3. Detect bot challenges / JS-only walls
     lower_raw = raw_text.lower()
@@ -608,8 +800,35 @@ def extract_fed_statement(
     date_diagnostics = None
 
     if feed_pub_at and published_date:
+        mismatch_detected = False
+        mismatch_reason = None
         feed_date_str = feed_pub_at[:10]
-        if feed_date_str != published_date:
+
+        if published_at:
+            try:
+                page_dt = datetime.fromisoformat(published_at).astimezone(timezone.utc)
+                feed_dt = datetime.fromisoformat(feed_pub_at).astimezone(timezone.utc)
+                if page_dt.date() != feed_dt.date():
+                    mismatch_detected = True
+                    mismatch_reason = (
+                        f"Page UTC date ({page_dt.date().isoformat()}) differs from "
+                        f"feed UTC date ({feed_dt.date().isoformat()})"
+                    )
+            except Exception:
+                if feed_date_str != published_date:
+                    mismatch_detected = True
+                    mismatch_reason = f"Page calendar date ({published_date}) differs from feed date ({feed_date_str})"
+        else:
+            feed_dt_utc_date = None
+            try:
+                feed_dt_utc_date = datetime.fromisoformat(feed_pub_at).astimezone(timezone.utc).date().isoformat()
+            except Exception:
+                pass
+            if published_date != feed_date_str and published_date != feed_dt_utc_date:
+                mismatch_detected = True
+                mismatch_reason = f"Page calendar date ({published_date}) differs from parent feed date ({feed_date_str})"
+
+        if mismatch_detected:
             date_diagnostics = {
                 "date_mismatch_detected": True,
                 "page_published_date": published_date,
@@ -617,7 +836,7 @@ def extract_fed_statement(
                 "feed_published_at": feed_pub_at,
                 "feed_raw_pub_date": feed_raw_pub,
                 "time_diagnostic": time_diag,
-                "reason": f"Page calendar date ({published_date}) differs from parent feed date ({feed_date_str})",
+                "reason": mismatch_reason,
             }
         else:
             date_diagnostics = {
@@ -657,123 +876,72 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
-    # 7. Exact byte locating in raw_bytes
-    article_attr_match = re.search(rb'<div\s+[^>]*id=["\']article["\'][^>]*>', raw_bytes, re.IGNORECASE)
-    if not article_attr_match:
-        return ExtractionResult(
-            document=None,
-            rejections=[
-                RejectionRecord(
-                    status="unsupported_structure",
-                    reason="Could not locate id='article' tag in raw bytes",
-                    source_url=source_url,
-                    raw_blob_sha256=actual_sha,
-                )
-            ],
-            extractor_version=STATEMENT_EXTRACTOR_VERSION,
-            schema_version=STATEMENT_SCHEMA_VERSION,
-        )
-    article_byte_pos = article_attr_match.start()
-
-    # Find heading tag in raw bytes
-    heading_match = re.search(rb'<div\s+[^>]*class=["\'][^"\']*\bheading\b[^"\']*["\'][^>]*>', raw_bytes[article_byte_pos:], re.IGNORECASE)
-    if not heading_match:
-        return ExtractionResult(
-            document=None,
-            rejections=[
-                RejectionRecord(
-                    status="unsupported_structure",
-                    reason="Could not locate .heading container in raw HTML bytes",
-                    source_url=source_url,
-                    raw_blob_sha256=actual_sha,
-                )
-            ],
-            extractor_version=STATEMENT_EXTRACTOR_VERSION,
-            schema_version=STATEMENT_SCHEMA_VERSION,
-        )
-    heading_byte_pos = article_byte_pos + heading_match.start()
-
-    # Locate date_proof inside heading
-    date_regex = re.compile(
-        rb'<p\s+class=["\']article__time["\']>.*?</p>',
-        re.DOTALL | re.IGNORECASE,
-    )
-    date_match = date_regex.search(raw_bytes, heading_byte_pos)
-    if not date_match:
-        raise StatementIntegrityError("Failed to locate exact date tag in raw bytes")
+    # 7. Exact byte locating in raw_bytes using DOM sourceline/sourcepos
+    date_start = _node_byte_start(date_elem, raw_lines, line_byte_offsets)
+    if date_start == -1:
+        raise StatementIntegrityError("Failed to calculate date element byte start position")
+    date_end = raw_bytes.find(b"</p>", date_start)
+    if date_end == -1:
+        raise StatementIntegrityError("Failed to locate closing </p> for date element in raw bytes")
+    date_end += 4
+    date_slice = raw_bytes[date_start:date_end]
     date_proof = ProofSpan(
-        byte_start=date_match.start(),
-        byte_end=date_match.end(),
-        quote_sha256=hashlib.sha256(date_match.group(0)).hexdigest(),
+        byte_start=date_start,
+        byte_end=date_end,
+        quote_sha256=hashlib.sha256(date_slice).hexdigest(),
         raw_blob_sha256=actual_sha,
-        raw_quote_text=date_match.group(0).decode("utf-8"),
+        raw_quote_text=date_slice.decode("utf-8"),
     )
     date_locator = {"type": "css_selector", "selector": "#article > div.heading p.article__time"}
 
-    # Locate title_proof inside heading (strictly skipping comments)
-    title_regex = re.compile(
-        rb'<h[1-3]\s+class=["\']title["\']>.*?</h[1-3]>',
-        re.DOTALL | re.IGNORECASE,
-    )
-    title_match = title_regex.search(raw_bytes, heading_byte_pos)
-    if not title_match:
-        raise StatementIntegrityError("Failed to locate exact title tag in raw bytes")
-    raw_title_slice = title_match.group(0)
-    raw_title_parsed = BeautifulSoup(raw_title_slice.decode("utf-8"), "html.parser").get_text(strip=True)
-    if raw_title_parsed != title_text:
-        raise StatementIntegrityError(
-            f"Title proof raw slice parsed to '{raw_title_parsed}', which does not match DOM title '{title_text}'"
-        )
+    # Locate title_proof directly at title_elem
+    title_start = _node_byte_start(title_elem, raw_lines, line_byte_offsets)
+    if title_start == -1:
+        raise StatementIntegrityError("Failed to calculate title element byte start position")
+    close_title_tag = f"</{title_elem.name}>".encode("utf-8")
+    title_end = raw_bytes.find(close_title_tag, title_start)
+    if title_end == -1:
+        raise StatementIntegrityError(f"Failed to locate closing </{title_elem.name}> for title element in raw bytes")
+    title_end += len(close_title_tag)
+    title_slice = raw_bytes[title_start:title_end]
     title_proof = ProofSpan(
-        byte_start=title_match.start(),
-        byte_end=title_match.end(),
-        quote_sha256=hashlib.sha256(raw_title_slice).hexdigest(),
+        byte_start=title_start,
+        byte_end=title_end,
+        quote_sha256=hashlib.sha256(title_slice).hexdigest(),
         raw_blob_sha256=actual_sha,
-        raw_quote_text=raw_title_slice.decode("utf-8"),
+        raw_quote_text=title_slice.decode("utf-8"),
     )
-    title_locator = {"type": "css_selector", "selector": "#article > div.heading h3.title"}
+    title_locator = {
+        "type": "css_selector",
+        "selector": f"#article > div.heading {title_elem.name}.title",
+    }
 
-    # Locate release_time_proof if present inside heading
+    # Locate release_time_proof if present directly at release_time_elem
     release_time_proof = None
     release_time_locator = None
     if release_time_elem:
-        rel_regex = re.compile(
-            rb'<p\s+class=["\']releaseTime["\']>.*?</p>',
-            re.DOTALL | re.IGNORECASE,
-        )
-        rel_match = rel_regex.search(raw_bytes, heading_byte_pos)
-        if rel_match:
-            release_time_proof = ProofSpan(
-                byte_start=rel_match.start(),
-                byte_end=rel_match.end(),
-                quote_sha256=hashlib.sha256(rel_match.group(0)).hexdigest(),
-                raw_blob_sha256=actual_sha,
-                raw_quote_text=rel_match.group(0).decode("utf-8"),
-            )
-            release_time_locator = {"type": "css_selector", "selector": "#article > div.heading p.releaseTime"}
+        rel_start = _node_byte_start(release_time_elem, raw_lines, line_byte_offsets)
+        if rel_start != -1:
+            rel_end = raw_bytes.find(b"</p>", rel_start)
+            if rel_end != -1:
+                rel_end += 4
+                rel_slice = raw_bytes[rel_start:rel_end]
+                release_time_proof = ProofSpan(
+                    byte_start=rel_start,
+                    byte_end=rel_end,
+                    quote_sha256=hashlib.sha256(rel_slice).hexdigest(),
+                    raw_blob_sha256=actual_sha,
+                    raw_quote_text=rel_slice.decode("utf-8"),
+                )
+                release_time_locator = {
+                    "type": "css_selector",
+                    "selector": "#article > div.heading p.releaseTime",
+                }
 
     # Locate statement container in raw bytes
-    container_regex = re.compile(
-        rb'<div\s+(?![^>]*\bheading\b)[^>]*class=["\'][^"\']*\bcol-xs-12\b[^"\']*\bcol-sm-8\b[^"\']*\bcol-md-8\b[^"\']*["\'][^>]*>',
-        re.IGNORECASE,
-    )
-    cont_match = container_regex.search(raw_bytes, title_match.end())
-    if not cont_match:
-        return ExtractionResult(
-            document=None,
-            rejections=[
-                RejectionRecord(
-                    status="unsupported_structure",
-                    reason="Could not locate statement container in raw HTML bytes",
-                    source_url=source_url,
-                    raw_blob_sha256=actual_sha,
-                )
-            ],
-            extractor_version=STATEMENT_EXTRACTOR_VERSION,
-            schema_version=STATEMENT_SCHEMA_VERSION,
-        )
-
-    cont_start = cont_match.start()
+    cont_start = _node_byte_start(body_div, raw_lines, line_byte_offsets)
+    if cont_start == -1:
+        raise StatementIntegrityError("Failed to calculate statement container byte start position")
     cont_end = _find_matching_closing_div(raw_bytes, cont_start)
     if cont_end == -1:
         return ExtractionResult(
@@ -804,47 +972,24 @@ def extract_fed_statement(
     }
 
     # 8. Extract paragraph items within container slice with unambiguous locators
-    p_regex = re.compile(rb'<p(?:\s[^>]*)?>.*?</p>', re.DOTALL | re.IGNORECASE)
+    dom_p_tags = [p for p in body_div.find_all("p") if _clean_display_text(p.encode("utf-8"))]
     paragraphs: List[StatementParagraph] = []
     substantive_paras: List[str] = []
 
-    # Collect DOM paragraphs from body_div with display text
-    dom_p_tags = [p for p in body_div.find_all("p") if _clean_display_text(p.encode("utf-8"))]
-    raw_p_matches = []
-    for p_m in p_regex.finditer(container_slice):
-        abs_p_start = cont_start + p_m.start()
-        abs_p_end = cont_start + p_m.end()
-        p_raw = raw_bytes[abs_p_start:abs_p_end]
-        disp = _clean_display_text(p_raw)
-        if disp:
-            raw_p_matches.append((p_m, abs_p_start, abs_p_end, p_raw, disp))
-
-    if len(dom_p_tags) != len(raw_p_matches):
-        return ExtractionResult(
-            document=None,
-            rejections=[
-                RejectionRecord(
-                    status="unsupported_structure",
-                    reason=f"Mismatch between DOM paragraph count ({len(dom_p_tags)}) and raw HTML paragraph slices ({len(raw_p_matches)})",
-                    source_url=source_url,
-                    raw_blob_sha256=actual_sha,
-                )
-            ],
-            extractor_version=STATEMENT_EXTRACTOR_VERSION,
-            schema_version=STATEMENT_SCHEMA_VERSION,
-        )
-
-    for idx, (p_dom, (_, abs_p_start, abs_p_end, p_raw, display_text)) in enumerate(zip(dom_p_tags, raw_p_matches)):
-        # Check correspondence between DOM text and raw slice display text
-        dom_display = _clean_display_text(p_dom.encode("utf-8"))
-        if dom_display != display_text:
-            raise StatementIntegrityError(
-                f"Paragraph text mismatch at index {idx}: DOM '{dom_display}' vs raw slice '{display_text}'"
-            )
+    for idx, p_dom in enumerate(dom_p_tags):
+        p_start = _node_byte_start(p_dom, raw_lines, line_byte_offsets)
+        if p_start == -1:
+            raise StatementIntegrityError(f"Failed to calculate paragraph {idx} byte start position")
+        p_end = raw_bytes.find(b"</p>", p_start)
+        if p_end == -1:
+            raise StatementIntegrityError(f"Failed to locate closing </p> for paragraph {idx}")
+        p_end += 4
+        p_raw = raw_bytes[p_start:p_end]
+        display_text = _clean_display_text(p_raw)
 
         p_proof = ProofSpan(
-            byte_start=abs_p_start,
-            byte_end=abs_p_end,
+            byte_start=p_start,
+            byte_end=p_end,
             quote_sha256=hashlib.sha256(p_raw).hexdigest(),
             raw_blob_sha256=actual_sha,
             raw_quote_text=p_raw.decode("utf-8"),
@@ -856,11 +1001,10 @@ def extract_fed_statement(
             root_elem=body_div,
         )
 
-        # Verify unambiguous selector cardinality in DOM
-        matches_count = len(soup.select(p_selector))
-        if matches_count != 1:
+        matched_nodes = soup.select(p_selector)
+        if len(matched_nodes) != 1 or matched_nodes[0] is not p_dom:
             raise StatementIntegrityError(
-                f"Paragraph selector '{p_selector}' is not unambiguous (matches {matches_count} nodes, expected 1)"
+                f"Paragraph selector '{p_selector}' does not resolve uniquely to the target DOM node (matches {len(matched_nodes)})"
             )
 
         p_locator = {
@@ -881,7 +1025,7 @@ def extract_fed_statement(
         if p_role not in ("media_inquiries", "implementation_note"):
             substantive_paras.append(display_text)
 
-    # 9. Negative Body Validation: Check for JS-only / Bot challenge barrier inside body
+    # 9. Negative Body Validation: Check for JS-only barriers and unsupported document types
     body_text_lower = " ".join(p.display_text.lower() for p in paragraphs)
     if (
         "enable javascript to view this article" in body_text_lower
@@ -902,6 +1046,31 @@ def extract_fed_statement(
             extractor_version=STATEMENT_EXTRACTOR_VERSION,
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
+
+    # Reject unsupported document bodies (e.g. discount rate minutes, projections, speeches)
+    unsupported_body_markers = [
+        "discount rate meetings",
+        "discount rate minutes",
+        "minutes of the board of governors",
+        "minutes of the federal open market committee",
+        "summary of economic projections",
+        "advisory council meeting",
+    ]
+    for marker in unsupported_body_markers:
+        if marker in body_text_lower:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="unsupported_document_type",
+                        reason=f"Article body indicates unsupported document type ({marker!r})",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
 
     if len(paragraphs) == 0 or len(substantive_paras) == 0:
         return ExtractionResult(
@@ -947,7 +1116,7 @@ def extract_fed_statement(
         statement_id=statement_id,
         profile_id=SUPPORTED_PROFILE,
         source_url=source_url,
-        issuer="Federal Reserve Board",
+        issuer=manifest.get("issuer", "Federal Reserve Board"),
         title=title_text,
         title_locator=title_locator,
         title_proof=title_proof,
@@ -984,12 +1153,12 @@ def build_fed_statement_bundle(
     output_dir: Path | str,
 ) -> Tuple[Path, Dict[str, Any]]:
     """Build and publish an immutable, deterministic research statement bundle.
-    
+
     Guarantees:
     - Zero network execution.
-    - Output directory validation: cannot publish inside or equal to fixture dir or live archive dirs.
+    - Output directory validation: cannot publish inside or equal to fixture dir, manifest dir, or live archive dirs.
     - Deterministic bundle_digest based on canonical JSON content.
-    - Atomic publication via os.link (FileExistsError handled safely).
+    - Safe atomic publication via O_CREAT | O_EXCL and os.link.
     - Idempotent replay for identical content; collision rejection without clobbering.
     - Frozen versions preserved even in rejected/zero-block outcomes.
     """
@@ -997,16 +1166,22 @@ def build_fed_statement_bundle(
     mpath = Path(manifest_path).resolve()
     out_dir = Path(output_dir).resolve()
     fixture_dir = fpath.parent.resolve()
+    manifest_dir = mpath.parent.resolve()
 
     if not fpath.is_file():
         raise FileNotFoundError(f"Fixture file not found: {fpath}")
     if not mpath.is_file():
         raise FileNotFoundError(f"Manifest file not found: {mpath}")
 
-    # Check forbidden output destinations
-    if out_dir == fixture_dir or out_dir.is_relative_to(fixture_dir):
+    # Check forbidden output destinations (both fixture and manifest directories and ancestors/children)
+    if (
+        out_dir == fixture_dir
+        or out_dir.is_relative_to(fixture_dir)
+        or out_dir == manifest_dir
+        or out_dir.is_relative_to(manifest_dir)
+    ):
         raise StatementPublishError(
-            f"Forbidden output_dir '{out_dir}': cannot publish inside or equal to fixture input directory '{fixture_dir}'"
+            f"Forbidden output_dir '{out_dir}': cannot publish inside or equal to input directories ('{fixture_dir}', '{manifest_dir}')"
         )
 
     live_data_base = Path("/home/pythia/pythia-evidence-r2-data").resolve()
@@ -1028,25 +1203,30 @@ def build_fed_statement_bundle(
         "rejection_count": len(extraction.rejections),
     }
 
+    acquisition_verification_status = manifest_data.get("acquisition_verification_status", "PARTIAL")
+
     bundle_payload = {
         "bundle_version": STATEMENT_BUNDLE_VERSION,
         "extractor_version": STATEMENT_EXTRACTOR_VERSION,
         "schema_version": STATEMENT_SCHEMA_VERSION,
         "manifest": {
             **manifest_data,
+            "acquisition_verification_status": acquisition_verification_status,
             "extraction_summary": extraction_summary,
         },
         "document": extraction.document.to_dict() if extraction.document else None,
         "rejections": [r.to_dict() for r in extraction.rejections],
         "research_metadata": {
-            "provenance_class": "research_fixture",
+            "provenance_class": manifest_data.get("research_provenance", "research_fixture"),
             "usable_for_forecast": False,
             "statement_profile": SUPPORTED_PROFILE,
+            "acquisition_verification_status": acquisition_verification_status,
+            "historical_acquisition_status": "PARTIAL",
             "article_collection_status": "research_sample_only_not_runtime_collected",
             "notes": (
                 "Research extraction bundle for official FOMC statement text. "
                 "Acquired via bounded research fixture acquisition, not runtime R2 collector. "
-                "Does not constitute verified production evidence or market outcome proof."
+                "Historical acquisition status is PARTIAL; does not constitute verified production evidence or market outcome proof."
             ),
         },
     }
@@ -1067,10 +1247,20 @@ def build_fed_statement_bundle(
     final_json_bytes = json.dumps(bundle_data, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8")
     target_path = out_dir / f"statement_bundle_{bundle_digest}.json"
 
-    # Atomic publication via temporary file and os.link
+    # Safe atomic publication via O_CREAT | O_EXCL and os.link
     tmp_path = out_dir / f".tmp_publish_{os.getpid()}_{hashlib.sha256(final_json_bytes).hexdigest()[:8]}.json"
+    created = False
     try:
-        tmp_path.write_bytes(final_json_bytes)
+        try:
+            fd = os.open(str(tmp_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            created = True
+        except FileExistsError:
+            raise StatementPublishError(
+                f"Temporary publication target '{tmp_path.name}' already exists (symlink or collision). Operation aborted."
+            )
+        with os.fdopen(fd, "wb") as f_tmp:
+            f_tmp.write(final_json_bytes)
+
         try:
             os.link(tmp_path, target_path)
         except FileExistsError:
@@ -1084,8 +1274,11 @@ def build_fed_statement_bundle(
                     f"with differing content! Competing bytes preserved without clobber."
                 )
     finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
+        if created and (tmp_path.is_symlink() or tmp_path.exists()):
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
     return target_path, bundle_data
 
@@ -1101,14 +1294,20 @@ def publish_statement_preview(
     mpath = Path(manifest_path).resolve()
     target = Path(preview_path).resolve()
     fixture_dir = fpath.parent.resolve()
+    manifest_dir = mpath.parent.resolve()
 
     if target == fpath or target == mpath:
         raise StatementPublishError(
-            f"Forbidden preview_path '{target}': resolves directly to fixture input file"
+            f"Forbidden preview_path '{target}': resolves directly to input file"
         )
-    if target == fixture_dir or target.is_relative_to(fixture_dir):
+    if (
+        target == fixture_dir
+        or target.is_relative_to(fixture_dir)
+        or target == manifest_dir
+        or target.is_relative_to(manifest_dir)
+    ):
         raise StatementPublishError(
-            f"Forbidden preview_path '{target}': resolves inside fixture directory '{fixture_dir}'"
+            f"Forbidden preview_path '{target}': resolves inside input directory ('{fixture_dir}', '{manifest_dir}')"
         )
     live_data_base = Path("/home/pythia/pythia-evidence-r2-data").resolve()
     if live_data_base.exists() and (target == live_data_base or target.is_relative_to(live_data_base)):
@@ -1128,8 +1327,18 @@ def publish_statement_preview(
 
     target.parent.mkdir(parents=True, exist_ok=True)
     temp_target = target.with_name(f".tmp_prev_{os.getpid()}_{hashlib.sha256(preview_bytes).hexdigest()[:8]}.md")
+    created = False
     try:
-        temp_target.write_bytes(preview_bytes)
+        try:
+            fd = os.open(str(temp_target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            created = True
+        except FileExistsError:
+            raise StatementPublishError(
+                f"Temporary preview target '{temp_target.name}' already exists (symlink or collision). Preview publication aborted."
+            )
+        with os.fdopen(fd, "wb") as f_tmp:
+            f_tmp.write(preview_bytes)
+
         try:
             os.link(temp_target, target)
         except FileExistsError:
@@ -1140,8 +1349,11 @@ def publish_statement_preview(
                     f"Preview conflict: target preview '{target}' already exists with different content"
                 )
     finally:
-        if temp_target.exists():
-            temp_target.unlink()
+        if created and (temp_target.is_symlink() or temp_target.exists()):
+            try:
+                temp_target.unlink()
+            except OSError:
+                pass
 
     return target
 
@@ -1159,6 +1371,9 @@ def generate_statement_preview(bundle_data: Dict[str, Any]) -> str:
     lines.append(f"- **Bundle Digest:** `{digest}`")
     lines.append(f"- **Extractor Version:** `{bundle.get('extractor_version')}`")
     lines.append(f"- **Provenance Class:** `{bundle.get('research_metadata', {}).get('provenance_class')}`")
+    acq_ver = bundle.get('research_metadata', {}).get('acquisition_verification_status')
+    if acq_ver:
+        lines.append(f"- **Acquisition Verification Status:** `{acq_ver}`")
     lines.append(f"- **Usable For Forecast:** `{bundle.get('research_metadata', {}).get('usable_for_forecast')}`")
     lines.append("")
 
@@ -1208,7 +1423,7 @@ def generate_statement_preview(bundle_data: Dict[str, Any]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Pythia R3.1.1: Pure Offline FOMC Statement Extractor")
+    parser = argparse.ArgumentParser(description="Pythia R3.1.2: Pure Offline FOMC Statement Extractor")
     parser.add_argument("--fixture-path", type=Path, required=True, help="Path to raw HTML fixture file")
     parser.add_argument("--manifest-path", type=Path, required=True, help="Path to fixture JSON manifest")
     parser.add_argument("--output-dir", type=Path, required=True, help="Directory to store published statement bundle")

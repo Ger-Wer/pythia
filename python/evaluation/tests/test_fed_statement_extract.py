@@ -1,4 +1,4 @@
-"""Tests for Pythia R3.1 / R3.1.1: Offline Fed Statement Extractor and Publisher.
+"""Tests for Pythia R3.1 / R3.1.2: Offline Fed Statement Extractor and Publisher.
 
 Enforces:
 1. Real official fixtures: accurate extraction, paragraph ordering, absence of nav/footer, valid ProofSpans.
@@ -7,12 +7,12 @@ Enforces:
 4. Dates: calendar-only yields published_at=None; timezone string parsed explicitly; invalid dates handled safely; separate times.
 5. Idempotent publication replay, collision conflict rejection (no-clobber), versions preserved in empty/rejected bundles.
 6. Zero network: socket connections strictly forbidden across tests and child CLI process.
-7. F1: Mandatory typed manifest & provenance validation (empty manifest, non-fed domains, transport failures).
-8. F2: Negative body remains negative (JS-only barrier inside valid #article skeleton).
-9. F3: Structural locators unambiguous (cardinality 1); title proof matches parsed title and skips comments.
+7. F1: Mandatory typed manifest & provenance validation (empty manifest, non-fed domains, transport failures, type gates).
+8. F2: Negative body remains negative (JS-only barrier and discount rate minutes body rejected).
+9. F3: Structural locators unambiguous (cardinality 1); proofs match exact DOM nodes skipping comments and duplicate siblings.
 10. F4: HTML entities decoded exactly once (no double unescaping of literal escaped entities).
-11. F5: Invalid hour/minute yields published_at=None; feed vs page date mismatch diagnostic.
-12. F6: Output directory & preview cannot overwrite source inputs or mutate archives.
+11. F5: Invalid hour/minute yields published_at=None; comparable precision instant comparison (EDT vs JST same instant).
+12. F6: Output directory, manifest directory, and preview cannot overwrite source inputs or follow temp symlinks.
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def _make_fixture_and_manifest(
         "fetch_completed_at": "2026-10-19T10:00:01+00:00",
         "duration_ms": 1000.0,
         "collected_at": "2026-10-19T10:00:01+00:00",
-        "research_provenance": "research_fixture",
+        "research_provenance": "synthetic_fixture",
         "parent_feed_reference": {
             "source_id": "fed_monetary_rss",
             "feed_fact_id": "fact-synthetic-test",
@@ -126,16 +126,19 @@ def _create_minimal_valid_html(
 <html>
 <head><title>Board of Governors - {title}</title></head>
 <body>
+<nav>Navigation Header (Should not be in extraction)</nav>
 <div id="article">
     <div class="heading col-xs-12 col-sm-8 col-md-8">
         <p class="article__time">{date_text}</p>
         <h3 class="title">{title}</h3>
         <p class="releaseTime">{release_time}</p>
     </div>
+    <div class="col-xs-12 col-sm-4 col-md-4 hidden-sm">Sidebar</div>
     <div class="col-xs-12 col-sm-8 col-md-8">
         {p_html}
     </div>
 </div>
+<footer>Footer links (Should not be in extraction)</footer>
 </body>
 </html>"""
     return leading_bytes + html_str.encode("utf-8")
@@ -145,8 +148,8 @@ def test_real_fixture_monetary20260916a_extraction():
     """Real September 16, 2026 FOMC statement extracted cleanly with 100% valid ProofSpans."""
     raw_path = FIXTURES_DIR / "raw_monetary20260916a.html"
     man_path = FIXTURES_DIR / "manifest_monetary20260916a.json"
-    if not raw_path.is_file():
-        pytest.skip("Fixture not found")
+    assert raw_path.is_file(), f"Committed real fixture missing: {raw_path}"
+    assert man_path.is_file(), f"Committed manifest missing: {man_path}"
 
     raw_bytes = raw_path.read_bytes()
     manifest = json.loads(man_path.read_text(encoding="utf-8"))
@@ -178,8 +181,8 @@ def test_real_fixture_monetary20260729a_extraction():
     """Real July 29, 2026 FOMC statement extracted with 7 paragraphs including dissent."""
     raw_path = FIXTURES_DIR / "raw_monetary20260729a.html"
     man_path = FIXTURES_DIR / "manifest_monetary20260729a.json"
-    if not raw_path.is_file():
-        pytest.skip("Fixture not found")
+    assert raw_path.is_file(), f"Committed real fixture missing: {raw_path}"
+    assert man_path.is_file(), f"Committed manifest missing: {man_path}"
 
     raw_bytes = raw_path.read_bytes()
     manifest = json.loads(man_path.read_text(encoding="utf-8"))
@@ -260,6 +263,8 @@ def test_invalid_utf8_encoding_rejected(tmp_path: Path):
         "bytes_stored": len(bad_bytes),
         "blob_sha256": hashlib.sha256(bad_bytes).hexdigest(),
         "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
     }
     result = extract_fed_statement(bad_bytes, manifest)
     assert not result.is_success
@@ -267,7 +272,7 @@ def test_invalid_utf8_encoding_rejected(tmp_path: Path):
 
 
 def test_unsupported_document_types_rejected(tmp_path: Path):
-    """Minutes, speeches, and projections are rejected as unsupported document types."""
+    """Minutes, speeches, and projections in title are rejected as unsupported document types."""
     cases = [
         "Minutes of the Federal Open Market Committee",
         "Summary of Economic Projections",
@@ -299,10 +304,38 @@ def test_challenge_barrier_rejected(tmp_path: Path):
         "bytes_stored": len(challenge_html),
         "blob_sha256": hashlib.sha256(challenge_html).hexdigest(),
         "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
     }
     result = extract_fed_statement(challenge_html, manifest)
     assert not result.is_success
     assert result.rejections[0].status == "blocked_or_challenge"
+
+
+def test_empty_content_rejected(tmp_path: Path):
+    """Container with no paragraphs or only whitespace paragraphs rejected."""
+    raw = _create_minimal_valid_html(paragraphs=[])
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "empty_paras", raw)
+    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
+    assert not res.is_success
+    assert len(res.rejections) == 1
+    assert res.rejections[0].status == "empty_content"
+
+
+def test_missing_article_structure_rejected(tmp_path: Path):
+    """HTML lacking #article structure rejected without fallback to whole-page text."""
+    bad_html = b"""<!doctype html>
+<html>
+<head><title>Federal Reserve issues FOMC statement</title></head>
+<body>
+<p>The Federal Open Market Committee approved the statement...</p>
+</body>
+</html>"""
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "no_article", bad_html)
+    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
+    assert not res.is_success
+    assert len(res.rejections) == 1
+    assert res.rejections[0].status == "unsupported_structure"
 
 
 def test_date_only_fixture_yields_null_published_at(tmp_path: Path):
@@ -321,37 +354,82 @@ def test_date_only_fixture_yields_null_published_at(tmp_path: Path):
     assert doc.published_at_provenance is None
 
 
+def test_explicit_timezone_release_time_parsed(tmp_path: Path):
+    """Explicit release time with EST timezone parsed accurately."""
+    raw = _create_minimal_valid_html(
+        date_text="November 05, 2026",
+        release_time="For release at 2:00 p.m. EST",
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "tz_time", raw)
+    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
+    assert res.is_success
+    doc = res.document
+    assert doc is not None
+    assert doc.published_date == "2026-11-05"
+    assert doc.published_at == "2026-11-05T14:00:00-05:00"
+    assert doc.published_at_provenance == "header_release_time"
+
+
+def test_invalid_date_rejected_safely(tmp_path: Path):
+    """Unparseable date text results in rejection rather than silent fallback."""
+    raw = _create_minimal_valid_html(date_text="Not A Valid Calendar Date")
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "bad_date", raw)
+    res = extract_fed_statement(fpath.read_bytes(), json.loads(mpath.read_text()))
+    assert not res.is_success
+    assert len(res.rejections) == 1
+    assert res.rejections[0].status == "invalid_date"
+
+
 def test_bundle_publication_idempotence_and_collision_conflict(tmp_path: Path):
-    """Atomic bundle publication: replay is idempotent; competing content raises conflict."""
+    """Atomic bundle publication: replay is idempotent; competing content raises conflict and preserves bytes."""
     raw = _create_minimal_valid_html()
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "bundle_test", raw)
     out_dir = tmp_path / "bundles"
 
     path1, bundle1 = build_fed_statement_bundle(fpath, mpath, out_dir)
     assert path1.is_file()
+    digest = bundle1["bundle_digest"]
 
     # Replay identical
     path2, bundle2 = build_fed_statement_bundle(fpath, mpath, out_dir)
     assert path1 == path2
     assert bundle1["bundle_digest"] == bundle2["bundle_digest"]
 
-    # Competing file at same target path raises StatementPublishError
-    path1.write_text("{\"competing\": true}", encoding="utf-8")
+    # Verify versions in manifest and bundle
+    bundle_data = json.loads(path1.read_text(encoding="utf-8"))["statement_bundle"]
+    assert bundle_data["extractor_version"] == STATEMENT_EXTRACTOR_VERSION
+    assert bundle_data["schema_version"] == STATEMENT_SCHEMA_VERSION
+    assert bundle_data["bundle_version"] == STATEMENT_BUNDLE_VERSION
+
+    # Collision test: competing pre-existing bytes must NOT be clobbered
+    out_dir_comp = tmp_path / "output_comp"
+    out_dir_comp.mkdir()
+    sentinel = b"competing pre-existing file content"
+    target = out_dir_comp / f"statement_bundle_{digest}.json"
+    target.write_bytes(sentinel)
+
     with pytest.raises(StatementPublishError, match="Atomic publication conflict"):
-        build_fed_statement_bundle(fpath, mpath, out_dir)
+        build_fed_statement_bundle(fpath, mpath, out_dir_comp)
+
+    # Verify competing file was not overwritten
+    assert target.read_bytes() == sentinel
 
 
 def test_rejected_bundle_publication_preserves_frozen_versions(tmp_path: Path):
-    """Rejection outcomes still produce published bundles preserving schema/extractor versions."""
+    """Rejection outcomes still produce published bundles preserving schema/extractor/bundle versions."""
     raw = _create_minimal_valid_html(title="Minutes of the Federal Open Market Committee")
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "rejected_test", raw)
     out_dir = tmp_path / "bundles"
 
-    path, bundle = build_fed_statement_bundle(fpath, mpath, out_dir)
+    path, bundle_data = build_fed_statement_bundle(fpath, mpath, out_dir)
     assert path.is_file()
-    assert bundle["statement_bundle"]["manifest"]["extraction_summary"]["status"] == "rejected"
-    assert bundle["statement_bundle"]["document"] is None
-    assert len(bundle["statement_bundle"]["rejections"]) > 0
+    b = bundle_data["statement_bundle"]
+    assert b["extractor_version"] == STATEMENT_EXTRACTOR_VERSION
+    assert b["schema_version"] == STATEMENT_SCHEMA_VERSION
+    assert b["bundle_version"] == STATEMENT_BUNDLE_VERSION
+    assert b["manifest"]["extraction_summary"]["status"] == "rejected"
+    assert b["document"] is None
+    assert len(b["rejections"]) > 0
 
 
 def test_preview_generation_from_bundle(tmp_path: Path):
@@ -389,7 +467,8 @@ def test_cli_execution_with_child_network_guard(tmp_path: Path):
     )
 
     env = dict(os.environ)
-    env["PYTHONPATH"] = f"{guard_dir}{os.pathsep}{Path.cwd()}"
+    REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+    env["PYTHONPATH"] = f"{guard_dir}{os.pathsep}{REPO_ROOT}" 
 
     cmd = [
         sys.executable,
@@ -405,18 +484,18 @@ def test_cli_execution_with_child_network_guard(tmp_path: Path):
         str(preview_file),
     ]
 
-    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=REPO_ROOT)
     assert proc.returncode == 0, f"CLI failed: {proc.stderr}"
     assert not child_marker.exists()
     assert preview_file.is_file()
 
 
 # ==============================================================================
-# R3.1.1 Boundary Regressions (F1 - F6)
+# R3.1.2 Boundary Regressions (F1 - F6)
 # ==============================================================================
 
 def test_f1_mandatory_manifest_validation(tmp_path: Path):
-    """F1: Empty manifest, non-official URLs, or transport failure are rejected."""
+    """F1: Empty manifest, missing fields, type violations, or contradictory metadata are rejected."""
     raw = _create_minimal_valid_html()
 
     # Empty manifest
@@ -431,23 +510,74 @@ def test_f1_mandatory_manifest_validation(tmp_path: Path):
         "blob_sha256": hashlib.sha256(raw).hexdigest(),
         "bytes_stored": len(raw),
         "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
     }
     res2 = extract_fed_statement(raw, m_bad_url)
     assert not res2.is_success
     assert res2.rejections[0].status == "unsupported_source_url"
 
-    # Transport failure
-    m_fail = {
-        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
-        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
-        "blob_sha256": hashlib.sha256(raw).hexdigest(),
-        "bytes_stored": len(raw),
-        "transport_outcome": "http_error",
-        "http_status": 403,
-    }
+    # Non-HTTPS URL
+    m_http = copy.deepcopy(m_bad_url)
+    m_http.update(source_url="http://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+                  final_url="http://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm")
+    res_http = extract_fed_statement(raw, m_http)
+    assert not res_http.is_success
+    assert res_http.rejections[0].status == "unsupported_source_url"
+
+    # Non-statement path on official host
+    m_path = copy.deepcopy(m_bad_url)
+    m_path.update(source_url="https://www.federalreserve.gov/aboutthefed.htm",
+                  final_url="https://www.federalreserve.gov/aboutthefed.htm")
+    res_path = extract_fed_statement(raw, m_path)
+    assert not res_path.is_success
+    assert res_path.rejections[0].status == "unsupported_source_url"
+
+    # Non-string source URL (must not crash with AttributeError)
+    m_int_url = copy.deepcopy(m_bad_url)
+    m_int_url["source_url"] = 12345
+    res_int_url = extract_fed_statement(raw, m_int_url)
+    assert not res_int_url.is_success
+    assert res_int_url.rejections[0].status == "invalid_manifest"
+
+    # Non-integer bytes_stored (float rejected)
+    m_float_size = copy.deepcopy(m_bad_url)
+    m_float_size.update(source_url="https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+                        final_url="https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+                        bytes_stored=float(len(raw)))
+    res_float = extract_fed_statement(raw, m_float_size)
+    assert not res_float.is_success
+    assert res_float.rejections[0].status == "invalid_manifest"
+
+    # Null http_status
+    m_null_http = copy.deepcopy(m_float_size)
+    m_null_http.update(bytes_stored=len(raw), http_status=None)
+    res_null_http = extract_fed_statement(raw, m_null_http)
+    assert not res_null_http.is_success
+    assert res_null_http.rejections[0].status == "invalid_manifest"
+
+    # Transport failure (HTTP 403)
+    m_fail = copy.deepcopy(m_null_http)
+    m_fail.update(http_status=403, transport_outcome="http_error")
     res3 = extract_fed_statement(raw, m_fail)
     assert not res3.is_success
     assert res3.rejections[0].status == "transport_failure"
+
+    # Explicit complete=False / eof_complete=False
+    m_eof = copy.deepcopy(m_null_http)
+    m_eof.update(http_status=200, transport_outcome="success", eof_complete=False)
+    res_eof = extract_fed_statement(raw, m_eof)
+    assert not res_eof.is_success
+    assert res_eof.rejections[0].status == "transport_failure"
+
+    # Contradictory provenance and forecast usability
+    m_contra = copy.deepcopy(m_null_http)
+    m_contra.update(http_status=200, transport_outcome="success",
+                    research_provenance="production_verified", usable_for_forecast=True,
+                    issuer="An unrelated issuer", parent_feed_reference={})
+    res_contra = extract_fed_statement(raw, m_contra)
+    assert not res_contra.is_success
+    assert res_contra.rejections[0].status == "invalid_manifest"
 
 
 def test_f2_negative_body_js_only(tmp_path: Path):
@@ -463,9 +593,21 @@ def test_f2_negative_body_js_only(tmp_path: Path):
     assert res.rejections[0].status == "blocked_or_challenge"
 
 
+def test_f2_unsupported_minutes_body_rejected(tmp_path: Path):
+    """F2: Supported statement title with discount rate minutes body is rejected."""
+    raw = _create_minimal_valid_html(
+        paragraphs=["Minutes of the Board of Governors discount rate meetings on August 24 and September 14, 2026."]
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "minutes_body", raw)
+    manifest = json.loads(mpath.read_text())
+
+    res = extract_fed_statement(raw, manifest)
+    assert not res.is_success
+    assert res.rejections[0].status == "unsupported_document_type"
+
+
 def test_f3_unambiguous_structural_locators(tmp_path: Path):
     """F3: Container and paragraph locators must resolve unambiguously (cardinality 1)."""
-    # Nested synthetic HTML
     nested_html = (
         b'<!doctype html><html><body>\r\n'
         b'<div id="article">\r\n'
@@ -502,6 +644,52 @@ def test_f3_unambiguous_structural_locators(tmp_path: Path):
     # Paragraph cardinalities == 1
     for p in doc.paragraphs:
         assert len(soup.select(p.locator["selector"])) == 1
+
+
+def test_f3_heading_comments_and_duplicate_paragraphs(tmp_path: Path):
+    """F3: Comments in heading do not contaminate proofs; duplicate siblings get distinct locators; h2 supported."""
+    p_text = "The Committee decided to maintain the range at 4 to 5 percent."
+    dup_html = (
+        b'<!doctype html><html><body>\r\n'
+        b'<div id="article">\r\n'
+        b'<div class="heading col-xs-12 col-sm-8 col-md-8">\r\n'
+        b'<!-- <p class="article__time">January 01, 1999</p> -->\r\n'
+        b'<p class="article__time">September 16, 2026</p>\r\n'
+        b'<h2 class="title">Federal Reserve issues FOMC statement</h2>\r\n'
+        b'<!-- <p class="releaseTime">For release at 1:00 a.m. EST</p> -->\r\n'
+        b'<p class="releaseTime">For release at 2:00 p.m. EDT</p>\r\n'
+        b'</div>\r\n'
+        b'<div class="col-xs-12 col-sm-8 col-md-8">\r\n'
+        b'<p>' + p_text.encode("utf-8") + b'</p>\r\n'
+        b'<p>' + p_text.encode("utf-8") + b'</p>\r\n'
+        b'</div>\r\n'
+        b'</div>\r\n'
+        b'</body></html>'
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "dup_f3", dup_html)
+    manifest = json.loads(mpath.read_text())
+
+    res = extract_fed_statement(dup_html, manifest)
+    assert res.is_success
+    doc = res.document
+    assert doc is not None
+
+    # Proofs must NOT match the commented dates or times
+    assert "1999" not in doc.date_proof.raw_quote_text
+    assert "1:00 a.m." not in (doc.release_time_proof.raw_quote_text if doc.release_time_proof else "")
+
+    # h2 title tag must have matching locator
+    assert doc.title_locator["selector"] == "#article > div.heading h2.title"
+    soup = BeautifulSoup(dup_html.decode("utf-8"), "html.parser")
+    assert len(soup.select(doc.title_locator["selector"])) == 1
+
+    # Duplicate sibling paragraphs must have distinct selectors and distinct proof byte ranges
+    p0 = doc.paragraphs[0]
+    p1 = doc.paragraphs[1]
+    assert p0.locator["selector"] != p1.locator["selector"]
+    assert p0.proof.byte_start != p1.proof.byte_start
+    assert len(soup.select(p0.locator["selector"])) == 1
+    assert len(soup.select(p1.locator["selector"])) == 1
 
 
 def test_f4_single_entity_decode(tmp_path: Path):
@@ -542,8 +730,27 @@ def test_f5_invalid_hour_minute_and_feed_mismatch(tmp_path: Path):
     assert doc.date_diagnostics["feed_date"] == "2026-10-16"
 
 
+def test_f5_same_instant_offset_boundary(tmp_path: Path):
+    """F5: Page EDT 14:00 (18:00Z) vs Feed +09:00 03:00 (18:00Z) does NOT trigger date mismatch."""
+    raw = _create_minimal_valid_html(
+        date_text="September 16, 2026",
+        release_time="For release at 2:00 p.m. EDT",
+    )
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "same_instant", raw)
+    manifest = json.loads(mpath.read_text())
+    manifest["parent_feed_reference"]["feed_published_at"] = "2026-09-17T03:00:00+09:00"
+    manifest["parent_feed_reference"]["feed_raw_pub_date"] = "Thu, 17 Sep 2026 03:00:00 +0900"
+
+    res = extract_fed_statement(raw, manifest)
+    assert res.is_success
+    doc = res.document
+    assert doc is not None
+    assert doc.date_diagnostics is not None
+    assert doc.date_diagnostics["date_mismatch_detected"] is False
+
+
 def test_f6_output_destination_and_preview_safety(tmp_path: Path):
-    """F6: Builder rejects publishing into fixture dir; CLI refuses symlink overwrite."""
+    """F6: Builder rejects publishing into fixture or manifest dir; CLI refuses symlink overwrite."""
     raw = _create_minimal_valid_html()
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "f6_safety", raw)
     fixture_dir = fpath.parent
@@ -589,3 +796,23 @@ def test_f6_output_destination_and_preview_safety(tmp_path: Path):
     assert proc.returncode != 0
     # Raw file must NOT be modified
     assert fpath.read_bytes() == raw_before
+
+
+def test_f6_temp_symlink_preserves_input(tmp_path: Path):
+    """F6: Pre-existing temporary symlink does not allow arbitrary file overwrite."""
+    raw = _create_minimal_valid_html()
+    fpath, mpath = _make_fixture_and_manifest(tmp_path, "temp_symlink", raw)
+    safe = tmp_path / "safe"
+    safe.mkdir()
+
+    # Pre-create a temporary symlink pointing to raw input
+    final = safe / "fresh_preview.md"
+    preview_text = "Test Preview Content"
+    temp = final.with_name(f".tmp_prev_{os.getpid()}_{hashlib.sha256(preview_text.encode()).hexdigest()[:8]}.md")
+    temp.symlink_to(fpath)
+
+    before = fpath.read_bytes()
+    with pytest.raises(StatementPublishError, match="already exists"):
+        publish_statement_preview(preview_text, final, fpath, mpath)
+    after = fpath.read_bytes()
+    assert before == after
