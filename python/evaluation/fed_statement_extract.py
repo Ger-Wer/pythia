@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 
-STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.3"
+STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.4"
 STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.2"
-STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.3"
+STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.4"
 SUPPORTED_PROFILE = "fomc_press_release_v1"
 
 OFFICIAL_DOMAINS = {"federalreserve.gov", "www.federalreserve.gov"}
@@ -559,13 +559,47 @@ def extract_fed_statement(
                 schema_version=STATEMENT_SCHEMA_VERSION,
             )
 
+    research_prov = manifest.get("research_provenance")
+    synth_flag = manifest.get("synthetic_fixture")
+
+    # Contradiction checks on manifest provenance flags
+    if synth_flag is True and research_prov is not None and research_prov != "synthetic_fixture":
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"Contradictory manifest provenance: synthetic_fixture is True but research_provenance is {research_prov!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    if synth_flag is False and research_prov == "synthetic_fixture":
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason="Contradictory manifest provenance: synthetic_fixture is False but research_provenance is 'synthetic_fixture'",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
     is_synthetic = (
-        manifest.get("research_provenance") == "synthetic_fixture"
-        or manifest.get("synthetic_fixture") is True
+        research_prov == "synthetic_fixture"
+        or (synth_flag is True and research_prov is None)
     )
 
     issuer_val = manifest.get("issuer")
-    if issuer_val is None or not isinstance(issuer_val, str) or not issuer_val.strip():
+    if issuer_val is None or not isinstance(issuer_val, str) or isinstance(issuer_val, bool) or not issuer_val.strip():
         return ExtractionResult(
             document=None,
             rejections=[
@@ -598,7 +632,7 @@ def extract_fed_statement(
     parent_feed_val = manifest.get("parent_feed_reference")
     if is_synthetic:
         if parent_feed_val is not None:
-            if not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
+            if not isinstance(parent_feed_val, dict) or isinstance(parent_feed_val, bool) or len(parent_feed_val) == 0:
                 return ExtractionResult(
                     document=None,
                     rejections=[
@@ -612,26 +646,54 @@ def extract_fed_statement(
                     extractor_version=STATEMENT_EXTRACTOR_VERSION,
                     schema_version=STATEMENT_SCHEMA_VERSION,
                 )
-            if parent_feed_val.get("label") == "not a feed reference" and not any(
-                k in parent_feed_val for k in ("fixture_kind", "source_id", "feed_fact_id", "synthetic")
-            ):
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason="parent_feed_reference lacks valid lineage attributes",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
+            for k, v in parent_feed_val.items():
+                if isinstance(v, bool) or isinstance(v, (int, float, list, tuple)):
+                    return ExtractionResult(
+                        document=None,
+                        rejections=[
+                            RejectionRecord(
+                                status="invalid_manifest",
+                                reason=f"Synthetic parent_feed_reference field {k!r} has invalid type: {type(v).__name__}",
+                                source_url=source_url,
+                                raw_blob_sha256=actual_sha,
+                            )
+                        ],
+                        extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                        schema_version=STATEMENT_SCHEMA_VERSION,
+                    )
+                if isinstance(v, str) and not v.strip():
+                    return ExtractionResult(
+                        document=None,
+                        rejections=[
+                            RejectionRecord(
+                                status="invalid_manifest",
+                                reason=f"Synthetic parent_feed_reference field {k!r} cannot be empty string",
+                                source_url=source_url,
+                                raw_blob_sha256=actual_sha,
+                            )
+                        ],
+                        extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                        schema_version=STATEMENT_SCHEMA_VERSION,
+                    )
+                if k == "feed_item_locator" and isinstance(v, dict):
+                    if "type" not in v or "path" not in v:
+                        return ExtractionResult(
+                            document=None,
+                            rejections=[
+                                RejectionRecord(
+                                    status="invalid_manifest",
+                                    reason="Synthetic feed_item_locator must contain 'type' and 'path'",
+                                    source_url=source_url,
+                                    raw_blob_sha256=actual_sha,
+                                )
+                            ],
+                            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                            schema_version=STATEMENT_SCHEMA_VERSION,
                         )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
         else:
             parent_feed_val = {"fixture_kind": "synthetic_fixture"}
     else:
-        if parent_feed_val is None or not isinstance(parent_feed_val, dict) or len(parent_feed_val) == 0:
+        if parent_feed_val is None or not isinstance(parent_feed_val, dict) or isinstance(parent_feed_val, bool) or len(parent_feed_val) == 0:
             return ExtractionResult(
                 document=None,
                 rejections=[
@@ -645,15 +707,33 @@ def extract_fed_statement(
                 extractor_version=STATEMENT_EXTRACTOR_VERSION,
                 schema_version=STATEMENT_SCHEMA_VERSION,
             )
-        required_lineage = ["archive_name", "feed_blob_sha256", "feed_fact_id", "feed_item_locator", "parent_bundle_digest"]
-        missing_lineage = [k for k in required_lineage if k not in parent_feed_val or not parent_feed_val[k]]
-        if missing_lineage:
+
+        # 1. Validate common mandatory lineage fields
+        common_required = ["feed_fact_id", "feed_blob_sha256", "feed_item_locator"]
+        for field in common_required:
+            if field not in parent_feed_val or parent_feed_val[field] is None:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"parent_feed_reference missing mandatory lineage field: {field!r}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+        fact_id = parent_feed_val["feed_fact_id"]
+        if not isinstance(fact_id, str) or isinstance(fact_id, bool) or not fact_id.strip():
             return ExtractionResult(
                 document=None,
                 rejections=[
                     RejectionRecord(
                         status="invalid_manifest",
-                        reason=f"parent_feed_reference missing required typed lineage fields: {missing_lineage}",
+                        reason=f"parent_feed_reference field 'feed_fact_id' must be a non-empty string, got {type(fact_id).__name__}",
                         source_url=source_url,
                         raw_blob_sha256=actual_sha,
                     )
@@ -661,6 +741,214 @@ def extract_fed_statement(
                 extractor_version=STATEMENT_EXTRACTOR_VERSION,
                 schema_version=STATEMENT_SCHEMA_VERSION,
             )
+
+        feed_blob_sha = parent_feed_val["feed_blob_sha256"]
+        if (
+            not isinstance(feed_blob_sha, str)
+            or isinstance(feed_blob_sha, bool)
+            or len(feed_blob_sha) != 64
+            or not all(c in "0123456789abcdefABCDEF" for c in feed_blob_sha)
+        ):
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"parent_feed_reference field 'feed_blob_sha256' must be a valid 64-char hex SHA-256 string, got {type(feed_blob_sha).__name__}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+        locator = parent_feed_val["feed_item_locator"]
+        if not isinstance(locator, dict) or isinstance(locator, bool) or len(locator) == 0:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"parent_feed_reference field 'feed_item_locator' must be a structural dictionary, got {type(locator).__name__}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+        loc_type = locator.get("type")
+        loc_path = locator.get("path")
+        if not isinstance(loc_type, str) or isinstance(loc_type, bool) or not loc_type.strip():
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"feed_item_locator 'type' must be non-empty string, got {type(loc_type).__name__}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+        if not isinstance(loc_path, str) or isinstance(loc_path, bool) or not loc_path.strip():
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"feed_item_locator 'path' must be non-empty string, got {type(loc_path).__name__}",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+        # 2. Check Context lineage: Form A (archive_name + parent_bundle_digest) OR Form B (receipt_id / feed_receipt_id + revision_id / feed_revision_id)
+        has_form_a = "archive_name" in parent_feed_val and "parent_bundle_digest" in parent_feed_val
+        has_receipt = "receipt_id" in parent_feed_val or "feed_receipt_id" in parent_feed_val
+        has_revision = "revision_id" in parent_feed_val or "feed_revision_id" in parent_feed_val
+        has_form_b = has_receipt and has_revision
+
+        if not has_form_a and not has_form_b:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason="parent_feed_reference must satisfy either archive/bundle lineage (archive_name, parent_bundle_digest) or receipt/revision lineage (feed_receipt_id/receipt_id, feed_revision_id/revision_id)",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+        # Validate Form A if present or partially present
+        if "archive_name" in parent_feed_val or "parent_bundle_digest" in parent_feed_val:
+            arc_name = parent_feed_val.get("archive_name")
+            if not isinstance(arc_name, str) or isinstance(arc_name, bool) or not arc_name.strip():
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"parent_feed_reference field 'archive_name' must be non-empty string, got {type(arc_name).__name__}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+            bundle_digest = parent_feed_val.get("parent_bundle_digest")
+            if (
+                not isinstance(bundle_digest, str)
+                or isinstance(bundle_digest, bool)
+                or len(bundle_digest) != 64
+                or not all(c in "0123456789abcdefABCDEF" for c in bundle_digest)
+            ):
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"parent_feed_reference field 'parent_bundle_digest' must be valid 64-char hex SHA-256 string, got {type(bundle_digest).__name__}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+        # Validate Form B if present or partially present
+        if has_receipt or has_revision or "source_id" in parent_feed_val:
+            rec_id = parent_feed_val.get("receipt_id")
+            feed_rec_id = parent_feed_val.get("feed_receipt_id")
+            if rec_id is not None and feed_rec_id is not None and rec_id != feed_rec_id:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Contradictory receipt identifier aliases: receipt_id={rec_id!r} vs feed_receipt_id={feed_rec_id!r}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+            receipt_val = rec_id if rec_id is not None else feed_rec_id
+            if has_form_b and (not isinstance(receipt_val, str) or isinstance(receipt_val, bool) or not receipt_val.strip()):
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Receipt identifier must be non-empty string, got {type(receipt_val).__name__}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+            rev_id = parent_feed_val.get("revision_id")
+            feed_rev_id = parent_feed_val.get("feed_revision_id")
+            if rev_id is not None and feed_rev_id is not None and rev_id != feed_rev_id:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Contradictory revision identifier aliases: revision_id={rev_id!r} vs feed_revision_id={feed_rev_id!r}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+            revision_val = rev_id if rev_id is not None else feed_rev_id
+            if has_form_b and (not isinstance(revision_val, str) or isinstance(revision_val, bool) or not revision_val.strip()):
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Revision identifier must be non-empty string, got {type(revision_val).__name__}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+            source_id = parent_feed_val.get("source_id")
+            if source_id is not None and (not isinstance(source_id, str) or isinstance(source_id, bool) or not source_id.strip()):
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"parent_feed_reference field 'source_id' must be non-empty string when present, got {type(source_id).__name__}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
 
     # Verify blob integrity against manifest
     manifest_sha = manifest["blob_sha256"]
@@ -1205,6 +1493,55 @@ def extract_fed_statement(
             schema_version=STATEMENT_SCHEMA_VERSION,
         )
 
+    # Positive FOMC statement profile validation:
+    # An official FOMC statement body must contain:
+    # 1. Committee institutional actor reference ("federal open market committee", "the committee", or "fomc")
+    # 2. Monetary policy stance / decision / mandate language ("target range", "federal funds rate",
+    #    "monetary policy", "policy action", "decided to maintain", "decided to raise", "decided to lower",
+    #    "decided to reduce", "decided to keep", "dual mandate", "price stability", "maximum employment",
+    #    "approved the following statement")
+    has_committee_actor = (
+        "the committee" in body_text_lower
+        or "federal open market committee" in body_text_lower
+        or "fomc" in body_text_lower
+    )
+
+    policy_decision_markers = [
+        "target range",
+        "federal funds rate",
+        "monetary policy",
+        "policy action",
+        "decided to maintain",
+        "decided to raise",
+        "decided to lower",
+        "decided to reduce",
+        "decided to keep",
+        "dual mandate",
+        "price stability",
+        "maximum employment",
+        "approved the statement",
+        "approved the following statement",
+        "ample reserves",
+        "rates maintained",
+    ]
+    has_policy_action = any(m in body_text_lower for m in policy_decision_markers)
+
+    total_body_chars = sum(len(p.display_text.strip()) for p in paragraphs)
+    if total_body_chars < 30 or not (has_committee_actor and has_policy_action):
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="unsupported_document_type",
+                    reason=f"Article body does not match supported FOMC statement profile ({SUPPORTED_PROFILE!r}): missing Committee policy decision or stance terms",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
     # 10. Verify ALL ProofSpans independently before assembling document
     for p in paragraphs:
         if not p.proof.verify_against_blob(raw_bytes):
@@ -1323,6 +1660,13 @@ def build_fed_statement_bundle(
 
     acquisition_verification_status = manifest_data.get("acquisition_verification_status", "PARTIAL")
 
+    res_prov = manifest_data.get("research_provenance")
+    syn_flag = manifest_data.get("synthetic_fixture")
+    is_synth_bundle = (
+        res_prov == "synthetic_fixture"
+        or (syn_flag is True and res_prov is None)
+    )
+
     bundle_payload = {
         "bundle_version": STATEMENT_BUNDLE_VERSION,
         "extractor_version": STATEMENT_EXTRACTOR_VERSION,
@@ -1331,7 +1675,7 @@ def build_fed_statement_bundle(
             **manifest_data,
             "acquisition_verification_status": (
                 "NOT_APPLICABLE_SYNTHETIC"
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else acquisition_verification_status
             ),
             "extraction_summary": extraction_summary,
@@ -1341,30 +1685,30 @@ def build_fed_statement_bundle(
         "research_metadata": {
             "provenance_class": (
                 "synthetic_fixture"
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else manifest_data.get("research_provenance", "research_fixture")
             ),
             "usable_for_forecast": False,
             "statement_profile": SUPPORTED_PROFILE,
             "acquisition_verification_status": (
                 "NOT_APPLICABLE_SYNTHETIC"
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else acquisition_verification_status
             ),
             "historical_acquisition_status": (
                 "NOT_APPLICABLE_SYNTHETIC"
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else "PARTIAL"
             ),
             "article_collection_status": (
                 "synthetic_fixture_test_only"
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else "research_sample_only_not_runtime_collected"
             ),
             "notes": (
                 "Synthetic research fixture for offline test and parser verification. "
                 "Not acquired from live web or runtime collector; no live acquisition claims."
-                if (manifest_data.get("research_provenance") == "synthetic_fixture" or manifest_data.get("synthetic_fixture") is True)
+                if is_synth_bundle
                 else (
                     "Research extraction bundle for official FOMC statement text. "
                     "Acquired via bounded research fixture acquisition, not runtime R2 collector. "

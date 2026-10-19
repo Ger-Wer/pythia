@@ -624,9 +624,9 @@ def test_f3_unambiguous_structural_locators(tmp_path: Path):
         b'<p class="releaseTime">For release at 2:00 p.m. EDT</p>\r\n'
         b'</div>\r\n'
         b'<div class="col-xs-12 col-sm-8 col-md-8">\r\n'
-        b'<p>First statement paragraph.</p>\r\n'
-        b'<div><p>Second statement paragraph.</p></div>\r\n'
-        b'<p>Third statement paragraph.</p>\r\n'
+        b'<p>The Federal Open Market Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.</p>\r\n'
+        b'<div><p>Economic activity has continued to expand at a solid pace.</p></div>\r\n'
+        b'<p>Inflation remains elevated relative to the Committee\'s 2 percent goal.</p>\r\n'
         b'</div>\r\n'
         b'</div>\r\n'
         b'</body></html>'
@@ -701,7 +701,10 @@ def test_f3_heading_comments_and_duplicate_paragraphs(tmp_path: Path):
 def test_f4_single_entity_decode(tmp_path: Path):
     """F4: HTML entities are decoded exactly once without double unescaping."""
     raw = _create_minimal_valid_html(
-        paragraphs=["Literal &amp;#49; percent; literal &amp;lt;5."]
+        paragraphs=[
+            "The Federal Open Market Committee decided to maintain the target range for the federal funds rate.",
+            "Literal &amp;#49; percent; literal &amp;lt;5.",
+        ]
     )
     fpath, mpath = _make_fixture_and_manifest(tmp_path, "f4_entities", raw)
     manifest = json.loads(mpath.read_text())
@@ -710,7 +713,7 @@ def test_f4_single_entity_decode(tmp_path: Path):
     assert res.is_success
     assert res.document is not None
     # Must NOT become "Literal 1 percent; literal <5."
-    assert res.document.paragraphs[0].display_text == "Literal &#49; percent; literal &lt;5."
+    assert res.document.paragraphs[1].display_text == "Literal &#49; percent; literal &lt;5."
 
 
 def test_f5_invalid_hour_minute_and_feed_mismatch(tmp_path: Path):
@@ -1007,3 +1010,196 @@ def test_f3_comment_closing_div_preserves_container_containment(tmp_path: Path):
     assert len(doc.paragraphs) == 1
     assert doc.container_proof.byte_start <= doc.paragraphs[0].proof.byte_start
     assert doc.paragraphs[0].proof.byte_end <= doc.container_proof.byte_end
+
+
+def test_f1_lineage_field_types_individual_negatives():
+    """F1: Individual non-typed lineage fields in parent_feed_reference must be rejected."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+    valid_parent = {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+    }
+
+    # Verify baseline valid parent succeeds
+    res_ok = extract_fed_statement(raw, {**base_man, "parent_feed_reference": valid_parent})
+    assert res_ok.is_success
+
+    # Individual negative field tests
+    bad_variations = [
+        ("archive_name", 17),
+        ("archive_name", True),
+        ("archive_name", ""),
+        ("feed_blob_sha256", True),
+        ("feed_blob_sha256", 12345),
+        ("feed_blob_sha256", "short_sha"),
+        ("feed_blob_sha256", "g" * 64),
+        ("feed_fact_id", ["not", "a", "fact-id"]),
+        ("feed_fact_id", True),
+        ("feed_fact_id", ""),
+        ("feed_item_locator", "this is not a structural locator"),
+        ("feed_item_locator", True),
+        ("feed_item_locator", {}),
+        ("feed_item_locator", {"type": "xml_xpath"}),
+        ("parent_bundle_digest", 33),
+        ("parent_bundle_digest", True),
+        ("parent_bundle_digest", "short_digest"),
+    ]
+
+    for key, bad_val in bad_variations:
+        mutated_parent = dict(valid_parent)
+        mutated_parent[key] = bad_val
+        res = extract_fed_statement(raw, {**base_man, "parent_feed_reference": mutated_parent})
+        assert not res.is_success, f"Expected rejection for {key}={bad_val!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+
+def test_f1_legacy_receipt_revision_form_and_aliases():
+    """F1: Legacy receipt/revision form supported with aliases, contradictory aliases rejected."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+    legacy_parent = {
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "feed_receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "feed_revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "source_id": "fed_monetary_rss",
+    }
+
+    # Form B with feed_receipt_id / feed_revision_id accepted
+    res_b = extract_fed_statement(raw, {**base_man, "parent_feed_reference": legacy_parent})
+    assert res_b.is_success
+    assert res_b.document.parent_feed_reference["feed_receipt_id"] == "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b"
+
+    # Form B with alias receipt_id / revision_id accepted
+    alias_parent = {
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+    }
+    res_alias = extract_fed_statement(raw, {**base_man, "parent_feed_reference": alias_parent})
+    assert res_alias.is_success
+
+    # Contradictory receipt aliases rejected
+    contra_rec = {
+        **legacy_parent,
+        "receipt_id": "different-receipt-id",
+        "feed_receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+    }
+    res_contra = extract_fed_statement(raw, {**base_man, "parent_feed_reference": contra_rec})
+    assert not res_contra.is_success
+    assert res_contra.rejections[0].status == "invalid_manifest"
+
+    # Contradictory revision aliases rejected
+    contra_rev = {
+        **legacy_parent,
+        "revision_id": "different-revision-id",
+        "feed_revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+    }
+    res_contra_rev = extract_fed_statement(raw, {**base_man, "parent_feed_reference": contra_rev})
+    assert not res_contra_rev.is_success
+    assert res_contra_rev.rejections[0].status == "invalid_manifest"
+
+
+def test_f1_contradictory_provenance_and_synthetic_flag():
+    """F1: Contradictory synthetic flag and research provenance rejected; explicit synthetic accepted."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "issuer": "Federal Reserve Board",
+    }
+
+    # Contradiction: downloaded_research_fixture + synthetic_fixture=True (without parent)
+    man_contra = {
+        **base_man,
+        "research_provenance": "downloaded_research_fixture",
+        "synthetic_fixture": True,
+    }
+    res_contra = extract_fed_statement(raw, man_contra)
+    assert not res_contra.is_success
+    assert res_contra.rejections[0].status == "invalid_manifest"
+
+    # Explicit synthetic fixture without real parent accepted honestly
+    man_synth = {
+        **base_man,
+        "research_provenance": "synthetic_fixture",
+    }
+    res_synth = extract_fed_statement(raw, man_synth)
+    assert res_synth.is_success
+    assert res_synth.document.parent_feed_reference == {"fixture_kind": "synthetic_fixture"}
+
+
+def test_f2_supported_body_profile_positive_and_negatives():
+    """F2: Unavailable placeholder and non-policy bodies rejected; supported FOMC profile accepted."""
+    man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+
+    # Negative 1: Unavailable placeholder
+    raw_unavail = _create_minimal_valid_html(
+        paragraphs=["This page is temporarily unavailable. Please try again later."]
+    )
+    res_unavail = extract_fed_statement(raw_unavail, {**man, "bytes_stored": len(raw_unavail), "blob_sha256": hashlib.sha256(raw_unavail).hexdigest()})
+    assert not res_unavail.is_success
+    assert res_unavail.rejections[0].status == "unsupported_document_type"
+
+    # Negative 2: Generic non-policy body
+    raw_generic = _create_minimal_valid_html(
+        paragraphs=["The administrative offices will be closed for scheduled server maintenance this weekend."]
+    )
+    res_generic = extract_fed_statement(raw_generic, {**man, "bytes_stored": len(raw_generic), "blob_sha256": hashlib.sha256(raw_generic).hexdigest()})
+    assert not res_generic.is_success
+    assert res_generic.rejections[0].status == "unsupported_document_type"
+
+    # Negative 3: Committee mentioned without policy stance
+    raw_no_policy = _create_minimal_valid_html(
+        paragraphs=["The Federal Open Market Committee announced its schedule of future meeting dates in Washington."]
+    )
+    res_no_policy = extract_fed_statement(raw_no_policy, {**man, "bytes_stored": len(raw_no_policy), "blob_sha256": hashlib.sha256(raw_no_policy).hexdigest()})
+    assert not res_no_policy.is_success
+    assert res_no_policy.rejections[0].status == "unsupported_document_type"
+
+    # Positive: Supported FOMC policy statement
+    raw_pos = _create_minimal_valid_html(
+        paragraphs=[
+            "The Federal Open Market Committee approved the following statement.",
+            "The Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.",
+        ]
+    )
+    res_pos = extract_fed_statement(raw_pos, {**man, "bytes_stored": len(raw_pos), "blob_sha256": hashlib.sha256(raw_pos).hexdigest()})
+    assert res_pos.is_success
+    assert "target range for the federal funds rate" in res_pos.document.substantive_statement_text

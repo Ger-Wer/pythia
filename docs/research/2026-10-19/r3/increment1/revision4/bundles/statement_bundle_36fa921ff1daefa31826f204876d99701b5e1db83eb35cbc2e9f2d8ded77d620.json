@@ -1,0 +1,252 @@
+{
+  "bundle_digest": "36fa921ff1daefa31826f204876d99701b5e1db83eb35cbc2e9f2d8ded77d620",
+  "statement_bundle": {
+    "bundle_version": "pythia-statement-bundle-r3/0.1.4",
+    "document": {
+      "container_locator": {
+        "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading)",
+        "type": "css_selector"
+      },
+      "container_proof": {
+        "byte_end": 74976,
+        "byte_start": 73482,
+        "quote_sha256": "0d30b0e65e65c4ca15a5826a57db016bd1668effd749d35fe500ab441290f1ac",
+        "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+        "raw_quote_text": "<div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n                \r\n                \r\n\r\n                \r\n                              \r\n                \r\n                <p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>\r\n\r\n<p>The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point<strong> </strong>to 3-3/4<strong> </strong>to 4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.</p>\r\n\r\n<p>Economic activity is expanding at a solid pace. While uncertainty remains elevated owing, in part, to geopolitical developments,<strong> </strong>domestic spending has been resilient. Productivity growth is strong, and capital investment is robust. Job gains have kept pace with the workforce, and the unemployment rate has changed little.</p>\r\n\r\n<p>Inflation remains elevated. Today's policy action will support a timelier return to the Committee's 2 percent goal. The Committee will deliver price stability.</p>\r\n\r\n<p>For media inquiries, please email <a href=\"/cdn-cgi/l/email-protection#96fbf3f2fff7d6f0e4f4b8f1f9e0\"><span class=\"__cf_email__\" data-cfemail=\"751810111c14351307175b121a03\">[email&#160;protected]</span></a> or call 202-452-2955.</p>\r\n\r\n<p><a href=\"/newsevents/pressreleases/monetary20260916a1.htm\">Implementation Note issued September 16, 2026</a></p>\r\n                 \r\n            </div>"
+      },
+      "date_diagnostics": {
+        "date_mismatch_detected": false,
+        "feed_date": "2026-09-16",
+        "feed_published_at": "2026-09-16T18:00:00+00:00",
+        "page_published_date": "2026-09-16",
+        "time_diagnostic": null
+      },
+      "date_locator": {
+        "selector": "#article > div.heading p.article__time",
+        "type": "css_selector"
+      },
+      "date_proof": {
+        "byte_end": 69147,
+        "byte_start": 69100,
+        "quote_sha256": "f4ec93cd027ed63c077d0669e7fabb140ece875d8fdf939dc039db73394614db",
+        "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+        "raw_quote_text": "<p class=\"article__time\">September 16, 2026</p>"
+      },
+      "issuer": "Federal Reserve Board",
+      "page_date_raw": "September 16, 2026",
+      "paragraphs": [
+        {
+          "display_text": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(1)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 0,
+          "proof": {
+            "byte_end": 73752,
+            "byte_start": 73647,
+            "quote_sha256": "ebc203933f0f938e6f4529ad25ec84616df5b14e255fffb40ae6e0df84caab53",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>"
+          },
+          "role": "vote_approval"
+        },
+        {
+          "display_text": "The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(2)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 1,
+          "proof": {
+            "byte_end": 74060,
+            "byte_start": 73756,
+            "quote_sha256": "ce16d2e4c5d11a321e49826ce014005f3fdddb3e8dc293bf15c6d53a4d2a9951",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p>The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point<strong> </strong>to 3-3/4<strong> </strong>to 4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.</p>"
+          },
+          "role": "policy_decision"
+        },
+        {
+          "display_text": "Economic activity is expanding at a solid pace. While uncertainty remains elevated owing, in part, to geopolitical developments, domestic spending has been resilient. Productivity growth is strong, and capital investment is robust. Job gains have kept pace with the workforce, and the unemployment rate has changed little.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(3)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 2,
+          "proof": {
+            "byte_end": 74410,
+            "byte_start": 74064,
+            "quote_sha256": "423741ab94055c9f312348053c74a097b3d0b8db533ae21f9acc223967b09cc6",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p>Economic activity is expanding at a solid pace. While uncertainty remains elevated owing, in part, to geopolitical developments,<strong> </strong>domestic spending has been resilient. Productivity growth is strong, and capital investment is robust. Job gains have kept pace with the workforce, and the unemployment rate has changed little.</p>"
+          },
+          "role": "economic_assessment"
+        },
+        {
+          "display_text": "Inflation remains elevated. Today's policy action will support a timelier return to the Committee's 2 percent goal. The Committee will deliver price stability.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(4)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 3,
+          "proof": {
+            "byte_end": 74580,
+            "byte_start": 74414,
+            "quote_sha256": "4e4a1f4ea46a0393a41ccbe73982670163e1abbf2d8553cbb2b3913bd336dfde",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p>Inflation remains elevated. Today's policy action will support a timelier return to the Committee's 2 percent goal. The Committee will deliver price stability.</p>"
+          },
+          "role": "inflation_mandate"
+        },
+        {
+          "display_text": "For media inquiries, please email [email protected] or call 202-452-2955.",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(5)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 4,
+          "proof": {
+            "byte_end": 74818,
+            "byte_start": 74584,
+            "quote_sha256": "4b5c9687ad25b63140d54fdd95bbbd4056643ccb8719288fec57f57896af5d3c",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p>For media inquiries, please email <a href=\"/cdn-cgi/l/email-protection#96fbf3f2fff7d6f0e4f4b8f1f9e0\"><span class=\"__cf_email__\" data-cfemail=\"751810111c14351307175b121a03\">[email&#160;protected]</span></a> or call 202-452-2955.</p>"
+          },
+          "role": "media_inquiries"
+        },
+        {
+          "display_text": "Implementation Note issued September 16, 2026",
+          "locator": {
+            "selector": "#article > div.col-xs-12.col-sm-8.col-md-8:not(.heading) > p:nth-of-type(6)",
+            "type": "css_selector"
+          },
+          "paragraph_index": 5,
+          "proof": {
+            "byte_end": 74937,
+            "byte_start": 74822,
+            "quote_sha256": "0f488c723de4ce19507bda8ade0f829ddb4fdf6ff62a5fcc90d137ebb2c4ad0c",
+            "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+            "raw_quote_text": "<p><a href=\"/newsevents/pressreleases/monetary20260916a1.htm\">Implementation Note issued September 16, 2026</a></p>"
+          },
+          "role": "implementation_note"
+        }
+      ],
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[3]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-09-16T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "profile_id": "fomc_press_release_v1",
+      "published_at": "2026-09-16T14:00:00-04:00",
+      "published_at_provenance": "header_release_time",
+      "published_date": "2026-09-16",
+      "published_date_precision": "day",
+      "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+      "release_time_locator": {
+        "selector": "#article > div.heading p.releaseTime",
+        "type": "css_selector"
+      },
+      "release_time_proof": {
+        "byte_end": 73752,
+        "byte_start": 69275,
+        "quote_sha256": "c3f4fb1f97fb57dd1c3a17770fe9d86f53cb403557d21c3842ef99be74758fac",
+        "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+        "raw_quote_text": "<p class=\"releaseTime\">For release at 2:00 p.m. EDT                     \r\n                \r\n                <ul class=\"list-unstyled\">\r\n                    <li class=\"share btn-group\">\r\n                        <a class='dropdown-toggle shareLink' aria-labelledby=\"shareMenu\" role=\"button\" data-toggle=\"dropdown\" title=\"Share\" href=\"#\">Share<span class=\"icon icon__sm icon-share icon--right\"></span></a>\r\n                        <ul role=\"menu\" class=\"dropdown-menu shareDL__dropdown shareDL__dropdown--inline shareDL__dropdown--right\" id=\"shareMenu\">\r\n                            \r\n\r\n\r\n    \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://twitter.com/share?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&text=Federal Reserve issues FOMC statement&via=FederalReserve\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-twitter-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-twitter-color\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n            \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://www.facebook.com/sharer.php?u=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&name=Federal Reserve issues FOMC statement\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-facebook-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-facebook-color\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n            \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n             \r\n                <a class=\"shareDL__link icon__link sr-only-focusable\" href=\"https://www.linkedin.com/shareArticle?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&title=Federal Reserve issues FOMC statement&mini=true\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-linkedin-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-linkedin-color\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n            \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n            \r\n                <a class=\"shareDL__link icon__link sr-only-focusable noIcon\" href=\"https://www.threads.net/intent/post?text=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-threads-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-threads\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n            \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n            \r\n                <a class=\"shareDL__link icon__link sr-only-focusable noIcon\" href=\"https://bsky.app/intent/compose?text=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-bluesky-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-bluesky\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n            \r\n        \r\n        \r\n            <li class='shareDL__item'>\r\n            \r\n                <a class=\"shareDL__link icon__link sr-only-focusable noIcon\" href=\"/cdn-cgi/l/email-protection#edd28f828994d08599999d9ed7c2c29a9a9ac38b8889889f8c819f889e889f9b88c38a829bc283889a9e889b8883999ec29d9f889e9e9f8881888c9e889ec280828388998c9f94dfdddfdbddd4dcdb8cc3859980cb9e988f87888e99d0ab8889889f8c81cdbf889e889f9b88cd849e9e98889ecdaba2a0aecd9e998c998880888399\">\r\n             <!--<span class=\"icon icon__sm icon--centered icon-email-color\"></span> -->\r\n            <span class=\"icon icon__sm icon--centered icon-email-color\"></span>\r\n          \r\n                </a>\r\n            </li>\r\n                    \r\n    \r\n \r\n \r\n                        </ul>\r\n                    </li>\r\n                </ul>\r\n \r\n            </div>\r\n            <div class=\"col-xs-12 col-sm-4 col-md-4 hidden-sm\"></div>\r\n            <div class=\"col-xs-12 col-sm-8 col-md-8\">\r\n                \r\n                \r\n\r\n                \r\n                              \r\n                \r\n                <p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>"
+      },
+      "release_time_raw": "For release at 2:00 p.m. EDT",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "statement_id": "stmt-bf54fb45de736e7d",
+      "substantive_statement_text": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:\n\nThe Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.\n\nEconomic activity is expanding at a solid pace. While uncertainty remains elevated owing, in part, to geopolitical developments, domestic spending has been resilient. Productivity growth is strong, and capital investment is robust. Job gains have kept pace with the workforce, and the unemployment rate has changed little.\n\nInflation remains elevated. Today's policy action will support a timelier return to the Committee's 2 percent goal. The Committee will deliver price stability.",
+      "title": "Federal Reserve issues FOMC statement",
+      "title_locator": {
+        "selector": "#article > div.heading h3.title",
+        "type": "css_selector"
+      },
+      "title_proof": {
+        "byte_end": 69225,
+        "byte_start": 69165,
+        "quote_sha256": "814ead7cbf96e6e128a32b19750703db005ea0ed5411388297dd2d92c9e694f9",
+        "raw_blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+        "raw_quote_text": "<h3 class=\"title\">Federal Reserve issues FOMC statement</h3>"
+      }
+    },
+    "extractor_version": "pythia-statement-extractor-r3/0.1.4",
+    "manifest": {
+      "acquisition_verification_status": "PARTIAL",
+      "blob_sha256": "8252bf02066af1c379bdcad3b9b70cc8cdbf8e21183eb3f00c8df0a2dba9391f",
+      "bytes_stored": 84741,
+      "collected_at": "2026-10-19T07:47:16.063714+00:00",
+      "content_type": "text/html",
+      "duration_ms": 199.305,
+      "error_msg": null,
+      "extraction_summary": {
+        "rejection_count": 0,
+        "status": "extracted",
+        "total_paragraphs": 6
+      },
+      "fetch_completed_at": "2026-10-19T07:47:16.063714+00:00",
+      "fetch_started_at": "2026-10-19T07:47:15.864408+00:00",
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "fixture_key": "monetary20260916a",
+      "http_status": 200,
+      "issuer": "Federal Reserve Board",
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[3]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-09-16T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "redirect_count": 0,
+      "research_provenance": "research_fixture",
+      "response_headers": {
+        "CF-Cache-Status": "HIT",
+        "CF-Ray": "a4ce2c788f4431a4-ZRH",
+        "Connection": "keep-alive",
+        "Content-Encoding": "gzip",
+        "Content-Type": "text/html",
+        "Date": "Mon, 19 Oct 2026 07:47:16 GMT",
+        "Last-Modified": "Wed, 16 Sep 2026 18:00:17 GMT",
+        "Server": "cloudflare",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "Transfer-Encoding": "chunked",
+        "X-Frame-Options": "SAMEORIGIN"
+      },
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "transport_outcome": "success",
+      "usable_for_forecast": false
+    },
+    "rejections": [],
+    "research_metadata": {
+      "acquisition_verification_status": "PARTIAL",
+      "article_collection_status": "research_sample_only_not_runtime_collected",
+      "historical_acquisition_status": "PARTIAL",
+      "notes": "Research extraction bundle for official FOMC statement text. Acquired via bounded research fixture acquisition, not runtime R2 collector. Historical acquisition status is PARTIAL; does not constitute verified production evidence or market outcome proof.",
+      "provenance_class": "research_fixture",
+      "statement_profile": "fomc_press_release_v1",
+      "usable_for_forecast": false
+    },
+    "schema_version": "pythia-statement-schema-r3/1.2"
+  }
+}
