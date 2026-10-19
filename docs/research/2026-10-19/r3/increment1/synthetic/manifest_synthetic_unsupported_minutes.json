@@ -1,0 +1,11 @@
+{
+  "fixture_key": "synthetic_unsupported_minutes",
+  "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_unsupported_minutes.htm",
+  "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_unsupported_minutes.htm",
+  "bytes_stored": 561,
+  "blob_sha256": "e0a1f8e07cc08b73be470268a0b53d4079e3b079c8d55298d3c60715383c1613",
+  "research_provenance": "synthetic_fixture",
+  "synthetic_fixture": true,
+  "transport_outcome": "success",
+  "usable_for_forecast": false
+}

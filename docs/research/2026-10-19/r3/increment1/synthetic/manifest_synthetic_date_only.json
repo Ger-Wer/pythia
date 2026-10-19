@@ -1,0 +1,11 @@
+{
+  "fixture_key": "synthetic_date_only",
+  "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_date_only.htm",
+  "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_date_only.htm",
+  "bytes_stored": 751,
+  "blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+  "research_provenance": "synthetic_fixture",
+  "synthetic_fixture": true,
+  "transport_outcome": "success",
+  "usable_for_forecast": false
+}

@@ -1,0 +1,40 @@
+{
+  "bundle_digest": "fa7ef06cfeac9cb683f43f5bf61c909870239abba5109526f7286d53e458c91e",
+  "statement_bundle": {
+    "bundle_version": "pythia-statement-bundle-r3/0.1",
+    "document": null,
+    "extractor_version": "pythia-statement-extractor-r3/0.1",
+    "manifest": {
+      "blob_sha256": "ef33b30823ba8803bf1bd3ec02dd528c608ba023e745faff228068cbddf6a351",
+      "bytes_stored": 140,
+      "extraction_summary": {
+        "rejection_count": 1,
+        "status": "rejected",
+        "total_paragraphs": 0
+      },
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_cf_challenge.htm",
+      "fixture_key": "synthetic_cf_challenge",
+      "research_provenance": "synthetic_fixture",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_cf_challenge.htm",
+      "synthetic_fixture": true,
+      "transport_outcome": "success",
+      "usable_for_forecast": false
+    },
+    "rejections": [
+      {
+        "raw_blob_sha256": "ef33b30823ba8803bf1bd3ec02dd528c608ba023e745faff228068cbddf6a351",
+        "reason": "Raw HTML represents a challenge or JavaScript-only barrier page",
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_cf_challenge.htm",
+        "status": "blocked_or_challenge"
+      }
+    ],
+    "research_metadata": {
+      "article_collection_status": "research_sample_only_not_runtime_collected",
+      "notes": "Research extraction bundle for official FOMC statement text. Acquired via bounded research fixture acquisition, not runtime R2 collector. Does not constitute verified production evidence or market outcome proof.",
+      "provenance_class": "research_fixture",
+      "statement_profile": "fomc_press_release_v1",
+      "usable_for_forecast": false
+    },
+    "schema_version": "pythia-statement-schema-r3/1.0"
+  }
+}

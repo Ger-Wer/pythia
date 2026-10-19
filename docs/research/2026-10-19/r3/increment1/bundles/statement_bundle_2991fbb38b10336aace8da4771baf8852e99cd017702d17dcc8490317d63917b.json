@@ -1,0 +1,141 @@
+{
+  "bundle_digest": "2991fbb38b10336aace8da4771baf8852e99cd017702d17dcc8490317d63917b",
+  "statement_bundle": {
+    "bundle_version": "pythia-statement-bundle-r3/0.1",
+    "document": {
+      "container_locator": {
+        "selector": "#article div.col-xs-12.col-sm-8.col-md-8",
+        "type": "html_css"
+      },
+      "container_proof": {
+        "byte_end": 728,
+        "byte_start": 385,
+        "quote_sha256": "32c5876777f7ede0fe09d6937344dd65b6f18cc5479f7e6d56c7b1c3ab325567",
+        "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+        "raw_quote_text": "<div class=\"col-xs-12 col-sm-8 col-md-8\">\n        <p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>\n<p>The Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.</p>\n<p>Economic activity has continued to expand at a moderate pace.</p>\n    </div>"
+      },
+      "date_locator": {
+        "selector": "#article div.heading p.article__time",
+        "type": "html_css"
+      },
+      "date_proof": {
+        "byte_end": 243,
+        "byte_start": 198,
+        "quote_sha256": "fc872367c593231a2ff8255aa35e0e810dd6294c85c70f74b42ac9f0cd807c40",
+        "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+        "raw_quote_text": "<p class=\"article__time\">October 28, 2026</p>"
+      },
+      "page_date_raw": "October 28, 2026",
+      "paragraphs": [
+        {
+          "display_text": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:",
+          "locator": {
+            "selector": "#article div.col-xs-12.col-sm-8.col-md-8 p:nth-of-type(1)",
+            "type": "html_css"
+          },
+          "paragraph_index": 0,
+          "proof": {
+            "byte_end": 540,
+            "byte_start": 435,
+            "quote_sha256": "ebc203933f0f938e6f4529ad25ec84616df5b14e255fffb40ae6e0df84caab53",
+            "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+            "raw_quote_text": "<p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>"
+          },
+          "role": "vote_approval"
+        },
+        {
+          "display_text": "The Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.",
+          "locator": {
+            "selector": "#article div.col-xs-12.col-sm-8.col-md-8 p:nth-of-type(2)",
+            "type": "html_css"
+          },
+          "paragraph_index": 1,
+          "proof": {
+            "byte_end": 648,
+            "byte_start": 541,
+            "quote_sha256": "07195e6b83e6dc1b082fa42d41ab2d1ed09099a952a61b3d2d7e1b121b24c411",
+            "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+            "raw_quote_text": "<p>The Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.</p>"
+          },
+          "role": "policy_decision"
+        },
+        {
+          "display_text": "Economic activity has continued to expand at a moderate pace.",
+          "locator": {
+            "selector": "#article div.col-xs-12.col-sm-8.col-md-8 p:nth-of-type(3)",
+            "type": "html_css"
+          },
+          "paragraph_index": 2,
+          "proof": {
+            "byte_end": 717,
+            "byte_start": 649,
+            "quote_sha256": "875720e5f1484427cde61f6581b46fc47aa913d77fbd19b45047f9faa374db7d",
+            "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+            "raw_quote_text": "<p>Economic activity has continued to expand at a moderate pace.</p>"
+          },
+          "role": "economic_assessment"
+        }
+      ],
+      "parent_feed_reference": null,
+      "profile_id": "fomc_press_release_v1",
+      "published_at": null,
+      "published_at_provenance": null,
+      "published_date": "2026-10-28",
+      "published_date_precision": "day",
+      "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+      "release_time_locator": {
+        "selector": "#article div.heading p.releaseTime",
+        "type": "html_css"
+      },
+      "release_time_proof": {
+        "byte_end": 369,
+        "byte_start": 321,
+        "quote_sha256": "cb51ed400832767a376364d6097b558a61ea46736b366079b6056d30a8653812",
+        "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+        "raw_quote_text": "<p class=\"releaseTime\">For immediate release</p>"
+      },
+      "release_time_raw": "For immediate release",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_date_only.htm",
+      "statement_id": "stmt-6ebd16c683a95944",
+      "substantive_statement_text": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:\n\nThe Committee decided to maintain the target range for the federal funds rate at 4 to 4-1/4 percent.\n\nEconomic activity has continued to expand at a moderate pace.",
+      "title": "Federal Reserve issues FOMC statement",
+      "title_locator": {
+        "selector": "#article div.heading h3.title",
+        "type": "html_css"
+      },
+      "title_proof": {
+        "byte_end": 312,
+        "byte_start": 252,
+        "quote_sha256": "814ead7cbf96e6e128a32b19750703db005ea0ed5411388297dd2d92c9e694f9",
+        "raw_blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+        "raw_quote_text": "<h3 class=\"title\">Federal Reserve issues FOMC statement</h3>"
+      }
+    },
+    "extractor_version": "pythia-statement-extractor-r3/0.1",
+    "manifest": {
+      "blob_sha256": "a53d3c768d94db126b487f1c71022c7165e149b620aa527b4a5d18e7624809ab",
+      "bytes_stored": 751,
+      "extraction_summary": {
+        "rejection_count": 0,
+        "status": "extracted",
+        "total_paragraphs": 3
+      },
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_date_only.htm",
+      "fixture_key": "synthetic_date_only",
+      "research_provenance": "synthetic_fixture",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_date_only.htm",
+      "synthetic_fixture": true,
+      "transport_outcome": "success",
+      "usable_for_forecast": false
+    },
+    "rejections": [],
+    "research_metadata": {
+      "article_collection_status": "research_sample_only_not_runtime_collected",
+      "notes": "Research extraction bundle for official FOMC statement text. Acquired via bounded research fixture acquisition, not runtime R2 collector. Does not constitute verified production evidence or market outcome proof.",
+      "provenance_class": "research_fixture",
+      "statement_profile": "fomc_press_release_v1",
+      "usable_for_forecast": false
+    },
+    "schema_version": "pythia-statement-schema-r3/1.0"
+  }
+}

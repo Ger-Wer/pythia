@@ -1,0 +1,40 @@
+{
+  "bundle_digest": "72bd51d92975a63a2751a51baa99aba9533d704ce91a0131aa6c9ef49b5ae57f",
+  "statement_bundle": {
+    "bundle_version": "pythia-statement-bundle-r3/0.1",
+    "document": null,
+    "extractor_version": "pythia-statement-extractor-r3/0.1",
+    "manifest": {
+      "blob_sha256": "e0a1f8e07cc08b73be470268a0b53d4079e3b079c8d55298d3c60715383c1613",
+      "bytes_stored": 561,
+      "extraction_summary": {
+        "rejection_count": 1,
+        "status": "rejected",
+        "total_paragraphs": 0
+      },
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_unsupported_minutes.htm",
+      "fixture_key": "synthetic_unsupported_minutes",
+      "research_provenance": "synthetic_fixture",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_unsupported_minutes.htm",
+      "synthetic_fixture": true,
+      "transport_outcome": "success",
+      "usable_for_forecast": false
+    },
+    "rejections": [
+      {
+        "raw_blob_sha256": "e0a1f8e07cc08b73be470268a0b53d4079e3b079c8d55298d3c60715383c1613",
+        "reason": "Document title 'Minutes of the Federal Open Market Committee' indicates unsupported document type ('minutes')",
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary_synth_synthetic_unsupported_minutes.htm",
+        "status": "unsupported_document_type"
+      }
+    ],
+    "research_metadata": {
+      "article_collection_status": "research_sample_only_not_runtime_collected",
+      "notes": "Research extraction bundle for official FOMC statement text. Acquired via bounded research fixture acquisition, not runtime R2 collector. Does not constitute verified production evidence or market outcome proof.",
+      "provenance_class": "research_fixture",
+      "statement_profile": "fomc_press_release_v1",
+      "usable_for_forecast": false
+    },
+    "schema_version": "pythia-statement-schema-r3/1.0"
+  }
+}

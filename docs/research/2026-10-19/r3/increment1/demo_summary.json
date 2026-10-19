@@ -1,0 +1,54 @@
+{
+  "bundle_version": "pythia-statement-bundle-r3/0.1",
+  "demo_version": "R3.1",
+  "extractor_version": "pythia-statement-extractor-r3/0.1",
+  "live_archives_healthy": true,
+  "network_attempts": 0,
+  "original_archives_unchanged": true,
+  "proofs_all_valid": true,
+  "real_statement_bundles": [
+    {
+      "bundle_digest": "b2991de58a918c6cf3d14015bb539b0fcb0f27bf45eee30ee9f2c874a64bf27b",
+      "bundle_file": "statement_bundle_b2991de58a918c6cf3d14015bb539b0fcb0f27bf45eee30ee9f2c874a64bf27b.json",
+      "fixture_key": "monetary20260916a",
+      "paragraphs_count": 6,
+      "preview_file": "statement_preview_monetary20260916a.md",
+      "proofs_verified": 10,
+      "published_at": "2026-09-16T14:00:00-04:00",
+      "published_date": "2026-09-16",
+      "title": "Federal Reserve issues FOMC statement"
+    },
+    {
+      "bundle_digest": "d9b46d553cf8bac213c8e0950c2cbab969aaa7421f5400c8432b08820ff3ee99",
+      "bundle_file": "statement_bundle_d9b46d553cf8bac213c8e0950c2cbab969aaa7421f5400c8432b08820ff3ee99.json",
+      "fixture_key": "monetary20260729a",
+      "paragraphs_count": 7,
+      "preview_file": "statement_preview_monetary20260729a.md",
+      "proofs_verified": 11,
+      "published_at": "2026-07-29T14:00:00-04:00",
+      "published_date": "2026-07-29",
+      "title": "Federal Reserve issues FOMC statement"
+    }
+  ],
+  "schema_version": "pythia-statement-schema-r3/1.0",
+  "supported_profile": "fomc_press_release_v1",
+  "synthetic_test_bundles": [
+    {
+      "bundle_digest": "2991fbb38b10336aace8da4771baf8852e99cd017702d17dcc8490317d63917b",
+      "fixture_key": "synthetic_date_only",
+      "status": "extracted"
+    },
+    {
+      "bundle_digest": "72bd51d92975a63a2751a51baa99aba9533d704ce91a0131aa6c9ef49b5ae57f",
+      "fixture_key": "synthetic_unsupported_minutes",
+      "status": "rejected (unsupported_document_type)"
+    },
+    {
+      "bundle_digest": "fa7ef06cfeac9cb683f43f5bf61c909870239abba5109526f7286d53e458c91e",
+      "fixture_key": "synthetic_cf_challenge",
+      "status": "rejected (blocked_or_challenge)"
+    }
+  ],
+  "total_proofs_verified": 21,
+  "utc": "2026-10-19T07:55:38.102437+00:00"
+}
