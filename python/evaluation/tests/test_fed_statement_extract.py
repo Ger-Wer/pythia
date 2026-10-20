@@ -1203,3 +1203,201 @@ def test_f2_supported_body_profile_positive_and_negatives():
     res_pos = extract_fed_statement(raw_pos, {**man, "bytes_stored": len(raw_pos), "blob_sha256": hashlib.sha256(raw_pos).hexdigest()})
     assert res_pos.is_success
     assert "target range for the federal funds rate" in res_pos.document.substantive_statement_text
+
+
+def test_f1_feed_item_locator_supported_rss_structure():
+    """F1: feed_item_locator must strictly follow xml_xpath /rss/channel/item[N] with 1-based N."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+    valid_parent = {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+    }
+
+    # Positives: positive integers 1, 3, 10
+    for path in ("/rss/channel/item[1]", "/rss/channel/item[3]", "/rss/channel/item[10]"):
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_parent)
+        m["parent_feed_reference"]["feed_item_locator"] = {"type": "xml_xpath", "path": path}
+        res = extract_fed_statement(raw, m)
+        assert res.is_success, f"Expected success for locator path {path}"
+
+    # Negatives: wrong type, arbitrary path, non-positive index, malformed
+    bad_locators = [
+        {"type": "html_css", "path": "#article"},
+        {"type": "xml_xpath", "path": "/html/body/p[1]"},
+        {"type": "xml_xpath", "path": "/rss/channel/item[0]"},
+        {"type": "xml_xpath", "path": "/rss/channel/item[-1]"},
+        {"type": "xml_xpath", "path": "this is not an XPath"},
+        {"type": "not_a_supported_locator", "path": "/rss/channel/item[3]"},
+        {"type": "xml_xpath", "path": "/rss/channel/item"},
+    ]
+    for loc in bad_locators:
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_parent)
+        m["parent_feed_reference"]["feed_item_locator"] = loc
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for locator {loc}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+
+def test_f1_known_identifiers_individual_validation_and_nulls():
+    """F1: Known identifier fields validated independently of form; nulls and bad types rejected."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+    valid_form_a = {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+    }
+
+    # Form A with single bad known identifier (bool or null) rejected
+    for key, bad_val in [
+        ("receipt_id", True),
+        ("receipt_id", None),
+        ("revision_id", True),
+        ("revision_id", None),
+        ("source_id", None),
+        ("source_id", ""),
+    ]:
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_form_a)
+        m["parent_feed_reference"][key] = bad_val
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for Form A with {key}={bad_val!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+    # Form B with null alias or null source_id rejected
+    valid_form_b = {
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "feed_receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "feed_revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "source_id": "fed_monetary_rss",
+    }
+    for key, bad_val in [
+        ("receipt_id", None),
+        ("revision_id", None),
+        ("source_id", None),
+        ("source_id", ""),
+        ("source_id", True),
+    ]:
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_form_b)
+        m["parent_feed_reference"][key] = bad_val
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for Form B with {key}={bad_val!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+
+def test_f1_synthetic_parent_marker_validation():
+    """F1: Synthetic parent fixture_kind must be 'synthetic_fixture'; non-synthetic markers rejected."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+
+    # Negatives: contradictory or non-synthetic marker values
+    for marker in ("downloaded_research_fixture", "not_synthetic", None):
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = {"fixture_kind": marker}
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for synthetic marker={marker!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+    # Positives: explicit synthetic without parent and with correct marker
+    m_no_parent = copy.deepcopy(base_man)
+    res_no_parent = extract_fed_statement(raw, m_no_parent)
+    assert res_no_parent.is_success
+    assert res_no_parent.document.parent_feed_reference == {"fixture_kind": "synthetic_fixture"}
+
+    m_with_marker = copy.deepcopy(base_man)
+    m_with_marker["parent_feed_reference"] = {"fixture_kind": "synthetic_fixture"}
+    res_with_marker = extract_fed_statement(raw, m_with_marker)
+    assert res_with_marker.is_success
+
+
+def test_f1_feed_datetime_nullable_string_validation():
+    """F1: feed_published_at and feed_raw_pub_date must be nullable strings; wrong types rejected without crash."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "research_fixture",
+        "issuer": "Federal Reserve Board",
+    }
+    valid_parent = {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {"path": "/rss/channel/item[3]", "type": "xml_xpath"},
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+    }
+
+    # Wrong type for feed_published_at (e.g. int, bool)
+    for bad_dt in (42, True, ["2026-09-16"]):
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_parent)
+        m["parent_feed_reference"]["feed_published_at"] = bad_dt
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for feed_published_at={bad_dt!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+    # Wrong type for feed_raw_pub_date
+    for bad_raw_dt in (100, False):
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"] = copy.deepcopy(valid_parent)
+        m["parent_feed_reference"]["feed_raw_pub_date"] = bad_raw_dt
+        res = extract_fed_statement(raw, m)
+        assert not res.is_success, f"Expected rejection for feed_raw_pub_date={bad_raw_dt!r}"
+        assert res.rejections[0].status == "invalid_manifest"
+
+    # Nullable string is accepted (None or valid string)
+    m_null = copy.deepcopy(base_man)
+    m_null["parent_feed_reference"] = copy.deepcopy(valid_parent)
+    m_null["parent_feed_reference"]["feed_published_at"] = None
+    m_null["parent_feed_reference"]["feed_raw_pub_date"] = None
+    res_null = extract_fed_statement(raw, m_null)
+    assert res_null.is_success
+
+    m_str = copy.deepcopy(base_man)
+    m_str["parent_feed_reference"] = copy.deepcopy(valid_parent)
+    m_str["parent_feed_reference"]["feed_published_at"] = "2026-09-16T18:00:00+00:00"
+    m_str["parent_feed_reference"]["feed_raw_pub_date"] = "Wed, 16 Sep 2026 18:00:00 GMT"
+    res_str = extract_fed_statement(raw, m_str)
+    assert res_str.is_success

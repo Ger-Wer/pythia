@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 
-STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.4"
+STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.5"
 STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.2"
-STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.4"
+STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.5"
 SUPPORTED_PROFILE = "fomc_press_release_v1"
 
 OFFICIAL_DOMAINS = {"federalreserve.gov", "www.federalreserve.gov"}
@@ -327,6 +327,99 @@ def _build_element_selector(el: Any, root_selector: str, root_elem: Any) -> str:
     if parts:
         return f"{root_selector} > {' > '.join(parts)}"
     return root_selector
+
+
+def _validate_rss_item_locator(
+    locator: Any,
+    source_url: str,
+    actual_sha: str,
+    prefix: str = "parent_feed_reference field 'feed_item_locator'",
+) -> Optional[ExtractionResult]:
+    """Offline syntactic validation of RSS feed item locator.
+
+    Supported form:
+      type: "xml_xpath"
+      path: "/rss/channel/item[N]" where N is a positive integer (1-based index)
+    """
+    if not isinstance(locator, dict) or isinstance(locator, bool) or len(locator) == 0:
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"{prefix} must be a structural dictionary, got {type(locator).__name__}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    loc_type = locator.get("type")
+    loc_path = locator.get("path")
+
+    if not isinstance(loc_type, str) or isinstance(loc_type, bool) or not loc_type.strip():
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"feed_item_locator 'type' must be non-empty string, got {type(loc_type).__name__}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    if loc_type != "xml_xpath":
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"feed_item_locator 'type' must be supported locator type ('xml_xpath'), got {loc_type!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    if not isinstance(loc_path, str) or isinstance(loc_path, bool) or not loc_path.strip():
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"feed_item_locator 'path' must be non-empty string, got {type(loc_path).__name__}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    if not re.match(r"^/rss/channel/item\[([1-9][0-9]*)\]$", loc_path):
+        return ExtractionResult(
+            document=None,
+            rejections=[
+                RejectionRecord(
+                    status="invalid_manifest",
+                    reason=f"feed_item_locator 'path' must match supported RSS item path ('/rss/channel/item[N]' with 1-based positive integer index), got {loc_path!r}",
+                    source_url=source_url,
+                    raw_blob_sha256=actual_sha,
+                )
+            ],
+            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+            schema_version=STATEMENT_SCHEMA_VERSION,
+        )
+
+    return None
 
 
 def extract_fed_statement(
@@ -646,7 +739,40 @@ def extract_fed_statement(
                     extractor_version=STATEMENT_EXTRACTOR_VERSION,
                     schema_version=STATEMENT_SCHEMA_VERSION,
                 )
+
+            # If fixture_kind is present in synthetic parent, it MUST be string 'synthetic_fixture'
+            if "fixture_kind" in parent_feed_val:
+                fk = parent_feed_val["fixture_kind"]
+                if fk != "synthetic_fixture":
+                    return ExtractionResult(
+                        document=None,
+                        rejections=[
+                            RejectionRecord(
+                                status="invalid_manifest",
+                                reason=f"Synthetic parent_feed_reference field 'fixture_kind' must be 'synthetic_fixture', got {fk!r}",
+                                source_url=source_url,
+                                raw_blob_sha256=actual_sha,
+                            )
+                        ],
+                        extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                        schema_version=STATEMENT_SCHEMA_VERSION,
+                    )
+
             for k, v in parent_feed_val.items():
+                if v is None:
+                    return ExtractionResult(
+                        document=None,
+                        rejections=[
+                            RejectionRecord(
+                                status="invalid_manifest",
+                                reason=f"Synthetic parent_feed_reference field {k!r} cannot be null",
+                                source_url=source_url,
+                                raw_blob_sha256=actual_sha,
+                            )
+                        ],
+                        extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                        schema_version=STATEMENT_SCHEMA_VERSION,
+                    )
                 if isinstance(v, bool) or isinstance(v, (int, float, list, tuple)):
                     return ExtractionResult(
                         document=None,
@@ -675,21 +801,13 @@ def extract_fed_statement(
                         extractor_version=STATEMENT_EXTRACTOR_VERSION,
                         schema_version=STATEMENT_SCHEMA_VERSION,
                     )
-                if k == "feed_item_locator" and isinstance(v, dict):
-                    if "type" not in v or "path" not in v:
-                        return ExtractionResult(
-                            document=None,
-                            rejections=[
-                                RejectionRecord(
-                                    status="invalid_manifest",
-                                    reason="Synthetic feed_item_locator must contain 'type' and 'path'",
-                                    source_url=source_url,
-                                    raw_blob_sha256=actual_sha,
-                                )
-                            ],
-                            extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                            schema_version=STATEMENT_SCHEMA_VERSION,
-                        )
+                if k == "feed_item_locator":
+                    loc_err = _validate_rss_item_locator(
+                        v, source_url, actual_sha,
+                        prefix="Synthetic parent_feed_reference field 'feed_item_locator'",
+                    )
+                    if loc_err:
+                        return loc_err
         else:
             parent_feed_val = {"fixture_kind": "synthetic_fixture"}
     else:
@@ -700,6 +818,22 @@ def extract_fed_statement(
                     RejectionRecord(
                         status="invalid_manifest",
                         reason="Real research manifest missing required 'parent_feed_reference' provenance linkage",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
+
+        # Real manifests must not contain synthetic fixture_kind marker
+        if "fixture_kind" in parent_feed_val:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason=f"Real parent_feed_reference cannot contain 'fixture_kind' marker, got {parent_feed_val['fixture_kind']!r}",
                         source_url=source_url,
                         raw_blob_sha256=actual_sha,
                     )
@@ -764,73 +898,64 @@ def extract_fed_statement(
             )
 
         locator = parent_feed_val["feed_item_locator"]
-        if not isinstance(locator, dict) or isinstance(locator, bool) or len(locator) == 0:
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason=f"parent_feed_reference field 'feed_item_locator' must be a structural dictionary, got {type(locator).__name__}",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
-                    )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
-        loc_type = locator.get("type")
-        loc_path = locator.get("path")
-        if not isinstance(loc_type, str) or isinstance(loc_type, bool) or not loc_type.strip():
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason=f"feed_item_locator 'type' must be non-empty string, got {type(loc_type).__name__}",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
-                    )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
-        if not isinstance(loc_path, str) or isinstance(loc_path, bool) or not loc_path.strip():
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason=f"feed_item_locator 'path' must be non-empty string, got {type(loc_path).__name__}",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
-                    )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
+        loc_err = _validate_rss_item_locator(locator, source_url, actual_sha)
+        if loc_err:
+            return loc_err
 
-        # 2. Check Context lineage: Form A (archive_name + parent_bundle_digest) OR Form B (receipt_id / feed_receipt_id + revision_id / feed_revision_id)
-        has_form_a = "archive_name" in parent_feed_val and "parent_bundle_digest" in parent_feed_val
-        has_receipt = "receipt_id" in parent_feed_val or "feed_receipt_id" in parent_feed_val
-        has_revision = "revision_id" in parent_feed_val or "feed_revision_id" in parent_feed_val
-        has_form_b = has_receipt and has_revision
-
-        if not has_form_a and not has_form_b:
-            return ExtractionResult(
-                document=None,
-                rejections=[
-                    RejectionRecord(
-                        status="invalid_manifest",
-                        reason="parent_feed_reference must satisfy either archive/bundle lineage (archive_name, parent_bundle_digest) or receipt/revision lineage (feed_receipt_id/receipt_id, feed_revision_id/revision_id)",
-                        source_url=source_url,
-                        raw_blob_sha256=actual_sha,
+        # 2. Validate EVERY present known identifier field independently of chosen form
+        known_id_fields = ("receipt_id", "feed_receipt_id", "revision_id", "feed_revision_id", "source_id")
+        for f in known_id_fields:
+            if f in parent_feed_val:
+                val = parent_feed_val[f]
+                if not isinstance(val, str) or isinstance(val, bool) or not val.strip():
+                    return ExtractionResult(
+                        document=None,
+                        rejections=[
+                            RejectionRecord(
+                                status="invalid_manifest",
+                                reason=f"parent_feed_reference field {f!r} must be a non-empty string when present, got {type(val).__name__}",
+                                source_url=source_url,
+                                raw_blob_sha256=actual_sha,
+                            )
+                        ],
+                        extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                        schema_version=STATEMENT_SCHEMA_VERSION,
                     )
-                ],
-                extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                schema_version=STATEMENT_SCHEMA_VERSION,
-            )
 
-        # Validate Form A if present or partially present
+        # Alias consistency: if both aliases are present, they must be equal
+        if "receipt_id" in parent_feed_val and "feed_receipt_id" in parent_feed_val:
+            if parent_feed_val["receipt_id"] != parent_feed_val["feed_receipt_id"]:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Contradictory receipt identifier aliases: receipt_id={parent_feed_val['receipt_id']!r} vs feed_receipt_id={parent_feed_val['feed_receipt_id']!r}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+        if "revision_id" in parent_feed_val and "feed_revision_id" in parent_feed_val:
+            if parent_feed_val["revision_id"] != parent_feed_val["feed_revision_id"]:
+                return ExtractionResult(
+                    document=None,
+                    rejections=[
+                        RejectionRecord(
+                            status="invalid_manifest",
+                            reason=f"Contradictory revision identifier aliases: revision_id={parent_feed_val['revision_id']!r} vs feed_revision_id={parent_feed_val['feed_revision_id']!r}",
+                            source_url=source_url,
+                            raw_blob_sha256=actual_sha,
+                        )
+                    ],
+                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                    schema_version=STATEMENT_SCHEMA_VERSION,
+                )
+
+        # 3. Validate Form A fields if present
         if "archive_name" in parent_feed_val or "parent_bundle_digest" in parent_feed_val:
             arc_name = parent_feed_val.get("archive_name")
             if not isinstance(arc_name, str) or isinstance(arc_name, bool) or not arc_name.strip():
@@ -868,87 +993,50 @@ def extract_fed_statement(
                     schema_version=STATEMENT_SCHEMA_VERSION,
                 )
 
-        # Validate Form B if present or partially present
-        if has_receipt or has_revision or "source_id" in parent_feed_val:
-            rec_id = parent_feed_val.get("receipt_id")
-            feed_rec_id = parent_feed_val.get("feed_receipt_id")
-            if rec_id is not None and feed_rec_id is not None and rec_id != feed_rec_id:
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason=f"Contradictory receipt identifier aliases: receipt_id={rec_id!r} vs feed_receipt_id={feed_rec_id!r}",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
-                        )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
-            receipt_val = rec_id if rec_id is not None else feed_rec_id
-            if has_form_b and (not isinstance(receipt_val, str) or isinstance(receipt_val, bool) or not receipt_val.strip()):
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason=f"Receipt identifier must be non-empty string, got {type(receipt_val).__name__}",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
-                        )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
+        # 4. Check Context lineage completeness: Form A OR Form B
+        has_form_a = (
+            "archive_name" in parent_feed_val
+            and "parent_bundle_digest" in parent_feed_val
+        )
+        has_receipt = "receipt_id" in parent_feed_val or "feed_receipt_id" in parent_feed_val
+        has_revision = "revision_id" in parent_feed_val or "feed_revision_id" in parent_feed_val
+        has_form_b = has_receipt and has_revision
 
-            rev_id = parent_feed_val.get("revision_id")
-            feed_rev_id = parent_feed_val.get("feed_revision_id")
-            if rev_id is not None and feed_rev_id is not None and rev_id != feed_rev_id:
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason=f"Contradictory revision identifier aliases: revision_id={rev_id!r} vs feed_revision_id={feed_rev_id!r}",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
-                        )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
-            revision_val = rev_id if rev_id is not None else feed_rev_id
-            if has_form_b and (not isinstance(revision_val, str) or isinstance(revision_val, bool) or not revision_val.strip()):
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason=f"Revision identifier must be non-empty string, got {type(revision_val).__name__}",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
-                        )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
+        if not has_form_a and not has_form_b:
+            return ExtractionResult(
+                document=None,
+                rejections=[
+                    RejectionRecord(
+                        status="invalid_manifest",
+                        reason="parent_feed_reference must satisfy either archive/bundle lineage (archive_name, parent_bundle_digest) or receipt/revision lineage (feed_receipt_id/receipt_id, feed_revision_id/revision_id)",
+                        source_url=source_url,
+                        raw_blob_sha256=actual_sha,
+                    )
+                ],
+                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                schema_version=STATEMENT_SCHEMA_VERSION,
+            )
 
-            source_id = parent_feed_val.get("source_id")
-            if source_id is not None and (not isinstance(source_id, str) or isinstance(source_id, bool) or not source_id.strip()):
-                return ExtractionResult(
-                    document=None,
-                    rejections=[
-                        RejectionRecord(
-                            status="invalid_manifest",
-                            reason=f"parent_feed_reference field 'source_id' must be non-empty string when present, got {type(source_id).__name__}",
-                            source_url=source_url,
-                            raw_blob_sha256=actual_sha,
+    # Validate parent feed date fields if present (both real and synthetic)
+    if parent_feed_val is not None:
+        for date_key in ("feed_published_at", "feed_raw_pub_date"):
+            if date_key in parent_feed_val:
+                d_val = parent_feed_val[date_key]
+                if d_val is not None:
+                    if not isinstance(d_val, str) or isinstance(d_val, bool) or not d_val.strip():
+                        return ExtractionResult(
+                            document=None,
+                            rejections=[
+                                RejectionRecord(
+                                    status="invalid_manifest",
+                                    reason=f"parent_feed_reference field {date_key!r} must be a nullable string, got {type(d_val).__name__}",
+                                    source_url=source_url,
+                                    raw_blob_sha256=actual_sha,
+                                )
+                            ],
+                            extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                            schema_version=STATEMENT_SCHEMA_VERSION,
                         )
-                    ],
-                    extractor_version=STATEMENT_EXTRACTOR_VERSION,
-                    schema_version=STATEMENT_SCHEMA_VERSION,
-                )
 
     # Verify blob integrity against manifest
     manifest_sha = manifest["blob_sha256"]
@@ -1175,7 +1263,7 @@ def extract_fed_statement(
     feed_raw_pub = parent_feed.get("feed_raw_pub_date")
     date_diagnostics = None
 
-    if feed_pub_at and published_date:
+    if feed_pub_at and isinstance(feed_pub_at, str) and published_date:
         mismatch_detected = False
         mismatch_reason = None
         feed_date_str = feed_pub_at[:10]
