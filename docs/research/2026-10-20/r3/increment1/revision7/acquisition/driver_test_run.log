@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /home/pythia/pythia-paper-channel-20261017/python/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/pythia/pythia-evidence-r31
+collecting ... collected 8 items
+
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_supervisor_kills_hung_worker PASSED [ 12%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_set_cookie_isolation_on_redirect PASSED [ 25%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_offsite_redirect_rejected_before_request PASSED [ 37%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_third_redirect_rejected_before_request PASSED [ 50%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_decoded_body_exact_limit_and_overflow PASSED [ 62%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_interrupted_body_incomplete_eof PASSED [ 75%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_attempt_budget_and_stop_on_success PASSED [ 87%]
+docs/research/2026-10-20/r3/increment1/revision7/acquisition/test_bounded_research_driver.py::test_mandatory_audit_fields_and_no_clobber PASSED [100%]
+
+============================== 8 passed in 3.47s ===============================
