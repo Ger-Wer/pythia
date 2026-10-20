@@ -1401,3 +1401,56 @@ def test_f1_feed_datetime_nullable_string_validation():
     m_str["parent_feed_reference"]["feed_raw_pub_date"] = "Wed, 16 Sep 2026 18:00:00 GMT"
     res_str = extract_fed_statement(raw, m_str)
     assert res_str.is_success
+
+
+def test_f1_synthetic_nullable_dates():
+    """F1: In synthetic parent reference, feed_published_at and feed_raw_pub_date must be nullable strings."""
+    raw = _create_minimal_valid_html()
+    base_man = {
+        "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261015a.htm",
+        "bytes_stored": len(raw),
+        "blob_sha256": hashlib.sha256(raw).hexdigest(),
+        "transport_outcome": "success",
+        "http_status": 200,
+        "research_provenance": "synthetic_fixture",
+        "issuer": "Federal Reserve Board",
+        "parent_feed_reference": {"fixture_kind": "synthetic_fixture"},
+    }
+
+    # Positives: None, valid strings, combinations, missing keys
+    shapes = [
+        ({"feed_published_at": None, "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT"}),
+        ({"feed_published_at": "2026-09-16T18:00:00+00:00", "feed_raw_pub_date": None}),
+        ({"feed_published_at": None, "feed_raw_pub_date": None}),
+        ({"feed_published_at": "2026-09-16T18:00:00+00:00", "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT"}),
+        ({"feed_published_at": None}),
+        ({"feed_raw_pub_date": None}),
+    ]
+    for dates in shapes:
+        m = copy.deepcopy(base_man)
+        m["parent_feed_reference"].update(dates)
+        res = extract_fed_statement(raw, m)
+        assert res.is_success, f"Failed for synthetic dates={dates!r}: {[r.to_dict() for r in res.rejections]}"
+        assert res.document is not None
+
+    # Negatives: wrong types (int, bool, list) for feed_published_at and feed_raw_pub_date
+    for bad_val in (42, True, False, ["2026-09-16"], {}):
+        m1 = copy.deepcopy(base_man)
+        m1["parent_feed_reference"]["feed_published_at"] = bad_val
+        res1 = extract_fed_statement(raw, m1)
+        assert not res1.is_success, f"Expected rejection for feed_published_at={bad_val!r}"
+        assert res1.rejections[0].status == "invalid_manifest"
+
+        m2 = copy.deepcopy(base_man)
+        m2["parent_feed_reference"]["feed_raw_pub_date"] = bad_val
+        res2 = extract_fed_statement(raw, m2)
+        assert not res2.is_success, f"Expected rejection for feed_raw_pub_date={bad_val!r}"
+        assert res2.rejections[0].status == "invalid_manifest"
+
+    # Strict non-null constraint maintained for other synthetic parent fields
+    m_bad_kind = copy.deepcopy(base_man)
+    m_bad_kind["parent_feed_reference"]["fixture_kind"] = None
+    res_bad_kind = extract_fed_statement(raw, m_bad_kind)
+    assert not res_bad_kind.is_success
+    assert res_bad_kind.rejections[0].status == "invalid_manifest"

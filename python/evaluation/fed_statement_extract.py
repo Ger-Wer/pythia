@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup
 
 from python.evaluation.evidence_extract import ProofSpan
 
-STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.5"
+STATEMENT_EXTRACTOR_VERSION = "pythia-statement-extractor-r3/0.1.6"
 STATEMENT_SCHEMA_VERSION = "pythia-statement-schema-r3/1.2"
-STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.5"
+STATEMENT_BUNDLE_VERSION = "pythia-statement-bundle-r3/0.1.6"
 SUPPORTED_PROFILE = "fomc_press_release_v1"
 
 OFFICIAL_DOMAINS = {"federalreserve.gov", "www.federalreserve.gov"}
@@ -759,6 +759,24 @@ def extract_fed_statement(
                     )
 
             for k, v in parent_feed_val.items():
+                if k in ("feed_published_at", "feed_raw_pub_date"):
+                    if v is not None:
+                        if not isinstance(v, str) or isinstance(v, bool) or not v.strip():
+                            return ExtractionResult(
+                                document=None,
+                                rejections=[
+                                    RejectionRecord(
+                                        status="invalid_manifest",
+                                        reason=f"Synthetic parent_feed_reference field {k!r} must be a nullable string, got {type(v).__name__}",
+                                        source_url=source_url,
+                                        raw_blob_sha256=actual_sha,
+                                    )
+                                ],
+                                extractor_version=STATEMENT_EXTRACTOR_VERSION,
+                                schema_version=STATEMENT_SCHEMA_VERSION,
+                            )
+                    continue
+
                 if v is None:
                     return ExtractionResult(
                         document=None,
