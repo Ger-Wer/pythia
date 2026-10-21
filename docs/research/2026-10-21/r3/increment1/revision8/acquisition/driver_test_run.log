@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /home/pythia/pythia-paper-channel-20261017/python/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/pythia/pythia-evidence-r31
+collecting ... collected 13 items
+
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_supervisor_kills_hung_worker PASSED [  7%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_set_cookie_isolation_on_redirect PASSED [ 15%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_offsite_redirect_rejected_before_request PASSED [ 23%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_third_redirect_rejected_before_request PASSED [ 30%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_gzip_valid_and_missing_trailer PASSED [ 38%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_deflate_valid_and_missing_trailer PASSED [ 46%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_unsupported_encoding_rejected PASSED [ 53%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_decoded_body_exact_limit_and_overflow PASSED [ 61%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_default_publication_fails_closed_on_existing PASSED [ 69%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_explicit_no_clobber_metadata_only PASSED [ 76%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_killed_audit_truthful_reporting PASSED [ 84%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_outgoing_headers_actual_recording PASSED [ 92%]
+docs/research/2026-10-21/r3/increment1/revision8/acquisition/test_bounded_research_driver.py::test_url_gate_invalids PASSED [100%]
+
+============================== 13 passed in 7.93s ==============================
