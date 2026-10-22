@@ -85,7 +85,7 @@ CANONICAL_SOURCES: Dict[str, str] = {
 }
 
 
-def validate_capture_result(capture: Any) -> None:
+def validate_capture_result(capture: Any, registry: Optional[Dict[str, str]] = None) -> None:
     """Validate CaptureResult invariants at archive boundary before persistent processing.
 
     Enforces strict typing and protocol invariants:
@@ -96,14 +96,22 @@ def validate_capture_result(capture: Any) -> None:
     - flags/counters/complete: strict consistency and type rules.
     - timestamps: valid ISO 8601 UTC strings.
     Raises ValueError on any violation.
+
+    The source registry defaults to CANONICAL_SOURCES (the accepted R1/R2
+    behaviour, unchanged). An archive instance dedicated to a different
+    document family (R3.2 article archive) may pass its own explicit
+    allowlist registry; the same strict membership and exact-URL rules then
+    apply against that registry instead.
     """
     if not isinstance(capture, CaptureResult):
         raise ValueError(f"Expected CaptureResult instance, got {type(capture).__name__}")
 
+    sources = CANONICAL_SOURCES if registry is None else registry
+
     # source_id and initial_url
-    if type(capture.source_id) is not str or capture.source_id not in CANONICAL_SOURCES:
+    if type(capture.source_id) is not str or capture.source_id not in sources:
         raise ValueError(f"Unknown or non-canonical source_id: {capture.source_id!r}")
-    expected_url = CANONICAL_SOURCES[capture.source_id]
+    expected_url = sources[capture.source_id]
     if type(capture.initial_url) is not str or capture.initial_url != expected_url:
         raise ValueError(
             f"URL mismatch for '{capture.source_id}': expected '{expected_url}', got {capture.initial_url!r}"

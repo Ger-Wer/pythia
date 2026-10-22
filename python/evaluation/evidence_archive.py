@@ -103,11 +103,21 @@ class ArchiveRevision:
 class EvidenceArchive:
     """Filesystem CAS + SQLite storage for immutable evidence documents and attempt receipts."""
 
-    def __init__(self, state_dir: Path | str) -> None:
+    def __init__(
+        self,
+        state_dir: Path | str,
+        source_registry: Optional[Dict[str, str]] = None,
+    ) -> None:
         self.state_dir = Path(state_dir).resolve()
         self.blobs_dir = self.state_dir / "blobs"
         self.tmp_dir = self.state_dir / "tmp"
         self.db_path = self.state_dir / "archive.db"
+        # R3.2: an archive instance may serve a dedicated document family with
+        # its own explicit source allowlist. None keeps the accepted default:
+        # validation against CANONICAL_SOURCES, byte-identical behaviour.
+        self._source_registry: Optional[Dict[str, str]] = (
+            dict(source_registry) if source_registry is not None else None
+        )
 
         # Ensure directory layout exists
         self.blobs_dir.mkdir(parents=True, exist_ok=True)
@@ -381,7 +391,7 @@ class EvidenceArchive:
 
     def _validate_capture(self, capture: CaptureResult) -> None:
         """Validate CaptureResult invariants at archive boundary before persistent processing."""
-        validate_capture_result(capture)
+        validate_capture_result(capture, registry=self._source_registry)
 
     def _compute_payload_fingerprint(
         self,
