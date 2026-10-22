@@ -1,0 +1,4001 @@
+{
+  "documents": {
+    "cbr_en_mrrf": {
+      "blob_sha256": "59bf59843dd6b46dc3318b7a9aae37ee55c9156538a277e9e76235b4dc6a5a39",
+      "complete": true,
+      "family": "cbr_data_page_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "International Reserves of the Russian Federation:Weekly values at the end of the reporting date | Bank of Russia",
+          "visible_text_chars": 2093
+        },
+        "kind": "negative",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "ff06d068-10af-4970-ac77-5a2fcd8352f8",
+      "revision_id": "31673c96-339d-46d0-b2f7-71642b5effa4",
+      "seq": 133,
+      "source_id": "cbr_en_mrrf",
+      "url": "https://www.cbr.ru/eng/hd_base/mrrf/mrrf_7d/"
+    },
+    "cbr_en_ruonia": {
+      "blob_sha256": "8a3f90710248f37a9315cb992cc8f4e3cd9f1c5e3ef3b11f4865e1e7173754dd",
+      "complete": true,
+      "family": "cbr_data_page_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "RUONIA (Ruble Overnight Index Average) | Bank of Russia",
+          "visible_text_chars": 2445
+        },
+        "kind": "negative",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "c644670d-930e-497a-b499-07422d69857b",
+      "revision_id": "8ef26e44-b35f-4673-b7b7-6f9aa0921b9a",
+      "seq": 132,
+      "source_id": "cbr_en_ruonia",
+      "url": "https://www.cbr.ru/eng/hd_base/ruonia/"
+    },
+    "cbr_impliedcny": {
+      "blob_sha256": "a48b73da5a401532f8ac7aefbd002c4f584249a4325e9dd7a0c46519b6fc6bb4",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.978,
+          "en_dates_found": 0,
+          "latin_share": 0.022,
+          "title": "\u0412\u043c\u0435\u043d\u0435\u043d\u043d\u0430\u044f \u0441\u0442\u0430\u0432\u043a\u0430 \u0432\u0430\u043b\u044e\u0442\u043d\u043e\u0433\u043e \u0441\u0432\u043e\u043f\u0430 \u043e\u0432\u0435\u0440\u043d\u0430\u0439\u0442 \u0432 \u044e\u0430\u043d\u044f\u0445 | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 1885
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "3ec47a3e-72a2-47e3-85fa-cb188dd064ce",
+      "revision_id": "9a9d3051-06ce-49ac-a29d-e4a375b5bf60",
+      "seq": 63,
+      "source_id": "cbr_impliedcny",
+      "url": "https://www.cbr.ru/hd_base/impliedratecny/"
+    },
+    "cbr_mkr": {
+      "blob_sha256": "03794f80cf41b93c862df1a03502629ac17193cd1c43ce1895e8986d97b6281e",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.919,
+          "en_dates_found": 0,
+          "latin_share": 0.081,
+          "title": "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u0438 \u0441\u0442\u0430\u0432\u043e\u043a \u043c\u0435\u0436\u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u043e\u0433\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u043e\u0433\u043e \u0440\u044b\u043d\u043a\u0430 \u0433\u0440\u0443\u043f\u043f\u044b MIACR \u0441 01.08.2000 | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 5452
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "33d67948-5cdd-4d54-bb26-6a9c2b1b364f",
+      "revision_id": "2473e1bd-d426-4378-b1a3-de2efc3475d9",
+      "seq": 62,
+      "source_id": "cbr_mkr",
+      "url": "https://www.cbr.ru/hd_base/mkr/mkr_base/"
+    },
+    "cbr_mrrf": {
+      "blob_sha256": "71775b28b792d20394a8552e92e2c73ad18d682efa014fb0aeb37d5abd0aa169",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.977,
+          "en_dates_found": 0,
+          "latin_share": 0.023,
+          "title": "\u041c\u0435\u0436\u0434\u0443\u043d\u0430\u0440\u043e\u0434\u043d\u044b\u0435 \u0440\u0435\u0437\u0435\u0440\u0432\u044b \u0420\u043e\u0441\u0441\u0438\u0439\u0441\u043a\u043e\u0439 \u0424\u0435\u0434\u0435\u0440\u0430\u0446\u0438\u0438:E\u0436\u0435\u043d\u0435\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f \u043d\u0430 \u043a\u043e\u043d\u0435\u0446 \u043e\u0442\u0447\u0435\u0442\u043d\u043e\u0439 \u0434\u0430\u0442\u044b | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 2732
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "f503ecba-666f-4370-bf86-5c4a15b753be",
+      "revision_id": "a7ca083d-9c4f-4a8f-84b8-92aaafd1ea41",
+      "seq": 61,
+      "source_id": "cbr_mrrf",
+      "url": "https://www.cbr.ru/hd_base/mrrf/mrrf_7d/"
+    },
+    "cbr_press_shell": {
+      "blob_sha256": "d841730fa7185e130350ae1025de4d4bfd9ee7b60d97b35a2bd34198f1554310",
+      "complete": true,
+      "family": "cbr_press_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "unverified",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.971,
+          "latin_share": 0.029,
+          "title": "\u041f\u0440\u0435\u0441\u0441-\u0440\u0435\u043b\u0438\u0437 | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 1505
+        },
+        "kind": "negative",
+        "note": "JS-rendered press release: served HTML carries no release text (contract 4.7).",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "dee95204-aeec-4407-8fa2-80beeb392d61",
+      "revision_id": "a6ae4f2f-93e9-4e63-8819-e79d17c8800b",
+      "seq": 66,
+      "source_id": "cbr_press_shell",
+      "url": "https://www.cbr.ru/press/pr/?file=12092025_1330_key.htm"
+    },
+    "cbr_reserves": {
+      "blob_sha256": "0d4c414a8b10af6ccd2515a65537a54fe76274fa50ebe07001df92323633f898",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.988,
+          "en_dates_found": 0,
+          "latin_share": 0.012,
+          "title": "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0432\u043d\u0435\u0448\u043d\u0435\u0433\u043e \u0441\u0435\u043a\u0442\u043e\u0440\u0430 | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 3608
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "816ce40d-4611-4d64-8794-bdd0a3c35ec4",
+      "revision_id": "e651ce60-6761-40c7-a7d8-92a603b54ff3",
+      "seq": 64,
+      "source_id": "cbr_reserves",
+      "url": "https://www.cbr.ru/statistics/macro_itm/external_sector/ir/"
+    },
+    "cbr_rss": {
+      "blob_sha256": "4b0a16243b58998223c01272aa5b5e4803f40fdb2d611ff64a00f08165ed0a20",
+      "complete": true,
+      "family": "rss_feed",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_item_title": "\u041e\u0442\u0432\u0435\u0442\u044b \u043d\u0430 \u0432\u043e\u043f\u0440\u043e\u0441\u044b \u043e\u0431 \u043e\u0442\u0437\u044b\u0432\u0435 \u043b\u0438\u0446\u0435\u043d\u0437\u0438\u0438 \u0443 \u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430 \u0432\u0437\u0430\u0438\u043c\u043d\u043e\u0433\u043e \u0441\u0442\u0440\u0430\u0445\u043e\u0432\u0430\u043d\u0438\u044f",
+          "item_count": 100,
+          "items_with_pubdate": 100
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "9d888f21-5bcd-48de-bd59-68f4d12b9e96",
+      "revision_id": "207712f9-1738-429d-8077-9d2292f7953c",
+      "seq": 25,
+      "source_id": "cbr_rss",
+      "url": "https://www.cbr.ru/rss/RssNews"
+    },
+    "cbr_ruonia": {
+      "blob_sha256": "550618f87b59da5ba6ca44ae8d4d429a7721122c461094cbb99eff30d47de754",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.923,
+          "en_dates_found": 0,
+          "latin_share": 0.077,
+          "title": "RUONIA (Ruble Overnight Index Average) | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 3631
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "8ec916a8-f011-4581-9639-df392c76b186",
+      "revision_id": "63283933-eacb-43e5-b52a-796620cf4414",
+      "seq": 60,
+      "source_id": "cbr_ruonia",
+      "url": "https://www.cbr.ru/hd_base/ruonia/"
+    },
+    "cbr_swap": {
+      "blob_sha256": "7c416803667e22366f4601bff531351377025f1438545d47dbd5f3f87ab7d016",
+      "complete": true,
+      "family": "cbr_data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.967,
+          "en_dates_found": 0,
+          "latin_share": 0.033,
+          "title": "\u0423\u0441\u043b\u043e\u0432\u0438\u044f \u0437\u0430\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f \u0441\u0434\u0435\u043b\u043e\u043a \u00ab\u0432\u0430\u043b\u044e\u0442\u043d\u044b\u0439 \u0441\u0432\u043e\u043f\u00bb \u043f\u043e \u043f\u0440\u043e\u0434\u0430\u0436\u0435 \u0438\u043d\u043e\u0441\u0442\u0440\u0430\u043d\u043d\u043e\u0439 \u0432\u0430\u043b\u044e\u0442\u044b \u0437\u0430 \u0440\u0443\u0431\u043b\u0438 | \u0411\u0430\u043d\u043a \u0420\u043e\u0441\u0441\u0438\u0438",
+          "visible_text_chars": 2474
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "ru",
+      "origin_entity": "Bank of Russia",
+      "receipt_id": "e2cd9797-44cd-4ca7-b605-c2ddcfb52a22",
+      "revision_id": "728608aa-a993-4a5f-b6a8-5a76c138fe0a",
+      "seq": 65,
+      "source_id": "cbr_swap",
+      "url": "https://www.cbr.ru/hd_base/swap_info/sell/"
+    },
+    "ecb_art_in261008": {
+      "blob_sha256": "a04aaea32680c0e91bd0f93970728260524df0e3b49cb46337352ac6d3657d7a",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.001,
+          "en_dates_found": 0,
+          "latin_share": 0.999,
+          "title": "Interview with Corriere della Sera",
+          "visible_text_chars": 19664
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "5e2ed1d9-f5be-4be0-8c9b-252450458626",
+      "revision_id": "5759c69b-e49b-42e6-af72-3f3e27a18d0e",
+      "seq": 109,
+      "source_id": "ecb_art_in261008",
+      "url": "https://www.ecb.europa.eu/press/inter/date/2026/html/ecb.in261008~3184e7d0d0.en.html"
+    },
+    "ecb_art_in261020": {
+      "blob_sha256": "895225a78a49a283792f8d609247fa94c4834e22a7c71fe803b4874197845d35",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Interview with Die Presse",
+          "visible_text_chars": 23163
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "57a61c48-e1db-4d68-a4a5-7ad856d6cb4a",
+      "revision_id": "da73d51f-ed49-45ef-9775-f8a24d080a5a",
+      "seq": 108,
+      "source_id": "ecb_art_in261020",
+      "url": "https://www.ecb.europa.eu/press/inter/date/2026/html/ecb.in261020~97e2e4bc38.en.html"
+    },
+    "ecb_art_mg261008": {
+      "blob_sha256": "0724f150d04632772a3e4bface7136c1744ac284032505491be12913ec4ad989",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "Meeting of 9-10 September 2026",
+          "visible_text_chars": 77658
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "c8ffd78d-c86f-42f6-a3da-57351ee089d7",
+      "revision_id": "88d3c741-2a30-4055-8871-e9af49c94471",
+      "seq": 38,
+      "source_id": "ecb_art_mg261008",
+      "url": "https://www.ecb.europa.eu/press/accounts/2026/html/ecb.mg261008~a10153d090.en.html"
+    },
+    "ecb_art_pr261007": {
+      "blob_sha256": "64e4dd2ef134aa6fe812c905823628a4e3a9fe22d721a71d5cae27718bd43fe7",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.001,
+          "en_dates_found": 0,
+          "latin_share": 0.999,
+          "title": "Results of the September 2026 survey on credit terms and conditions in euro-denominated securities financing and OTC derivatives markets (SESFOD)",
+          "visible_text_chars": 18299
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "b9225b10-440d-4e6c-ad26-d8ac510e449c",
+      "revision_id": "d9473f98-eeea-4df2-bd28-4240a03f0898",
+      "seq": 39,
+      "source_id": "ecb_art_pr261007",
+      "url": "https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.pr261007~6447350434.en.html"
+    },
+    "ecb_art_sp261006": {
+      "blob_sha256": "b796ea1699cf7095280ad7a19f78287b0c9931f8072730f2fad64c651ec18ad9",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Money in the digital age: digital euro, tokenisation and the role of central banks",
+          "visible_text_chars": 34337
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "0cee5cab-d2af-4af4-8816-9c9c7f8197cb",
+      "revision_id": "0876d535-c987-401f-be80-b8cfe17d0cd1",
+      "seq": 111,
+      "source_id": "ecb_art_sp261006",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261006~0da978f159.en.html"
+    },
+    "ecb_art_sp261013": {
+      "blob_sha256": "129be34af1019a20612f398eed90c3672cfc61f6ba93e10dea97382480042dcd",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "The AI opportunity for Europe",
+          "visible_text_chars": 26379
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "73ff9b4c-772f-4289-abe3-0ffb42d96c09",
+      "revision_id": "7638ce8a-9ce7-463f-8ba5-e9816f4197a4",
+      "seq": 37,
+      "source_id": "ecb_art_sp261013",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261013~9db9bf4fd6.en.html"
+    },
+    "ecb_art_sp261014": {
+      "blob_sha256": "a5cfccd8acea870a706fab94d5621c1a15439a2f216e0f7eb1d006c7b2dce9dc",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Ensuring resilience in the face of uncertainty",
+          "visible_text_chars": 40193
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "d39d427a-a74e-4e0c-a3fa-416f9ed928dc",
+      "revision_id": "a2b1d788-c801-4eda-92af-164ea83024cc",
+      "seq": 110,
+      "source_id": "ecb_art_sp261014",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261014~e4ca33588e.en.html"
+    },
+    "ecb_art_sp261017": {
+      "blob_sha256": "a16cd881a9de1753cc6060ea4ddbba49b495f2a45bd7a78013aea23c49092cc9",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "IMFC Statement",
+          "visible_text_chars": 23222
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "94a4294a-912d-412f-b66e-5119138e367a",
+      "revision_id": "15b52640-f1dc-4425-bea7-d5cb614e385b",
+      "seq": 36,
+      "source_id": "ecb_art_sp261017",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261017~7015ea3099.en.html"
+    },
+    "ecb_art_sp261019": {
+      "blob_sha256": "d373e23c50c6a5d2f9c530a14c64e1974ecdd5295f9a128f973c1a2a385dcb97",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "From climate and nature risks to economic resilience and competitiveness",
+          "visible_text_chars": 42072
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "d3f2d1a5-ab6b-449b-bc69-62f8125a03db",
+      "revision_id": "5e7adbd1-fdc8-42c7-a205-c0b53cf5b902",
+      "seq": 35,
+      "source_id": "ecb_art_sp261019",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261019~f0a3e053de.en.html"
+    },
+    "ecb_art_sp261021": {
+      "blob_sha256": "be781e30dd31863eb8ab9016cbea6e89a7e7d2b5615c1ad5bfe17518c93dfd0b",
+      "complete": true,
+      "family": "ecb_article",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Euro liquidity lines and the international monetary system",
+          "visible_text_chars": 25655
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "3c3bab43-2b15-48f0-a9c7-3055538ad8b4",
+      "revision_id": "2052718c-b95b-4bc9-acbb-300fa97fdfc0",
+      "seq": 34,
+      "source_id": "ecb_art_sp261021",
+      "url": "https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261021~401d6c4b70.en.html"
+    },
+    "ecb_rss_press": {
+      "blob_sha256": "b60a6770c44c91e20a8fa16067ca65b8894c9ff3f8e8c7bcea58ed841b03f5eb",
+      "complete": true,
+      "family": "rss_feed",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_item_title": "Piero Cipollone: Pontes and Appia: unlocking opportunities for banks",
+          "item_count": 15,
+          "items_with_pubdate": 15
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "European Central Bank",
+      "receipt_id": "8b84bda2-82ab-4125-9372-8840164a99eb",
+      "revision_id": "1ef90d8d-6701-49ee-8f11-33cdf4e910f0",
+      "seq": 18,
+      "source_id": "ecb_rss_press",
+      "url": "https://www.ecb.europa.eu/rss/press.xml"
+    },
+    "fed_other_bcreg20260929a": {
+      "blob_sha256": "e14ff532fba0733b6f500d0c1de04352a3275e68f21c7c281c31d67a81e87c8f",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Agencies publish resolution plan feedback letters for 15 banking organizations",
+          "visible_text_chars": 10385
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "8be7dfe0-0e1b-497d-8841-430d6a821d92",
+      "revision_id": "bbfdb2f7-46c3-4846-93aa-f8be4dc6dfdc",
+      "seq": 143,
+      "source_id": "fed_other_bcreg20260929a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260929a.htm"
+    },
+    "fed_other_bcreg20260930a": {
+      "blob_sha256": "500f8a74e4c78e39452e639cc0fc9a8524049ff061136cd711120b3c340b335b",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board finalizes changes to enhance the transparency and public accountability of its stress test and reduce volatility in its stress test-related capital requirements",
+          "visible_text_chars": 12900
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "316050f7-9091-48e4-b4c0-0c7ff3f414ae",
+      "revision_id": "972b6fdd-52f1-4cfc-a130-cd73abd7d3b1",
+      "seq": 81,
+      "source_id": "fed_other_bcreg20260930a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260930a.htm"
+    },
+    "fed_other_bcreg20261002a": {
+      "blob_sha256": "47e2534dbe2173a33754175bd250ad898b3687b011656d9ab2fe90e3c0868d5d",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board announces it will extend, until November 4, the comment period on its proposal to modernize Regulation O",
+          "visible_text_chars": 9938
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "cb28ca51-76e5-45fd-b3c5-e8a131a50250",
+      "revision_id": "5933861e-0d4c-441c-a20f-6cd41e33e55c",
+      "seq": 80,
+      "source_id": "fed_other_bcreg20261002a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261002a.htm"
+    },
+    "fed_other_enforcement20261008a": {
+      "blob_sha256": "b28b7bbac572b6fd10737bf121ab2098cb3303286b7ebcca12faf5a672879dc6",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm\u2019s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+          "visible_text_chars": 10204
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "fbe91c3a-eb66-4df5-935c-e6e0a89ba8e5",
+      "revision_id": "e16e90e2-38fd-4dfa-b27d-557b742bcd42",
+      "seq": 78,
+      "source_id": "fed_other_enforcement20261008a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261008a.htm"
+    },
+    "fed_other_enforcement20261016a": {
+      "blob_sha256": "dcbea5ac6cd989f51c3c3ded636af77602a53003d60719c44186e2ae3610d0be",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board announces termination of enforcement actions with Gardner Bancshares, Inc. and Small Business Bank",
+          "visible_text_chars": 9812
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "222d6158-44b8-4bda-a0e5-dc525c8b4e7f",
+      "revision_id": "bcdba56d-c75a-4f70-9d07-d53fff35a8f4",
+      "seq": 76,
+      "source_id": "fed_other_enforcement20261016a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261016a.htm"
+    },
+    "fed_other_orders20260925a": {
+      "blob_sha256": "3692909c6511589652de7025b96123c6f8be436967f8a9359200a54b998b1124",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
+          "visible_text_chars": 9716
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "19f12c13-2674-4362-8403-d6bb62de24cc",
+      "revision_id": "277a9ac1-6bd7-4591-8dfa-32436cf42861",
+      "seq": 144,
+      "source_id": "fed_other_orders20260925a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260925a.htm"
+    },
+    "fed_other_orders20261005a": {
+      "blob_sha256": "971d7b5be2741a4acdc9d317b6b403a264c42cebc49f4973bb76add8aa39ca15",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board announces approval of application by Isabella Bank Corporation",
+          "visible_text_chars": 9670
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "31ba9f3b-f395-4c40-803d-8cbdbe0c9532",
+      "revision_id": "a1f0347a-953a-487f-a492-65eed54439ff",
+      "seq": 79,
+      "source_id": "fed_other_orders20261005a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261005a.htm"
+    },
+    "fed_other_other20261009a": {
+      "blob_sha256": "6830e033ee93b8f340a9926be53f7d5ad6157edb626eae6b9c92bbe60573242c",
+      "complete": true,
+      "family": "fed_other_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Federal Reserve Board - Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
+          "visible_text_chars": 12706
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "4388d8a1-44e8-4839-bec7-6e8614f0d91d",
+      "revision_id": "46a3db76-9d09-4604-9d65-a59461989338",
+      "seq": 77,
+      "source_id": "fed_other_other20261009a",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/other20261009a.htm"
+    },
+    "fed_rss_all": {
+      "blob_sha256": "529e889a916423a3979c1bebdd94c2b8d402889700d8c85cc4d125b7f538d327",
+      "complete": true,
+      "family": "rss_feed",
+      "label": {
+        "coverage": "rss_extractor",
+        "expected_class": "valid",
+        "facts": {
+          "first_item_title": "Federal Reserve Board announces termination of enforcement actions with Gardner Bancshares, Inc. and Small Business Bank",
+          "item_count": 20,
+          "items_with_pubdate": 20
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "dbf9859e-31b7-4104-b43e-0e3175d36323",
+      "revision_id": "6e2f9e28-6ff3-4823-a8a4-03e6eb530b07",
+      "seq": 17,
+      "source_id": "fed_rss_all",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml"
+    },
+    "fed_rss_monetary": {
+      "blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+      "complete": true,
+      "family": "rss_feed",
+      "label": {
+        "coverage": "rss_extractor",
+        "expected_class": "valid",
+        "facts": {
+          "first_item_title": "Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026",
+          "item_count": 15,
+          "items_with_pubdate": 15
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "49fea6a9-6061-4b8a-8da3-9c693fc06af1",
+      "revision_id": "3c98f8f3-aad0-4e3c-a911-4657e4aa04cb",
+      "seq": 15,
+      "source_id": "fed_rss_monetary",
+      "url": "https://www.federalreserve.gov/feeds/press_monetary.xml"
+    },
+    "fed_rss_speeches": {
+      "blob_sha256": "41d3b87fbd6930e4285ef366f574d20ee3a8db2ab295fceb5d8fa68448055930",
+      "complete": true,
+      "family": "rss_feed",
+      "label": {
+        "coverage": "rss_extractor",
+        "expected_class": "valid",
+        "facts": {
+          "first_item_title": "Bowman, Supervisory Modernization After Silicon Valley Bank",
+          "item_count": 15,
+          "items_with_pubdate": 15
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "1527af3c-3927-4822-90b7-e1dde8bd43f4",
+      "revision_id": "c3b39a7c-07cc-4de5-b711-c7f7c805efeb",
+      "seq": 16,
+      "source_id": "fed_rss_speeches",
+      "url": "https://www.federalreserve.gov/feeds/speeches.xml"
+    },
+    "fed_speech_barr20260929a": {
+      "blob_sha256": "595dbbf1d214cce6047f77c30e7c44d645ed6f642597256e7b5bf5980c201aa7",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 7,
+          "latin_share": 1.0,
+          "title": "Speech by Governor Barr on economic conditions and monetary policy - Federal Reserve Board",
+          "visible_text_chars": 25392
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "07eb251a-f031-41cc-a91b-0eb207b2099e",
+      "revision_id": "cf51c1a3-5808-4dd7-8d19-177dbd132956",
+      "seq": 106,
+      "source_id": "fed_speech_barr20260929a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/barr20260929a.htm"
+    },
+    "fed_speech_bowman20260929a": {
+      "blob_sha256": "32627f9b28ffecc800ff43d1022c11602995315a2b85cf210dea172a76057d65",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 3,
+          "latin_share": 1.0,
+          "title": "Opening remarks by Vice Chair for Supervision Bowman at the Community Bank Cyber Workshop - Federal Reserve Board",
+          "visible_text_chars": 14197
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "8d23319e-b8d6-4720-a2da-22e5200c5647",
+      "revision_id": "1b9f8427-a235-49df-ac01-437013f31971",
+      "seq": 107,
+      "source_id": "fed_speech_bowman20260929a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/bowman20260929a.htm"
+    },
+    "fed_speech_bowman20261001a": {
+      "blob_sha256": "4a78d983a9836f6ca095bb6bae503c44747ae5ecd553448066b19507697558e8",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 7,
+          "latin_share": 1.0,
+          "title": "Speech by Vice Chair for Supervision Bowman on modernizing financial regulation - Federal Reserve Board",
+          "visible_text_chars": 23348
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "6d67ffe6-8616-4cde-a853-07b759a4eace",
+      "revision_id": "a7c6ae00-2442-4ded-b729-acad6d1414d4",
+      "seq": 29,
+      "source_id": "fed_speech_bowman20261001a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/bowman20261001a.htm"
+    },
+    "fed_speech_bowman20261006a": {
+      "blob_sha256": "572bf4a6d21a84748b0613ac6de00a14b2167d7a235d6dc4511d86bed4072b37",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 12,
+          "latin_share": 1.0,
+          "title": "Speech by Vice Chair for Supervision Bowman on modernizing regulation and supervision - Federal Reserve Board",
+          "visible_text_chars": 29276
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "db95a7b5-ae02-470f-bcbe-dfcdb6881671",
+      "revision_id": "4969390e-c01b-4d11-b3b6-5126d8bef41b",
+      "seq": 28,
+      "source_id": "fed_speech_bowman20261006a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/bowman20261006a.htm"
+    },
+    "fed_speech_bowman20261014a": {
+      "blob_sha256": "4354fd9d0333503e5b63c2d823fa72689ba24b1f21b90295fae19de791092bdf",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "Speech by Vice Chair for Supervision Bowman on supervisory modernization after Silicon Valley Bank - Federal Reserve Board",
+          "visible_text_chars": 22795
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "f517025f-2ab2-40d2-84c5-593a462ca698",
+      "revision_id": "d553d867-c53d-49b6-8b50-8a9c280bd60a",
+      "seq": 26,
+      "source_id": "fed_speech_bowman20261014a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/bowman20261014a.htm"
+    },
+    "fed_speech_cook20260930a": {
+      "blob_sha256": "820257ca4c6e7ab72e83f914709f3cf92870e108490c39488acad560ffac6779",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Speech by Governor Cook on the dual mandate in rural America - Federal Reserve Board",
+          "visible_text_chars": 26416
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "6fa7b248-b484-464f-99fd-95ea9e1b1011",
+      "revision_id": "2657b81a-de45-4a3f-86df-c84219460db7",
+      "seq": 32,
+      "source_id": "fed_speech_cook20260930a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/cook20260930a.htm"
+    },
+    "fed_speech_jefferson20261001a": {
+      "blob_sha256": "270dd5c58be005b2e209ad0d98954a54d8a717dd9a9ef55791ee94e712751a50",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Speech by Vice Chair Jefferson on the U.S. economy and monetary policy - Federal Reserve Board",
+          "visible_text_chars": 19103
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "fdcb3577-c8e8-4bd8-9740-68156494fa03",
+      "revision_id": "810dc8d1-788b-4bdb-8641-bf9bb6b02ee9",
+      "seq": 30,
+      "source_id": "fed_speech_jefferson20261001a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/jefferson20261001a.htm"
+    },
+    "fed_speech_waller20260928a": {
+      "blob_sha256": "3776575ae165ff9a1bf1d6e42ecda83bfe9354d4535b8d554e2883c6a7c96557",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 3,
+          "latin_share": 1.0,
+          "title": "Speech by Governor Waller on payments in the age of AI agents - Federal Reserve Board",
+          "visible_text_chars": 22861
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "c8d96b23-714d-4afc-ac17-296053c62f41",
+      "revision_id": "45c98669-f47b-4fa0-9b82-e83ec0fa7b92",
+      "seq": 33,
+      "source_id": "fed_speech_waller20260928a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/waller20260928a.htm"
+    },
+    "fed_speech_waller20261001a": {
+      "blob_sha256": "37e7e5f518a031fbe7d771daaa3505d6bd26914eff476fbbcb69a58f39b3bb07",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Speech by Governor Waller on Federal Reserve economic data - Federal Reserve Board",
+          "visible_text_chars": 16808
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "0a8ca60f-7147-4492-9d94-93af66699694",
+      "revision_id": "35eb3d3a-10f8-469c-854e-890c3a67f128",
+      "seq": 31,
+      "source_id": "fed_speech_waller20261001a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/waller20261001a.htm"
+    },
+    "fed_speech_waller20261008a": {
+      "blob_sha256": "698b35979cf2bec5b191d463813e1b6fdf6b3e77715ddb6d2a170c5b4273fb62",
+      "complete": true,
+      "family": "fed_speech",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 2,
+          "latin_share": 1.0,
+          "title": "Speech by Governor Waller on the economic outlook - Federal Reserve Board",
+          "visible_text_chars": 20884
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "f7352ae2-7c85-4839-89bf-e3835f8d54b5",
+      "revision_id": "d35cde23-e1f3-4739-be86-77b5301d4fe3",
+      "seq": 27,
+      "source_id": "fed_speech_waller20261008a",
+      "url": "https://www.federalreserve.gov/newsevents/speech/waller20261008a.htm"
+    },
+    "fed_stmt_20200303": {
+      "blob_sha256": "3364b42e506ffe2f4416a656ddf88d387c667dc259fe24e2643f34f382422ae6",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 6,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "1a101c5b72caf42f5992432e7c929d76dbd8e30fc3e19d693d561f91c67941c8",
+            "a6feab5cea86f14c05520dbb1e84f839f643579ad5e7682d29276471da8d2d60",
+            "b43eb58234a42ee92fefd2689643979203fae3737da5b15b3460eb10afaa2058",
+            "87bfa5ba3b0f7e6c0aafc21f0af22ba5b85a71ee047c8a63826d74d91c30bbbd",
+            "6bd65c91176d43456e589c591477e2232dbf3a6c19dfbfaa28b040ef29b066f5",
+            "22ea791a0761726eb08341f068c5770d20ef631126fb94f32d6349ba7b8741ff"
+          ],
+          "release_date_text": "March 3, 2020",
+          "target_range": [
+            "1",
+            "1-1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "f7b77aff-6cb9-49b0-80ef-0ba1977f390d",
+      "revision_id": "6a671cbf-1ef3-4890-8514-356a14324fe4",
+      "seq": 142,
+      "source_id": "fed_stmt_20200303",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20200303a.htm"
+    },
+    "fed_stmt_20210428": {
+      "blob_sha256": "c6449d867fd57d94d82371837d549aa6b6d64790af6939a6c986bca69cf4c85a",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "d5696b29f1a728a1f9b0b12fd63e2cb69221baa9fe850a13aaed9a8093bfe61c",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "ab789d98eab2e6719eb466295d4f22862513c75ced0ed2bb823b01d6aa74c2fb",
+            "2acfc8169aacd28ce0c819a866ba57b1884bc2e7cc4bc05aa81057e05a2bf06d",
+            "b5becefe866b192ed58f0f518c4e5da8e7ab607f31725c4cd6dc02efbdec773b",
+            "63222533df97bc2d2b2f14cca82a44fc4278720404e8ba2dd5ef172336feca51",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "36022ceab81e2628d9cf77deec31cf92c6ac1dc4e98de315ec91f9b2cb47c908",
+            "f43754cfb24821e4c15fda7764a81fba73a050d8afb3078aee26533311302c9e"
+          ],
+          "release_date_text": "April 28, 2021",
+          "target_range": [
+            "0",
+            "1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "17e1761b-5d5d-46d0-9e52-0ed03970ba2e",
+      "revision_id": "46edba7d-aa87-4ce4-bd5f-df21e97878ef",
+      "seq": 138,
+      "source_id": "fed_stmt_20210428",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20210428a.htm"
+    },
+    "fed_stmt_20210922": {
+      "blob_sha256": "a80d66f67a2f96fefc0bfdf60f5722b704738befad47583877ed191d8ff13ef2",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "4bb2d9dd11b64f24e63b4d34f3600c6b3af298fa0249bfe0bb9d25930cec87fc",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "ab789d98eab2e6719eb466295d4f22862513c75ced0ed2bb823b01d6aa74c2fb",
+            "3995b8eea1031f4f07eb318aa09b7a582fdc433579b18b27caa0d87da144913d",
+            "487708eb472dc38f2f9be11ee700d6697f6f04e0cbd78d10f859de1c10b175e8",
+            "29d145efa43849b7a748e3db11ebcbd00f653cf9da06972b1d613558bde546d4",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "36022ceab81e2628d9cf77deec31cf92c6ac1dc4e98de315ec91f9b2cb47c908",
+            "c95dcc4f3ecab84e53e355e21fead8d15134cb0184766a18ab68f80632c808ea"
+          ],
+          "release_date_text": "September 22, 2021",
+          "target_range": [
+            "0",
+            "1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "829828f3-1870-4071-89dc-1afdc98104bb",
+      "revision_id": "65c977e0-fbff-42f2-ba26-20321b4ff491",
+      "seq": 139,
+      "source_id": "fed_stmt_20210922",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20210922a.htm"
+    },
+    "fed_stmt_20211215": {
+      "blob_sha256": "260d3106faa5dc7ac5669b23c8611576e34d7fe60307710dacc4192cb7501612",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "dac46eb083c365940910839eaeaee2c262bbe648f179d62d897954dc7b810706",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "ab789d98eab2e6719eb466295d4f22862513c75ced0ed2bb823b01d6aa74c2fb",
+            "6ad4809e35941854b431fbe04ec06fa24c8786e0754977ce6b408152e9057e38",
+            "e030e8438f1f95c9a9f714f9cc2842b4fd5f7dcd62ab3c82a4b2023f53ceaaf6",
+            "10bdfd1d6881b9f990f67aa565047b43490adf38cc625c30ec85239e47eb54e4",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "36022ceab81e2628d9cf77deec31cf92c6ac1dc4e98de315ec91f9b2cb47c908",
+            "f062d99d1ecff217cf749e383822fb0ecbcc5bb56dfecd1ff837ffdc615ea699"
+          ],
+          "release_date_text": "December 15, 2021",
+          "target_range": [
+            "0",
+            "1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "8c066d94-07b5-4556-9918-ad020c70de07",
+      "revision_id": "00399e8e-2263-4387-a52a-2ecad4682d92",
+      "seq": 140,
+      "source_id": "fed_stmt_20211215",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20211215a.htm"
+    },
+    "fed_stmt_20220126": {
+      "blob_sha256": "fdb42651758b7f6feecdf46ca5e1896a170bb89a9e3ae7d830f7f77d6fbb40e3",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 8,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "e490d35eaebb8d0eec95e9d19ca867a502f0a38ad31e7c0cb25f1bb59a93fadb",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "7497670d4142fddc6b87b271072fe6dd2249f865addfe4ed50f46eb549a2dc89",
+            "e030e8438f1f95c9a9f714f9cc2842b4fd5f7dcd62ab3c82a4b2023f53ceaaf6",
+            "262a020d2ef7e3a569982d8067141d50ecf216370a6797429208cf0df45d375c",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "2c08bc250c5302ef9fcdffb2a6886471d7f4144eb5085592c45c99ae99cae7c0",
+            "1b9bf5180d28b5ce9c5905eac5a24ec3d694fca1995ac4ab1ebb48dcaa04af6e"
+          ],
+          "release_date_text": "January 26, 2022",
+          "target_range": [
+            "0",
+            "1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "c3cbd1b1-78db-407d-b7f4-0fce7f48ba99",
+      "revision_id": "091ac7a9-b33d-4265-8186-8a1cb9f290df",
+      "seq": 141,
+      "source_id": "fed_stmt_20220126",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20220126a.htm"
+    },
+    "fed_stmt_20220615": {
+      "blob_sha256": "e6341d604d8b58060d255ce4185b646616005801aaafba930c78485f552634bd",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 8,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "8b8d05caa11301c7e16e390f2c0a4303f659f014eca4a3390cededdde39e8a60",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "45a9411522925c539b3c230d2c57ea016a582c14c10a2cdd763576dd1c918fdd",
+            "d8b317d43379b6a726abde7645b718a694133ca7d41c0053f36202d337d629b5",
+            "7189a1f9a4f09f68a750caa04f26ad6c00fbd148972ab614bfd014541ca267dd",
+            "ed9922e8d462c0dbf9c17abc42bcf247d73d04307f7ce2d4dd9d1fa3f78986a9",
+            "8425b5dda204aef251703cff777df49afcd6584ffd9ac63ea73cb936c43d886d",
+            "3dad02d0d932dbc1bfe9a2e65bc468ae951168c040056e092eaa642ac876c579"
+          ],
+          "release_date_text": "June 15, 2022",
+          "target_range": [
+            "1-1/2",
+            "1-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "3173bde3-b586-45a5-bced-cf5ab457883f",
+      "revision_id": "e34c7b43-62e4-4c94-9def-a86ad2f36f83",
+      "seq": 100,
+      "source_id": "fed_stmt_20220615",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20220615a.htm"
+    },
+    "fed_stmt_20220921": {
+      "blob_sha256": "ecaf9b759b0951d813c1160b10df6b03d27a4bf70684bd30bf2d05890c89a461",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 8,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "1d54fb3926e797c6ce6d34c173ae36f12fa97610164434ee5555b5d6d2d36209",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "fbbc5252840c402a97df51ff5768c844f468f382f5bbefb5a68aab87414c5e4a",
+            "c8d6c267d2a8b24133cbb005b7b7750081904f32c968e9468fa32c93af888520",
+            "a4199d0da9e6f97368df79c63e774075e7dff4be7f3fac896e8e59aaee038b85",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "4bd4ef9cd8384dfc78315f6987f36328944e770cbb71fb87c8119feb7dc794b0",
+            "ff7633facdb09890f0511feee4cb0480c006ce9ca5fbd3e7d1095338a6896b73"
+          ],
+          "release_date_text": "September 21, 2022",
+          "target_range": [
+            "3",
+            "3-1/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "9d3a8531-3f04-4dbd-8485-466c055149b1",
+      "revision_id": "bf534ab9-a00f-456d-b8f6-2a25ef97adae",
+      "seq": 101,
+      "source_id": "fed_stmt_20220921",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20220921a.htm"
+    },
+    "fed_stmt_20221214": {
+      "blob_sha256": "95b3bf201412a2f03b22fa5b517c07f313e13c051fe9a25b67333da431a8afb7",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "cba69eb2a5c892f28e460bf6d51cc087bd53cea85b99c501382374e0fafa7822",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "fbbc5252840c402a97df51ff5768c844f468f382f5bbefb5a68aab87414c5e4a",
+            "f67c7e1c567ebe70a7e37ca8022c3a120baec3ebbc895d55c9584d7c05bc2de7",
+            "a94019475942f2df22fe1697e34c9855d0ce6da503abebd6af9d9bfddb655b43",
+            "740f244d80d77ad034bbcbcdc8c0bd973d490f38122a0f3772366061ff317582",
+            "4bd4ef9cd8384dfc78315f6987f36328944e770cbb71fb87c8119feb7dc794b0",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "298a7003e27b86d53bd5d45ebcc56fa1ff51616f405d4d6af0b824326526c938"
+          ],
+          "release_date_text": "December 14, 2022",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "eb28fc0e-0108-4121-9a65-1e56096e5aef",
+      "revision_id": "a4516469-647c-4e7e-a8d0-b2346c541ffa",
+      "seq": 102,
+      "source_id": "fed_stmt_20221214",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20221214a.htm"
+    },
+    "fed_stmt_20230201": {
+      "blob_sha256": "8f1a7823a11c8b49a388c8393e6ee7ff5dd858eace8066ad581e34e1279398a1",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "68f90c9394c960b7b28265bde2b8db0c7cdba8a480cbb57adf7a37c2a76bec1e",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "7299f7ec5a88c99cd344a2a5b3201169a21a1e472e3a4a3a6da656a16e2d7afc",
+            "84f8a81560c588342cb9afe49b2c090bdd9ed6110e2056bcdc08e46b437ad463",
+            "e61cd0daa9dae9fe24cea335f54265034822a0aaa2231835fcd775ce783b6ee7",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "25d698e9c2d71f41e4e3a3d86ba7ea5982431841589f76d41f7ee56144104f93",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "6cc614c130da23dc03a976a4ca5969b5713cedd99727f4132adcdb2b424af14b"
+          ],
+          "release_date_text": "February 1, 2023",
+          "target_range": [
+            "4-1/2",
+            "4-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "4b4e5f35-2da3-4e80-8a45-26aa0a29b861",
+      "revision_id": "dd34eb78-bf0d-44e7-9e48-24c2e5a2022f",
+      "seq": 1,
+      "source_id": "fed_stmt_20230201",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230201a.htm"
+    },
+    "fed_stmt_20230322": {
+      "blob_sha256": "3d2379ac6eb46c45447858853c9b15484bb18879029589c060a6f9d016ba8135",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "02b6cb0fb7361c5b9de183d78b46157e003eb5b8f991ca77585b76d46448be54",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "5d4ee8cb53839fecb0ae8edba72ef8f58cc94a7fc7e21d012c9458664b52bcf5",
+            "329d4025dd967589301fdf3f03458feb150f1a5aecae51a6d8bb3946508d9004",
+            "1410c7b55675b3f836c0b1a6c8169581c9b406453119588c42303b851e219e69",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "43109ad38d652dd23779b4458bcfd8f13467bd47f06fde9c7dbb05b5f8b26e69",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "7d8e0ab7c283a788c60a426324ebb29f038d6f054e3b4f7df7c902fba269c897"
+          ],
+          "release_date_text": "March 22, 2023",
+          "target_range": [
+            "4-3/4",
+            "5"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "3145678d-8c82-4b5c-b20b-db257436dd3e",
+      "revision_id": "2282d9f5-808b-4deb-8f32-297e79962ebc",
+      "seq": 70,
+      "source_id": "fed_stmt_20230322",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230322a.htm"
+    },
+    "fed_stmt_20230726": {
+      "blob_sha256": "fcb5432c1ed9f3795c6a1705f7155a7e19fe6c0ca6352fd1599539136cf1d959",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "d591f0aa915655b66017cf760e9cc49031a152d2b96f917151f60943ffc9f0e3",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "00efd94d55dff533c3c63701c93154a2b1434c6557be14396f7765217eb591cc",
+            "974c0f6470025b5d98e02db79c7f3283587500c54604de14aecca617406cdb70",
+            "66a3c227d860395a46218496923e4ea1e01b4014ed9c1e01ff08c8dfc2697b37",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "43109ad38d652dd23779b4458bcfd8f13467bd47f06fde9c7dbb05b5f8b26e69",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "2979e5b0768dedbc0df785a0f66154ec81a3f8889d7123e29f2185494458b971"
+          ],
+          "release_date_text": "July 26, 2023",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "b79345cc-312b-49d1-82ba-f612fd342f10",
+      "revision_id": "f317889c-e62f-4cf1-b49d-5c887f7e6737",
+      "seq": 2,
+      "source_id": "fed_stmt_20230726",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230726a.htm"
+    },
+    "fed_stmt_20231101": {
+      "blob_sha256": "69e41106e4ad28fcfa52b488b6477d65755683c2dcd760c9ea8866ff69ef0b3a",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "72d7e74cba45fe492ef45863b48b937aa51a3e8c336829e9b3b7caf9678fc04c",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "d5f8cb3f6c036d3d95b3816c52070f8112bbd5d006b17fdd5ac7213a4a8d71d4",
+            "e191cf8d9a12c6d505819f1c8520b9097340515e7ab8224a6090d966ff20f612",
+            "8d1e3f27645ef2eef11d3f0c1d389288dfeb7a875c17498cecb0e4e006aab9eb",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "df9335ef4bb341d21182d0aa1c0a9cca740a2c45b0f24f54b4222066ba31d4af",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "7d9d9faf5e91cd2496ec1fef48f0c8384b8a5b6bfd3288958af8b7d7a7e58907"
+          ],
+          "release_date_text": "November 1, 2023",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "e8216b0e-2133-4397-a457-aabbb06e09a0",
+      "revision_id": "cef123e3-4782-4d20-9c28-64bff805f533",
+      "seq": 71,
+      "source_id": "fed_stmt_20231101",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20231101a.htm"
+    },
+    "fed_stmt_20231213": {
+      "blob_sha256": "c60f09e7c323c5338924ae20fbd07640c8b501c3bbf2bfecfd77e07a7a86e62b",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "e10c8cb49124baa4cfabdecad69b73ada1dbf4f1e82d2f675195ce6341d24548",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "534afc9b70ee75bd4851b63f15c292abef3b41364e6c43640cff90b931619590",
+            "e191cf8d9a12c6d505819f1c8520b9097340515e7ab8224a6090d966ff20f612",
+            "9a7aff409db466c3f575fe648acf3b16979bbcead57ae43f21dfe8a1c3d0c6ff",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "df9335ef4bb341d21182d0aa1c0a9cca740a2c45b0f24f54b4222066ba31d4af",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "532ea15e0d3cf14590b9e7abfe13f81a82cfcf010028ce34eec0b7bc5e147667"
+          ],
+          "release_date_text": "December 13, 2023",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "f170f18b-c0e1-4ea9-9f14-fb08fafe291d",
+      "revision_id": "b3422aa5-0a6b-452d-b69d-d4304887eef6",
+      "seq": 3,
+      "source_id": "fed_stmt_20231213",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20231213a.htm"
+    },
+    "fed_stmt_20240131": {
+      "blob_sha256": "10a464a87a476fabb25dddd3489e63102048d7b28de81396100ab2ceb4860c8c",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "eca8ac32c419a791ec27a96f38b1a39c9219d9ccebf4a9445aed484cc6c6ff5c",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "b28862731218e206bf2e32e9f4517176a044e1715d60f349397b68fa3eb0474c",
+            "e8f041ab152edcab00baf114388d76aa4ed3165dc1d49f32d4e7ed40aea73aee",
+            "67ef84aa452b75292d66bd3b7c277890096bed29f9562322450f8f530dd594db",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "1259aac39bcb067aeda2fc360f007b472d334be18e59eed14e5aed51a9a7ca7d",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "68adda5f1a1010aae1f265284b24935fc4341e6ed36349def2cf8f2728ac9490"
+          ],
+          "release_date_text": "January 31, 2024",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "1bfb77f4-63f1-4473-ad6c-436ff17c7898",
+      "revision_id": "0c772984-0eb1-4828-92c5-025bd00c9349",
+      "seq": 72,
+      "source_id": "fed_stmt_20240131",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240131a.htm"
+    },
+    "fed_stmt_20240501": {
+      "blob_sha256": "37044b275b7f3dad64635a2d9734a01628fff07950bef87bd0d9f5b3f317992b",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "9c1a35f68c0a325b3234693403d97b7b7e357ac4e8bc1ba4e924792fb872d6cf",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "58e42a736d77b7609c740bd85492445da10bcfafa1970faa166156c91531adb1",
+            "c766e51d3289b5fff82fa4981f239a79807f590ce707b6f50bdfe9ada90a32ad",
+            "00b6bda0d8b4dee9e915ea1e3170a8682a2613bda3e02b01be04c7f9f87a7185",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "1259aac39bcb067aeda2fc360f007b472d334be18e59eed14e5aed51a9a7ca7d",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "6afb0ed5475bed531c1db3269cc99ad390812917f6a4257d00eb6e931c27a2a5"
+          ],
+          "release_date_text": "May 1, 2024",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "3dbc430b-2817-4dcf-8f83-98b607827362",
+      "revision_id": "8fba4f35-22a9-42b0-a366-ba162a17961b",
+      "seq": 103,
+      "source_id": "fed_stmt_20240501",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240501a.htm"
+    },
+    "fed_stmt_20240612": {
+      "blob_sha256": "74c2bee756293d1f6c2f78af747b6e01e39392b3c5306ce2c74f5166beb08b26",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "80fb3bd4197b330354f6c8a3f0c21dc9ad9e177d05a6107a4f1b355f5474a576",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "49ed2851a6b31e7c90ec917c2a5070b1b5d0e356a79e40a74ce0d52b3e5ef43f",
+            "c766e51d3289b5fff82fa4981f239a79807f590ce707b6f50bdfe9ada90a32ad",
+            "0664362f4e6441ae7842c2e9f104ee70f90950a3c50dca5cd410018c2b246196",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "1259aac39bcb067aeda2fc360f007b472d334be18e59eed14e5aed51a9a7ca7d",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "07091f90e685689be0fb1985c3d2dc12006ccec3be51269fb89ab1475645cc9d"
+          ],
+          "release_date_text": "June 12, 2024",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "6055179f-ee60-436e-b400-fdcf9005eab6",
+      "revision_id": "9ed133c0-ea47-4568-8a5d-53178b65cb3e",
+      "seq": 4,
+      "source_id": "fed_stmt_20240612",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240612a.htm"
+    },
+    "fed_stmt_20240731": {
+      "blob_sha256": "6eb295e1372d942ae845f998870b69a719490cfd54bd36fa54600a288d28e4d7",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "8458ed0060bbd94d87d10566ff2ea851701079c94cd10c3b5e597953f5dd2f58",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "c263483d476428c4fb21dfa725dd0ab446a769cb7e3d126af79b796bcbe30f7c",
+            "24dac0260e6dcdf9333d53cc8a79e9d8883cc610b6d466246ef6a69ec6ecbf5e",
+            "0664362f4e6441ae7842c2e9f104ee70f90950a3c50dca5cd410018c2b246196",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "022a6f37cc1eeb83ec20b58ef6d334538482e8fc9621ac357ffb67876761e141",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "ea500e4685810174969d573e76195e9e48ea1dd2e9d73c58f440381cd004c29a"
+          ],
+          "release_date_text": "July 31, 2024",
+          "target_range": [
+            "5-1/4",
+            "5-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "e0b20584-cfc6-487b-9626-c2c63d862ff7",
+      "revision_id": "96e49929-f1ac-4fc9-9758-358db4b73a9b",
+      "seq": 73,
+      "source_id": "fed_stmt_20240731",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240731a.htm"
+    },
+    "fed_stmt_20240918": {
+      "blob_sha256": "27cb82cd50faf092f372d69e22b6d2b2528df11ffdc04e80d876c7aad3f13cc2",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "f86ee30770bb4f1b1cf715c36e12309806ef4628643f10e9804d32700c983a44",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "6e97ac532324ba2db60d5470231fa7b20afe11f9397d9b5da51f5a80cc989e73",
+            "b744444e93a81e6339228693e07a83c0904fedd3ae59fa2a95081978ea6c57c4",
+            "6984312b0520b74b272dd60464cb19ff2f4ec477e54146317d96da6f99967313",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "d188ea8cca1db4649daac12a522102a2f70a04834e2e8353ddbcb4238649f49d",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "68c5668361c4dda9e420111292795bc9f36fada7422e69147da13d62bab6c194"
+          ],
+          "release_date_text": "September 18, 2024",
+          "target_range": [
+            "4-3/4",
+            "5"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "68edfb63-ab8b-4771-b06d-07058ab1cc05",
+      "revision_id": "e5110b3c-1a91-4bd6-b3b1-9268ca930893",
+      "seq": 5,
+      "source_id": "fed_stmt_20240918",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm"
+    },
+    "fed_stmt_20241218": {
+      "blob_sha256": "b61594bdd142ddae00897c224a6adec62081de9b884923a913b7151f204a403e",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "e8cd4cebbd9b59d4935436912e9f6a3ddafec54271b455b3caee03ca6f5e5f1b",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "40eb54784fe531947d022c49b1097a1a8aedc4d7f11382b0a338df43d0fa6448",
+            "c05c91df794516ca5c9e4febb6f7446cab0943fdbc2e73b930dfeb006b949dc4",
+            "261d297b2ce11a634c79dabb9e40f925ff6051e93166a89f1f685245bab4f98a",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "d9a218300eae58cf9c183311f0d4a6d1afb9be1a8f6113ade135fe5059b5b4a1",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "5741c50de9669d7c736b6b44baa927f48b0272e9693b44f1724aaab7b87cdee2"
+          ],
+          "release_date_text": "December 18, 2024",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "c7b1c59c-170a-45e5-b8d3-926ec4b2d367",
+      "revision_id": "382aa397-f588-4365-b047-7e4de82aba51",
+      "seq": 6,
+      "source_id": "fed_stmt_20241218",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20241218a.htm"
+    },
+    "fed_stmt_20250129": {
+      "blob_sha256": "61efa8d8b45365f9d0cebc2bd1be379f51ab32de16614f553ca2d038cf5c0e3d",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "2d91e9ceb89f490229e896f36b66a25cdc4816c65fa4fc52d89638791477376a",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "28d8d7ca9de60236e9f40d90e47147c1a6c3a2278e4d123011266bd1ba07174d",
+            "c05c91df794516ca5c9e4febb6f7446cab0943fdbc2e73b930dfeb006b949dc4",
+            "6ad94da674e0c605d893337e5742d1b3f97efa1acc9cd386d0d531ac48a984b8",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "67a9a0a8c2d06cb2e8565383a1f8b7415a16bcbf296938ea8d5c05ae345d8503",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "b0465a9cc0145a309603d21aad245b672e0930b215806707c6f9670a64eda1ff"
+          ],
+          "release_date_text": "January 29, 2025",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "1224c898-4905-458c-a945-f6ea27eabbb9",
+      "revision_id": "d33d1d17-6f95-4e5f-805a-68f5582ec1d9",
+      "seq": 74,
+      "source_id": "fed_stmt_20250129",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250129a.htm"
+    },
+    "fed_stmt_20250319": {
+      "blob_sha256": "4b1db0afafdb9ca7b8094187799f748b7bd75e4e304eea2c15ee14a2a350cef6",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "45a5e2e5f13963b0fd9514ff43a16b351953c50dd3909e0e83e1624e7920cf01",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "28d8d7ca9de60236e9f40d90e47147c1a6c3a2278e4d123011266bd1ba07174d",
+            "cbb41c8224593ddafa039e5382b23713093cdf3948e28442b67710588a74d64b",
+            "bf93a35e2da45a034781d17d888dd8f24854b2c38ba6ee4108fd1ec0fdc4e230",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "1bd06a3f7c684ecfa2ce995259b8fbf6e0dbd418e5b86bd69359eb9f343507da",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "29f3f257e5a0c2f225f676b681d83c2b63c7023596909d9ab2d1626d50fcf9cb"
+          ],
+          "release_date_text": "March 19, 2025",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "1e8a5533-6d31-4ed3-afe9-5879d6e77762",
+      "revision_id": "039d05a6-bdc3-4616-840b-bbf082b1833e",
+      "seq": 7,
+      "source_id": "fed_stmt_20250319",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250319a.htm"
+    },
+    "fed_stmt_20250618": {
+      "blob_sha256": "365b73d2425bcaaaf3e7aaf6725837eb88bdf9a1730428b8c880a916d5c16f6d",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "bce71bf0fb1f6d44abffc5ba5e2e42a2037be5e2490b6c7be6b805490f523739",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "32964939604b6f7dff895060690c2736304089a87d7d6ed025595edf9a62dcdd",
+            "6bfd5335ab484b3975a9fcb1ff1da452cfc47c38b407203029bdc03d2cd3cc54",
+            "6ad94da674e0c605d893337e5742d1b3f97efa1acc9cd386d0d531ac48a984b8",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "67a9a0a8c2d06cb2e8565383a1f8b7415a16bcbf296938ea8d5c05ae345d8503",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "9c50cf4d301eeda3f87a99fe1ee5ce52f5de04335656e8b124e108206092759a"
+          ],
+          "release_date_text": "June 18, 2025",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "c5b85c86-84bd-4e90-ba29-b10bd49509ac",
+      "revision_id": "39285279-f616-44f1-967d-2a86fa6f4346",
+      "seq": 8,
+      "source_id": "fed_stmt_20250618",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250618a.htm"
+    },
+    "fed_stmt_20250730": {
+      "blob_sha256": "f0232adad6b8caa23ef79ebc6d3a45d3ad4a3cd273a169b1196574880a0baed0",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "ad06145900a152c49e0a5db76f4d38e665d797c006feb6a9dea3bd24a86d5fe1",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "757d48d5b5b86a5c22f5c9f220c7388272e376fd05c1b54792d04ccd86ccde8d",
+            "6bfd5cfb9841f78fd639f23c38a0c5063a34e6bcb5427ca3436f9542a6fad6b9",
+            "6ad94da674e0c605d893337e5742d1b3f97efa1acc9cd386d0d531ac48a984b8",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "244ba1bf4f677b971f9cfa3b58a4e9bd935c951afd7e8c7009ac0e921b16861d",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "df1f5cd12f9b3de21eea88c9e03fdadc159e87e322eb2cb29e85432d75cf5067"
+          ],
+          "release_date_text": "July 30, 2025",
+          "target_range": [
+            "4-1/4",
+            "4-1/2"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "0ca36e87-c78d-4533-857e-db0200e6bf60",
+      "revision_id": "fe4f7bb5-f243-47f7-a892-a132c54a4776",
+      "seq": 75,
+      "source_id": "fed_stmt_20250730",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250730a.htm"
+    },
+    "fed_stmt_20251029": {
+      "blob_sha256": "869cc899bc24cd4202145df8582c219c4deaf24b9054d6ea9b8c043b0a1947c0",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "be50dcb7d35f99051099a432db0c85fd7dfc2162b051a135f51a2e527030ac83",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "413ebd00eacbf785fc74eb39cd91c99f0dfc46b0c7b7693b3cbd456512948c1c",
+            "c69263bd5a282ed2bea901f7d33880db96c5424cd7d0f14811f6a8689ed76908",
+            "9685ac085ec61832db7e2f73c9adba04771abafa2260da7174873c885828746a",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "e50a37f797343e63408307dac01822f63627638856baae4f43d2724c37ed6191",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "b6965a8a7a603d935739ff31801ee54ea17b7353692e8a801a773cf16ba72ebe"
+          ],
+          "release_date_text": "October 29, 2025",
+          "target_range": [
+            "3-3/4",
+            "4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "7ea29b90-3193-4a08-92bc-fb0e437b703b",
+      "revision_id": "d3302d07-d707-4c5f-aab2-56df191c7beb",
+      "seq": 9,
+      "source_id": "fed_stmt_20251029",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20251029a.htm"
+    },
+    "fed_stmt_20251210": {
+      "blob_sha256": "54f8ddc8c2ee77c0de0c033598213493c6dec3852c3237e14377b8fe3d476af6",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 10,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "75d60e29a0763e3dc53cd110a11162c4c9c731d31fccf6754d6649a06604eb2c",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "1d8688e8e186f2a708eb0d45eb27a4efc7eea36a03bbf2754cdff312d02d4d90",
+            "c69263bd5a282ed2bea901f7d33880db96c5424cd7d0f14811f6a8689ed76908",
+            "bd7bccc04cc04bbd2e15c2dbcd647c7f3d86a43b2f4dbb51196a000e20b209d1",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "61880d7451546618cab76a46b5e86ac69f70074664efd4fa436608568a83fdbf",
+            "d08d08bc94a1d2f692b03e9f405e928104b5bfa2bfa839b3a1639daeed487461",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "9d2dc33e820d06fd8bbf31cf09dd8d383a3e92316507bc83800ddee9b2af4455"
+          ],
+          "release_date_text": "December 10, 2025",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "0d65b1d5-0b7d-45f2-acfc-c7a40a6fa635",
+      "revision_id": "dba5aad8-95c8-4c49-8899-390920def360",
+      "seq": 104,
+      "source_id": "fed_stmt_20251210",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20251210a.htm"
+    },
+    "fed_stmt_20260128": {
+      "blob_sha256": "712ba9e3667fc274e7a67689fa1c30e7d025f34e1cb6fcf10085f223f1c0f3e1",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "0e89c9bd370a936e8e90567756ee607335dff68a4c3bb97fb7660e0e0333fb07",
+            "006496cd825366a1e6f2bd20d9324c7dc22b2952870f7df6de662758331eb8f9",
+            "6cd2530372bd6eb3e07528d74d0d3dc965996d4e46bba26a2e636736e4d3f6b1",
+            "6bfd5cfb9841f78fd639f23c38a0c5063a34e6bcb5427ca3436f9542a6fad6b9",
+            "b51b8e8db172eff1d6d6a969d3105be027fae9a906a573aa7f6e5a7e43ef05ae",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "c18e94afcfca1694a9f9de109593948c90f76f2735f75b8e05c022e2c358ce81",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "490e5ab0c814cacd310ecb21af1c047b89daca24c8352c67fe0a40382457bb0c"
+          ],
+          "release_date_text": "January 28, 2026",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "61f42d42-3d7e-4e4b-9239-ffc33bb9e59b",
+      "revision_id": "3781c921-0afe-496a-adb1-679b2031b5a0",
+      "seq": 10,
+      "source_id": "fed_stmt_20260128",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260128a.htm"
+    },
+    "fed_stmt_20260318": {
+      "blob_sha256": "2e7d0cfe4b9efa7da086fe86492e5d5ac16f93b0c78a05274fea3aaf6364f3b0",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "4812659f6603bd906289d18250336ccbbc725a188923440ea86d38d645650d6f",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "94a441a4b0138523f5d8dd24f943f0f32f5aa33d5cb76f078083ddfd2a1040f5",
+            "fb24ebda26fdc77312c905527fb0d90cd5fd46708291957ae96b62766fd962e0",
+            "b51b8e8db172eff1d6d6a969d3105be027fae9a906a573aa7f6e5a7e43ef05ae",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "52225d50665b97bf2a3e603bb9180e0b3c2b34e6760bdf037f7acf0927fe1ab3",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "88ea36d7be3eda6a0c42f3081046b5ee35f62dd080a69a59436367e587f8bb14"
+          ],
+          "release_date_text": "March 18, 2026",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "54c16c81-171c-483a-8e46-8ee381263723",
+      "revision_id": "94d7eaff-7517-4f8d-a435-b274a021798d",
+      "seq": 105,
+      "source_id": "fed_stmt_20260318",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260318a.htm"
+    },
+    "fed_stmt_20260429": {
+      "blob_sha256": "ef13a689c4eb39d614617e8c474e0abb5bc3efcce53be0946891aecf13fab911",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "72791f7946dcb08fb7df8e90960940322bb3aab28a623684a810f293b16ad728",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "c91c9aebbf26ad0f0bf40235834e27488bd9084e789986c58f38b5259c89b12f",
+            "cdf5d7107149ad43a2adebc6886cc5f0e7ef9abb3352759f2b262ba3a44fbe60",
+            "b51b8e8db172eff1d6d6a969d3105be027fae9a906a573aa7f6e5a7e43ef05ae",
+            "678b3d2b35c19ad5bce9c170fa00ecd59c37468edb093cf47dda143aeb3a01cd",
+            "c5f888e04ef628d473d40d73efcc42ce4715ace09da549dd4664569bf9d56bdf",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "9dc2402190deb57d760606b29863cdaf7d1ea08e91fa2a4dc71bf77162cb161e"
+          ],
+          "release_date_text": "April 29, 2026",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "96ab6e69-9257-4197-9c60-79c1328161aa",
+      "revision_id": "2c11e1bc-b6c5-40f5-a53d-a69a10bd8dfa",
+      "seq": 11,
+      "source_id": "fed_stmt_20260429",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260429a.htm"
+    },
+    "fed_stmt_20260617": {
+      "blob_sha256": "603630472e7c287adad0681cc8430eb8f54a50b5f3d77268e7158b23b11cfca5",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "collection_only_no_lineage",
+        "expected_class": "valid",
+        "extraction_at_labeling": "not_run_no_lineage",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 8,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "8277b4b2d6b9b985a7d5032667552aff0617a5d0d077b61556e926c4f8fb1e7a",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "d49966dc9fdb20ecd41939b7afaa3aa879808b25b5bd6f641fc5931565032d14",
+            "4536fb6a49bb5b43c26c7a6ede1f1409d7628dd8fae3b0cd1ee3a3a929983420",
+            "1a641871668fc91d6a306458b8669570684893710a71cc2ba98379e5d028d360",
+            "458cc7ffbd04fe1ea31c46b92be2082976230889cd17729dd6cdbe09c5fd540f",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "7171febfd6ad5da064ddccba36e545e254b3ac973cad13f89d25d2fc76cae3bf"
+          ],
+          "release_date_text": "June 17, 2026",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "note": "Direct corpus capture without feed lineage: the accepted statement profile requires parent_feed_reference by design (R3.1 F1); the measurement verifies refusal without lineage and collection-level facts.",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "051c5de7-ac62-480c-b5c7-9568afc20919",
+      "revision_id": "007808f8-73a4-4cc8-a93f-4ab79124054c",
+      "seq": 12,
+      "source_id": "fed_stmt_20260617",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm"
+    },
+    "fed_stmt_20260729": {
+      "blob_sha256": "9d6135fd62ccb2a6d3c6987ba5b02736c4624c9ebf99ec658d7272acedd6625f",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "statement_extractor",
+        "expected_class": "valid",
+        "extraction_at_labeling": "success",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 9,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "91c8aee75396020f341028684fe52441fa8b1131c77a319e1abc0272f448a5db",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "2b56a08b8260737c216c14ecb9454eab4b762d041392c3cd8f6015be4c586131",
+            "148fa9d4c8e3b259cf3dd970c62c965f2a495dfe835c36e7c3a4113d783e67f8",
+            "1a641871668fc91d6a306458b8669570684893710a71cc2ba98379e5d028d360",
+            "458cc7ffbd04fe1ea31c46b92be2082976230889cd17729dd6cdbe09c5fd540f",
+            "a728f2d07334fd21fbfdb33cac197c4d187fe76e21e7bbb4e4300f9d74775984",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "3f2570efe62d28b8a0a04fdcfeeab071633dd67b3a3bce5f8c368f1e3b201649"
+          ],
+          "release_date_text": "July 29, 2026",
+          "target_range": [
+            "3-1/2",
+            "3-3/4"
+          ]
+        },
+        "kind": "positive",
+        "lineage": {
+          "archive_name": "pythia-evidence-corpus",
+          "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+          "feed_fact_id": "fact-03853d9b5cd7dbf8",
+          "feed_item_locator": {
+            "path": "/rss/channel/item[7]",
+            "type": "xml_xpath"
+          },
+          "feed_published_at": "2026-07-29T18:00:00+00:00",
+          "feed_raw_pub_date": "Wed, 29 Jul 2026 18:00:00 GMT",
+          "parent_bundle_as_of_seq": 15,
+          "parent_bundle_digest": "aa486158ddc90415fc6ddef2b2b83e49980b935a37de0f185d89e14d1253e4de",
+          "receipt_id": "49fea6a9-6061-4b8a-8da3-9c693fc06af1",
+          "revision_id": "3c98f8f3-aad0-4e3c-a911-4657e4aa04cb",
+          "seq": 15
+        },
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "9eb09984-df5d-4bfd-9ec9-32c5522b089e",
+      "revision_id": "6e69a6fb-439b-4e29-945d-1f98e744c781",
+      "seq": 150,
+      "source_id": "fed_stmt_20260729",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm"
+    },
+    "fed_stmt_20260916": {
+      "blob_sha256": "e3812b8523fb0c9e0c56e1ad730fba044a36a73b1b9b43aac3b6c32bc348ca41",
+      "complete": true,
+      "family": "fomc_statement",
+      "label": {
+        "coverage": "statement_extractor",
+        "expected_class": "valid",
+        "extraction_at_labeling": "success",
+        "facts": {
+          "date_matches_url": true,
+          "n_paragraphs": 8,
+          "page_title": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+          "paragraph_texts_sha": [
+            "4c3317bf557a38fe58eb690f7891ea5bab5f5ac6d3223538b53c0722b8d394e2",
+            "02cb466a444b1022487029051e5b47e2be7f741b0b06ecd1994f7387b50a6fef",
+            "d49966dc9fdb20ecd41939b7afaa3aa879808b25b5bd6f641fc5931565032d14",
+            "f3c2b2dba81a9c74413e075145026a0e08611a45353dc94bddfa82977fb9ba9a",
+            "55c5a74f05535845962b5d951ccd57925d3ce52ea4528539b0e8074dd52e2f6b",
+            "b7f0dbc8ffe5b459eda07719fd59c38344144b80c0a7386720f9b958895c8466",
+            "e2a25174a1f4cd6cf01dd75c745582673d9b0a7c8e47a387c3cd55603e5751f8",
+            "24d341e82e73524bb02a51c4722eb2540656f7f120b11a5cf077ed38caff09e2"
+          ],
+          "release_date_text": "September 16, 2026",
+          "target_range": [
+            "3-3/4",
+            "4"
+          ]
+        },
+        "kind": "positive",
+        "lineage": {
+          "archive_name": "pythia-evidence-corpus",
+          "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+          "feed_fact_id": "fact-40f63014471fd57c",
+          "feed_item_locator": {
+            "path": "/rss/channel/item[3]",
+            "type": "xml_xpath"
+          },
+          "feed_published_at": "2026-09-16T18:00:00+00:00",
+          "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT",
+          "parent_bundle_as_of_seq": 15,
+          "parent_bundle_digest": "aa486158ddc90415fc6ddef2b2b83e49980b935a37de0f185d89e14d1253e4de",
+          "receipt_id": "49fea6a9-6061-4b8a-8da3-9c693fc06af1",
+          "revision_id": "3c98f8f3-aad0-4e3c-a911-4657e4aa04cb",
+          "seq": 15
+        },
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "d1bc651c-2396-47a1-8bce-ce0cf27ef7d9",
+      "revision_id": "50304699-5a49-49ad-ae10-ce3e757774ee",
+      "seq": 149,
+      "source_id": "fed_stmt_20260916",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm"
+    },
+    "fomc_minutes_20251210": {
+      "blob_sha256": "0c7ebee83b8821053c9c0c8f71f6a1555e0e0aa30c52abc178d0e49081ee15bb",
+      "complete": true,
+      "family": "fomc_minutes",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "The Fed - Monetary Policy:",
+          "visible_text_chars": 60171
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "dee856cc-dd24-4d55-8f28-90833c1dc37d",
+      "revision_id": "732376ba-225e-4035-9da7-61e8d6575edc",
+      "seq": 83,
+      "source_id": "fomc_minutes_20251210",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20251210.htm"
+    },
+    "fomc_minutes_20260128": {
+      "blob_sha256": "537f9fdb29229c8f3dc1758c8d2fc792edae10195596a64d88d6786da046d645",
+      "complete": true,
+      "family": "fomc_minutes",
+      "label": {
+        "coverage": "statement_profile_control",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "latin_share": 1.0,
+          "title": "The Fed - Monetary Policy:",
+          "visible_text_chars": 53460
+        },
+        "kind": "negative",
+        "note": "Valid document of another type: the FOMC statement profile must reject it (typed), never extract it as a statement.",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "c8c5b6f7-b771-4096-adf0-ecdabaf318c4",
+      "revision_id": "7a2a2895-2cc1-482f-ac38-a1f076f264a4",
+      "seq": 82,
+      "source_id": "fomc_minutes_20260128",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260128.htm"
+    },
+    "gdpnow_page": {
+      "blob_sha256": "f2dd5524eae518f6e650dd68320f4afcbe0945848145992c36220ef61eaf679b",
+      "complete": true,
+      "family": "data_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 8,
+          "latin_share": 1.0,
+          "title": "GDPNow - Federal Reserve Bank of Atlanta",
+          "visible_text_chars": 23977
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Bank of Atlanta",
+      "receipt_id": "75206d62-2381-443d-9cc8-827d4cf0a980",
+      "revision_id": "cea6b123-732f-4ef5-bc1b-755a14b9aec7",
+      "seq": 19,
+      "source_id": "gdpnow_page",
+      "url": "https://www.atlantafed.org/research-and-data/data/gdpnow"
+    },
+    "github_anthropic_sdk": {
+      "blob_sha256": "a880740d6b61825d3942b5a72210df07b245ab4a687029d6ab88d5f19be340f4",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21T22:00:30Z",
+          "first_name": "v2.1.0",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "86445d1d-d85c-4003-8634-630f0bdc7798",
+      "revision_id": "4e47c35e-d9db-4cc8-8f5f-d818dea937a0",
+      "seq": 116,
+      "source_id": "github_anthropic_sdk",
+      "url": "https://api.github.com/repos/anthropics/anthropic-sdk-python/releases?per_page=2"
+    },
+    "github_deepseek_v3": {
+      "blob_sha256": "963effeacc708105089524a8573cd62ca1c44a703b8f12fc352ef6e656e7d271",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2025-06-27T08:46:37Z",
+          "first_name": "v1.0.0",
+          "record_count": 1
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "1c59e7bd-ea15-4d12-b0e9-8a6b03469fc6",
+      "revision_id": "e2a287ef-0fa0-4a05-a41a-753e9b42b491",
+      "seq": 67,
+      "source_id": "github_deepseek_v3",
+      "url": "https://api.github.com/repos/deepseek-ai/DeepSeek-V3/releases?per_page=2"
+    },
+    "github_langchain": {
+      "blob_sha256": "013622f322f64300b9c5e1ac98f29db17a338d0056f9aa60313cf228ce6f0f81",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21T21:39:16Z",
+          "first_name": "langchain==1.4.7",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "79e12267-0a1e-45ac-93c3-f97ff465140c",
+      "revision_id": "8f884e72-5280-4b2e-860b-997aa35647f1",
+      "seq": 117,
+      "source_id": "github_langchain",
+      "url": "https://api.github.com/repos/langchain-ai/langchain/releases?per_page=2"
+    },
+    "github_llama_cpp": {
+      "blob_sha256": "97f00291c34b7267afbf389d2142be909346f0c8eb2d1f3bffeb7974c21e8b8e",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-22T12:53:52Z",
+          "first_name": "b11819",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "3d3cab69-2a5c-454b-91ee-c5c79a1d9b72",
+      "revision_id": "01a42880-d5ab-4dfe-8691-da72404f8454",
+      "seq": 68,
+      "source_id": "github_llama_cpp",
+      "url": "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=2"
+    },
+    "github_openai_python": {
+      "blob_sha256": "e2bb35468e88daec6532b7db561070fc9ef206ddb7d0afc3ae0f1936985bd06d",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-22T03:32:31Z",
+          "first_name": "v3.36.1",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "8177b573-894f-4ba8-8339-111b10acd37a",
+      "revision_id": "a46e7d19-fb76-4ce2-a6aa-477e7b085caa",
+      "seq": 87,
+      "source_id": "github_openai_python",
+      "url": "https://api.github.com/repos/openai/openai-python/releases?per_page=2"
+    },
+    "github_transformers": {
+      "blob_sha256": "6f13dfa9697108179c79a21b3688fac84e3af573f4b9853c90dc87c6c23dcd74",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-19T17:45:37Z",
+          "first_name": "Patch release v5.20.2",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "a64f04b7-09d6-48d3-8d43-dbf7fd45219e",
+      "revision_id": "e3401b1f-81c6-4e9c-ab43-34ea1aacc450",
+      "seq": 69,
+      "source_id": "github_transformers",
+      "url": "https://api.github.com/repos/huggingface/transformers/releases?per_page=2"
+    },
+    "github_vllm": {
+      "blob_sha256": "ce671e3b4728d50d189941dbed3ce529441297218021ac16ad76363a83a90645",
+      "complete": true,
+      "family": "ai_releases_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-18T06:50:48Z",
+          "first_name": "v0.32.0",
+          "record_count": 2
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "GitHub",
+      "receipt_id": "67313ddd-03d8-4411-822a-e07ddac1c447",
+      "revision_id": "2722f791-8bf4-4bf0-952b-423c31ab1276",
+      "seq": 88,
+      "source_id": "github_vllm",
+      "url": "https://api.github.com/repos/vllm-project/vllm/releases?per_page=2"
+    },
+    "hf_deepseek": {
+      "blob_sha256": "1f5ad8a9e7f0fc312134fd7d04b06cf3ac3a38c430423b0aabc85f7fd31dc7cd",
+      "complete": true,
+      "family": "ai_models_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-17T05:46:55.000Z",
+          "first_name": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+          "record_count": 3
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "e94cf465-6c27-4229-a93b-f59ce288fb1c",
+      "revision_id": "3d17c47f-81ca-4b73-b4c0-f517e6464620",
+      "seq": 20,
+      "source_id": "hf_deepseek",
+      "url": "https://huggingface.co/api/models?author=deepseek-ai&sort=lastModified&direction=-1&limit=3"
+    },
+    "hf_meta_llama": {
+      "blob_sha256": "c8aaad4dfd48d8e1d479c1868be48de4afcbb1db00ebd91bfe5fc6ede486bb66",
+      "complete": true,
+      "family": "ai_models_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2025-11-12T21:27:00.000Z",
+          "first_name": "meta-llama/Prompt-Guard-86M",
+          "record_count": 3
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "64693b17-a45f-4981-b661-c3e258e6457a",
+      "revision_id": "42717a10-6828-4f57-8ce5-f838b49dd708",
+      "seq": 114,
+      "source_id": "hf_meta_llama",
+      "url": "https://huggingface.co/api/models?author=meta-llama&sort=lastModified&direction=-1&limit=3"
+    },
+    "hf_mistral": {
+      "blob_sha256": "3e7157da5d51163783f57da0f740aa43c3f51e4164ffb44b8acfbdafc3bfabe0",
+      "complete": true,
+      "family": "ai_models_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-19T19:19:07.000Z",
+          "first_name": "mistralai/Timestral-28M",
+          "record_count": 3
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "f89538d3-7c74-4169-80ed-1a7035d868fb",
+      "revision_id": "0884413a-2d4c-41af-a7cc-cb848a06bd22",
+      "seq": 115,
+      "source_id": "hf_mistral",
+      "url": "https://huggingface.co/api/models?author=mistralai&sort=lastModified&direction=-1&limit=3"
+    },
+    "hf_model_deepseek_r1": {
+      "blob_sha256": "cd15cddd19a6091525cc581feb28aea3c8b46a1e36038a56ac875cfb8ff3c120",
+      "complete": true,
+      "family": "ai_model_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "deepseek-ai/DeepSeek-R1 \u00b7 Hugging Face",
+          "visible_text_chars": 15047
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "436fed08-1d48-4c54-81d0-15ce72768789",
+      "revision_id": "61c6d3ce-a4f7-4671-85b6-a0bef158a6fc",
+      "seq": 86,
+      "source_id": "hf_model_deepseek_r1",
+      "url": "https://huggingface.co/deepseek-ai/DeepSeek-R1"
+    },
+    "hf_model_deepseek_v32": {
+      "blob_sha256": "5dd3bd4b18fbca7aaa4d0f24eabeec6714e9aa203373a63ade20cad85d58a063",
+      "complete": true,
+      "family": "ai_model_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "deepseek-ai/DeepSeek-V3.2 \u00b7 Hugging Face",
+          "visible_text_chars": 9500
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "4c58da62-3a83-4490-8a9e-588194ca498b",
+      "revision_id": "dd00b459-1aa9-4bbe-bb1a-223f4dfb2f66",
+      "seq": 84,
+      "source_id": "hf_model_deepseek_v32",
+      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
+    },
+    "hf_model_qwen3": {
+      "blob_sha256": "d7f5049c37c85a256b6eb454c9f86d8ac8a9a3e12dc41f103ff864d981a58fe6",
+      "complete": true,
+      "family": "ai_model_page",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 1,
+          "latin_share": 1.0,
+          "title": "Qwen/Qwen3-235B-A22B \u00b7 Hugging Face",
+          "visible_text_chars": 20426
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "05c6ce0b-09d4-4abd-83e4-9a91aa16f5df",
+      "revision_id": "5597bbea-08cf-4e72-b571-616f14165a2a",
+      "seq": 85,
+      "source_id": "hf_model_qwen3",
+      "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B"
+    },
+    "hf_qwen": {
+      "blob_sha256": "9c4008ed1adeab2461058b84ab29353e014e0369f30bdf744e1898d2d495ea8f",
+      "complete": true,
+      "family": "ai_models_api",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-12T09:45:49.000Z",
+          "first_name": "Qwen/Qwen-Image-2.1-Turbo",
+          "record_count": 3
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Hugging Face",
+      "receipt_id": "1aa6391a-08df-47cc-b3f1-254ec484d5df",
+      "revision_id": "f88ba885-8dc0-4081-9565-d04b3a95a2c7",
+      "seq": 21,
+      "source_id": "hf_qwen",
+      "url": "https://huggingface.co/api/models?author=Qwen&sort=lastModified&direction=-1&limit=3"
+    },
+    "nbs_1965449": {
+      "blob_sha256": "5793799202066c330332cce23b6c312f1ab2a24df40f6732cf6b3b71a16c2e1f",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.967,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.033,
+          "title": "2026\u5e749\u6708\u4e2d\u56fd\u91c7\u8d2d\u7ecf\u7406\u6307\u6570\u8fd0\u884c\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 12007
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "f3e0fc77-c62e-4226-96ee-07a4284e846d",
+      "revision_id": "a39d9136-ba6f-4e84-b67c-0136a2b8a7c5",
+      "seq": 50,
+      "source_id": "nbs_1965449",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202609/t20260930_1965449.html"
+    },
+    "nbs_1965465": {
+      "blob_sha256": "a00747a6da87166b2f0a9e76bae7a5e451ed4cc36a4fbd372f725d3c03460bf1",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.919,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.081,
+          "title": "2026\u5e749\u6708\u4e0b\u65ec\u6d41\u901a\u9886\u57df\u91cd\u8981\u751f\u4ea7\u8d44\u6599\u5e02\u573a\u4ef7\u683c\u53d8\u52a8\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 9561
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "9b7bc8f8-670b-49c1-8862-19b734b8840d",
+      "revision_id": "8b282826-747c-43ba-bd50-ffc2b6083164",
+      "seq": 51,
+      "source_id": "nbs_1965465",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261008_1965465.html"
+    },
+    "nbs_1965476": {
+      "blob_sha256": "e50ab7dc7d03a9bc30c4aa9b9c4bd5e06b6036cff29124f2a3f53e485fcbcf02",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.975,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.025,
+          "title": "2026\u5e749\u6708\u4efd\u5de5\u4e1a\u751f\u4ea7\u8005\u51fa\u5382\u4ef7\u683c\u540c\u6bd4\u4e0a\u6da85.0% \u73af\u6bd4\u4e0a\u6da81.2% - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 7380
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "01090394-ad48-48f1-99ac-9659d18b29ef",
+      "revision_id": "9f7715dc-f5f7-410c-a3e2-2b55f10ad3a9",
+      "seq": 52,
+      "source_id": "nbs_1965476",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261014_1965476.html"
+    },
+    "nbs_1965477": {
+      "blob_sha256": "ac0ed2d2e3d259249d113fe41b32b0936823d4493143aa0fea55707a14cffc3b",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.967,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.033,
+          "title": "2026\u5e749\u6708\u4efd\u5c45\u6c11\u6d88\u8d39\u4ef7\u683c\u540c\u6bd4\u4e0a\u6da80.9% - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 7022
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "c5585794-6f69-4235-8650-ee0e291a68ba",
+      "revision_id": "998b8f37-37ab-4cab-860a-882d2ad317a6",
+      "seq": 53,
+      "source_id": "nbs_1965477",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261014_1965477.html"
+    },
+    "nbs_1965512": {
+      "blob_sha256": "b11e043b6e9aea30317fafb5ff8d4a9422e4da0dbc3a54f0931a7d5cda59b695",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.982,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.018,
+          "title": "2025\u5e74\u5168\u56fd\u79d1\u6280\u7ecf\u8d39\u6295\u5165\u7edf\u8ba1\u516c\u62a5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 10217
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "fedb9cd9-4e77-425c-b1df-43fb5d749924",
+      "revision_id": "ec1b568c-26b3-4cc7-a793-d5b230dddbe1",
+      "seq": 54,
+      "source_id": "nbs_1965512",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261016_1965512.html"
+    },
+    "nbs_1965609": {
+      "blob_sha256": "b22e6f41ce64db46f45c3c06b54e930210a520909cef3fbacddd7e058c4fb011",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.992,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.008,
+          "title": "2026\u5e749\u6708\u4efd70\u4e2a\u5927\u4e2d\u57ce\u5e02\u5546\u54c1\u4f4f\u5b85\u9500\u552e\u4ef7\u683c\u53d8\u52a8\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 24869
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "274afcc7-a725-4e4e-bc84-f4be811b5543",
+      "revision_id": "97a01b4c-4724-410f-b9d3-99cdb14793bb",
+      "seq": 55,
+      "source_id": "nbs_1965609",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965609.html"
+    },
+    "nbs_1965611": {
+      "blob_sha256": "ef6b78f3e578f9f129809ff8befdc93442acebe8ba961e3301ba5407734a23bf",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.995,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.005,
+          "title": "2026\u5e74\u4e09\u5b63\u5ea6\u5168\u56fd\u89c4\u6a21\u4ee5\u4e0a\u5de5\u4e1a\u4ea7\u80fd\u5229\u7528\u7387\u4e3a73.1% - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 4663
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "de6720e6-6eca-4c0d-bc51-0b2238755cec",
+      "revision_id": "fdde60d9-6030-4c22-a2d6-1dc7e3749e49",
+      "seq": 56,
+      "source_id": "nbs_1965611",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965611.html"
+    },
+    "nbs_1965612": {
+      "blob_sha256": "dfe47867a33572595e64fc8647e370444306d2ec75561943bd02c2abec9d9c6d",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.998,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.002,
+          "title": "2026\u5e74\u524d\u4e09\u5b63\u5ea6\u5c45\u6c11\u6536\u5165\u548c\u6d88\u8d39\u652f\u51fa\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 8608
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "c8d44bc1-5209-4cd7-a32c-63c0811aeff2",
+      "revision_id": "c473b322-e860-41ca-b8b9-5b0e91f61484",
+      "seq": 57,
+      "source_id": "nbs_1965612",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965612.html"
+    },
+    "nbs_1965613": {
+      "blob_sha256": "a66ad37d0b5188d9f94ad1767be36737582f7aad4322793c74b8373c16d4f374",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.997,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.003,
+          "title": "2026\u5e749\u6708\u4efd\u80fd\u6e90\u751f\u4ea7\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 4076
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "8e0c3026-18c8-4b30-ad2c-c0fd50b36cf4",
+      "revision_id": "52cf3838-be38-4609-a583-81382ce04a1c",
+      "seq": 58,
+      "source_id": "nbs_1965613",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965613.html"
+    },
+    "nbs_1965614": {
+      "blob_sha256": "b27d0c8aa542541828c90f42953d0e2011eeb4e7552671f15aa1ada6202cb5b6",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.998,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.002,
+          "title": "2026\u5e741\u20149\u6708\u4efd\u793e\u4f1a\u6d88\u8d39\u54c1\u96f6\u552e\u603b\u989d\u589e\u957f1.1% - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 7197
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "2634c272-9911-4964-9fe5-aa88154fea2e",
+      "revision_id": "18103282-61c9-44db-8cf5-397267399deb",
+      "seq": 59,
+      "source_id": "nbs_1965614",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965614.html"
+    },
+    "nbs_1965615": {
+      "blob_sha256": "81f43efbc242d618070adeecf985576b49aeb5b729f063db664a2d00db9a56a5",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.998,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.002,
+          "title": "2026\u5e741\u20149\u6708\u4efd\u5168\u56fd\u623f\u5730\u4ea7\u5e02\u573a\u57fa\u672c\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 8077
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "fba3cb99-09c6-4ab1-8155-03d683378547",
+      "revision_id": "e928c27b-2960-40b1-a05d-10de127f78d0",
+      "seq": 112,
+      "source_id": "nbs_1965615",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965615.html"
+    },
+    "nbs_1965616": {
+      "blob_sha256": "37c4728269674ef5fb95696b58f94cadea66564ffa4e6baa7747bec71936205c",
+      "complete": true,
+      "family": "nbs_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.997,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.003,
+          "title": "2026\u5e741\u20149\u6708\u4efd\u5168\u56fd\u56fa\u5b9a\u8d44\u4ea7\u6295\u8d44\u57fa\u672c\u60c5\u51b5 - \u56fd\u5bb6\u7edf\u8ba1\u5c40",
+          "visible_text_chars": 6744
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "fa864b61-9cc9-4b35-a852-f5764cb63152",
+      "revision_id": "4bde5c61-a714-4a5e-aac7-1c6b735941e0",
+      "seq": 113,
+      "source_id": "nbs_1965616",
+      "url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965616.html"
+    },
+    "nbs_en_1965466": {
+      "blob_sha256": "800b86d45d8262775999a545025efb6a3721823df6264c94d50c9277f28bc856",
+      "complete": true,
+      "family": "nbs_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Purchasing Managers\u2019 Index for September 2026",
+          "visible_text_chars": 12650
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "2ebab883-d796-4eb2-afde-020cddd1e646",
+      "revision_id": "8be22bc7-c2d3-4645-803c-2712ef779c39",
+      "seq": 89,
+      "source_id": "nbs_en_1965466",
+      "url": "https://www.stats.gov.cn/english/PressRelease/202610/t20261008_1965466.html"
+    },
+    "nbs_en_1965467": {
+      "blob_sha256": "a27edd0f114c59238fe14faaef68befda9f78e9726da83cf55a624af59a10968",
+      "complete": true,
+      "family": "nbs_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Market Prices of Important Means of Production in Circulation, September 21-30, 2026",
+          "visible_text_chars": 9059
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "15b489df-543c-40e5-a60d-f49aa5d51718",
+      "revision_id": "e756d831-df08-4a07-8b84-71430ad301e8",
+      "seq": 90,
+      "source_id": "nbs_en_1965467",
+      "url": "https://www.stats.gov.cn/english/PressRelease/202610/t20261008_1965467.html"
+    },
+    "nbs_en_1965499": {
+      "blob_sha256": "d13a55f2fa8b46a84ba76095c88510a5fcff3e0e7bcf0e7d544151cfe528079e",
+      "complete": true,
+      "family": "nbs_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "Industrial Producer Price Indexes in September 2026",
+          "visible_text_chars": 8051
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "7807abbf-8f30-4c5d-9f82-bc38083dce3f",
+      "revision_id": "92e8a3c1-437d-4057-b72a-ae1807327764",
+      "seq": 91,
+      "source_id": "nbs_en_1965499",
+      "url": "https://www.stats.gov.cn/english/PressRelease/202610/t20261015_1965499.html"
+    },
+    "nbs_en_1965619": {
+      "blob_sha256": "376897804c1255449be6709c50a99640dd32e089a33af11eccd6be7031e7d211",
+      "complete": true,
+      "family": "nbs_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.0,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 1.0,
+          "title": "National Economy was Generally Stable with New Achievement Made in High-Quality Development in the First Three Quarters",
+          "visible_text_chars": 25154
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "National Bureau of Statistics of China",
+      "receipt_id": "23ee8b3c-6db7-484f-b5c9-1d3ee29ae675",
+      "revision_id": "948fa6ed-f491-440f-bc5e-d5efabcf97bf",
+      "seq": 92,
+      "source_id": "nbs_en_1965619",
+      "url": "https://www.stats.gov.cn/english/PressRelease/202610/t20261019_1965619.html"
+    },
+    "neg_arena": {
+      "blob_sha256": null,
+      "complete": false,
+      "family": "negative_blocked",
+      "label": {
+        "coverage": "transport",
+        "expected_class": "blocked",
+        "facts": {
+          "http_status": 403
+        },
+        "kind": "negative",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Arena",
+      "receipt_id": "0fa0a255-68d3-46c4-aa59-aa7889d7e692",
+      "revision_id": null,
+      "seq": 147,
+      "source_id": "neg_arena",
+      "url": "https://arena.ai/leaderboard/text/overall-no-style-control"
+    },
+    "neg_bls_cpi_page": {
+      "blob_sha256": null,
+      "complete": false,
+      "family": "negative_blocked",
+      "label": {
+        "coverage": "transport",
+        "expected_class": "blocked",
+        "facts": {
+          "http_status": 403
+        },
+        "kind": "negative",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "U.S. Bureau of Labor Statistics",
+      "receipt_id": "27a5d406-3f75-4acf-b15c-03af7b9192b3",
+      "revision_id": null,
+      "seq": 145,
+      "source_id": "neg_bls_cpi_page",
+      "url": "https://www.bls.gov/news.release/cpi.htm"
+    },
+    "neg_bls_cpi_rss": {
+      "blob_sha256": null,
+      "complete": false,
+      "family": "negative_blocked",
+      "label": {
+        "coverage": "transport",
+        "expected_class": "blocked",
+        "facts": {
+          "http_status": 403
+        },
+        "kind": "negative",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "U.S. Bureau of Labor Statistics",
+      "receipt_id": "968f5ba1-e7c0-459b-bc75-eb0b9af8ec5a",
+      "revision_id": null,
+      "seq": 146,
+      "source_id": "neg_bls_cpi_rss",
+      "url": "https://www.bls.gov/feed/cpi.rss"
+    },
+    "neg_fed_404": {
+      "blob_sha256": null,
+      "complete": false,
+      "family": "negative_blocked",
+      "label": {
+        "coverage": "transport",
+        "expected_class": "blocked",
+        "facts": {
+          "http_status": 404
+        },
+        "kind": "negative",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Board",
+      "receipt_id": "d2b05b0b-aca5-437e-ae1c-849124c9a47b",
+      "revision_id": null,
+      "seq": 148,
+      "source_id": "neg_fed_404",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20990101a.htm"
+    },
+    "neg_syn_absurd_number": {
+      "blob_sha256": "c1d5cd9a0bda9a4433e9425488d7c05445f1485fb2d30258e969b5711be5dbf9",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "invalid_content",
+        "kind": "negative",
+        "note": "Injected absurd figures (450 percent inflation): number/unit bounds must reject the claims.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "ed25b1c1-38ed-4d4d-ba73-6ec36ef05729",
+      "revision_id": "a2b7bbba-8c8e-45a6-b0f1-5f1971a1dc22",
+      "seq": 126,
+      "source_id": "neg_syn_absurd_number",
+      "url": "https://synthetic.invalid/absurd-number"
+    },
+    "neg_syn_login_wall": {
+      "blob_sha256": "edaa27a766db75fe030165fefd15eddefb7783d0b715871ed6a88ed6ac1eae99",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "blocked",
+        "kind": "negative",
+        "note": "Login wall: not a document; must be classified blocked, never stored as evidence.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "acf579ca-5065-4efe-9bf2-5ec7bd5d5be5",
+      "revision_id": "ed6921e6-d81e-4ff2-ac80-68f305e61ae1",
+      "seq": 127,
+      "source_id": "neg_syn_login_wall",
+      "url": "https://synthetic.invalid/login-wall"
+    },
+    "neg_syn_spa_shell": {
+      "blob_sha256": "a7c2768ad89fe7289ed1f5bf66ba50243c46d068ad00739884f58df138b0b5b7",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "unverified",
+        "kind": "negative",
+        "note": "Empty client-side shell (contract 4.7): unverified/invalid, never authoritative.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "a0fac124-106b-42ba-aaed-eeb72633f6df",
+      "revision_id": "911ffcbd-d4a2-4587-9ab5-105f7a763a44",
+      "seq": 128,
+      "source_id": "neg_syn_spa_shell",
+      "url": "https://synthetic.invalid/spa-shell"
+    },
+    "neg_syn_syndication_a": {
+      "blob_sha256": "1b8fdcfd3cb77b291f60c75100c0eb3b2c0b75c626640acf5fe5f04156a70bbb",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": "cluster_stmt_20240918",
+        "expected_class": "valid",
+        "kind": "negative",
+        "note": "Syndicated copy of fed_stmt_20240918: same origin cluster; must not count as independent evidence.",
+        "split": "control",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "326cdc7c-c0fd-4b1b-885a-182c643575ed",
+      "revision_id": "cf5a85e7-3b50-4d30-85c6-62ce9704f146",
+      "seq": 129,
+      "source_id": "neg_syn_syndication_a",
+      "url": "https://synthetic.invalid/wire-a-republish"
+    },
+    "neg_syn_syndication_b": {
+      "blob_sha256": "35a0a7de24d6035d30d42215562acc8fe7fd46b6223c6c5b9950bac1600eaae7",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": "cluster_stmt_20240918",
+        "expected_class": "valid",
+        "kind": "negative",
+        "note": "Syndicated copy of fed_stmt_20240918: same origin cluster; must not count as independent evidence.",
+        "split": "control",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "7c8c5e51-f441-49d5-8a06-abf882c0aa7b",
+      "revision_id": "d473552f-4aa0-4964-8ed3-713145b76d31",
+      "seq": 130,
+      "source_id": "neg_syn_syndication_b",
+      "url": "https://synthetic.invalid/wire-b-republish"
+    },
+    "neg_syn_translation_fake": {
+      "blob_sha256": "800b86d45d8262775999a545025efb6a3721823df6264c94d50c9277f28bc856",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "invalid_content",
+        "kind": "negative",
+        "note": "English NBS release presented as the Chinese original: translation must never replace the original record.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "zh",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "c712e342-e660-4c67-8d5d-d249fcdfc2aa",
+      "revision_id": "fc350e8e-e9f4-4746-93a1-6d3d39ee0db9",
+      "seq": 131,
+      "source_id": "neg_syn_translation_fake",
+      "url": "https://synthetic.invalid/translation-as-original"
+    },
+    "neg_syn_truncated_stmt": {
+      "blob_sha256": "92011f8639049f6e35dffeabe6297c7c16b1255a6db1790d13d0fcbbd53bb607",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "rejected",
+        "kind": "negative",
+        "note": "Truncated statement body: extraction must reject, never publish partial facts.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "00b3a11f-f0e1-4e47-ad29-8ce1f90596f7",
+      "revision_id": "8de7b905-9836-41a0-889f-8b04dcd7d9e4",
+      "seq": 124,
+      "source_id": "neg_syn_truncated_stmt",
+      "url": "https://synthetic.invalid/truncated-statement"
+    },
+    "neg_syn_undated_stmt": {
+      "blob_sha256": "fbdbd2d9f447f8424bd76f6a98e1fe2858d09ee9deedba7cecc0ee914a3d7370",
+      "complete": true,
+      "family": "negative_synthetic",
+      "label": {
+        "cluster_id": null,
+        "expected_class": "rejected",
+        "kind": "negative",
+        "note": "Release date stripped: no date may be invented; published_at stays unproven.",
+        "split": "tuning",
+        "synthetic": true
+      },
+      "language": "en",
+      "origin_entity": "Synthetic fixture (R4)",
+      "receipt_id": "45eb5d5d-6d63-4994-96a5-30e3b3b7510c",
+      "revision_id": "7016c733-dfec-4ced-a5fe-f43ee920f916",
+      "seq": 125,
+      "source_id": "neg_syn_undated_stmt",
+      "url": "https://synthetic.invalid/undated-statement"
+    },
+    "nyfed_effr25": {
+      "blob_sha256": "70ff76b8e971f4f935a03b42cf2d9c4c279db0ccf98063b6c6e27c6048ab5b91",
+      "complete": true,
+      "family": "reference_rates",
+      "label": {
+        "coverage": "effr_extractor",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21",
+          "first_percent_rate": 3.88,
+          "record_count": 25
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Bank of New York",
+      "receipt_id": "b7e120bf-b715-4771-a814-a356f89c945b",
+      "revision_id": "1fe8b617-df46-4442-bcfd-dee0d35eafc9",
+      "seq": 13,
+      "source_id": "nyfed_effr25",
+      "url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/25.json"
+    },
+    "nyfed_effr5": {
+      "blob_sha256": "0abce64afe9e42baaec7cb87afbc7342702652c1d7cda4263cb18f3b536bea1b",
+      "complete": true,
+      "family": "reference_rates",
+      "label": {
+        "coverage": "effr_extractor",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21",
+          "first_percent_rate": 3.88,
+          "record_count": 5
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Bank of New York",
+      "receipt_id": "8501ef67-a80a-4eb1-960f-65e95cb9ea92",
+      "revision_id": "e49f15b0-cb90-488b-9af3-8e0d780cd958",
+      "seq": 118,
+      "source_id": "nyfed_effr5",
+      "url": "https://markets.newyorkfed.org/api/rates/unsecured/effr/last/5.json"
+    },
+    "nyfed_sofr": {
+      "blob_sha256": "69e157aab5eefffeb10a1d0eb43f379a788d9eaaa7a1dbe5bb6cbf4fb7150474",
+      "complete": true,
+      "family": "reference_rates",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21",
+          "first_percent_rate": 3.88,
+          "record_count": 5
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Bank of New York",
+      "receipt_id": "d67d6175-3414-41b7-92ba-0cb4eb19999a",
+      "revision_id": "d71920fc-1f28-4a0a-be7d-7ed0b76c4ee3",
+      "seq": 14,
+      "source_id": "nyfed_sofr",
+      "url": "https://markets.newyorkfed.org/api/rates/secured/sofr/last/5.json"
+    },
+    "nyfed_sofr25": {
+      "blob_sha256": "987c83a048ec46b6603d16f0d90d345cd9afb3d005b553f54b2d995e370bf47a",
+      "complete": true,
+      "family": "reference_rates",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "first_date": "2026-10-21",
+          "first_percent_rate": 3.88,
+          "record_count": 25
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "Federal Reserve Bank of New York",
+      "receipt_id": "f8d6d1b4-d7b5-44fd-b6c4-2881efdec620",
+      "revision_id": "73afee56-cb32-4037-a6a8-cd7f7087a88f",
+      "seq": 119,
+      "source_id": "nyfed_sofr25",
+      "url": "https://markets.newyorkfed.org/api/rates/secured/sofr/last/25.json"
+    },
+    "pboc_2026101418371517078": {
+      "blob_sha256": "8a5e569aee4c2d5e61e14fa25ff903e4ec58522acbc4931abc0381508165b866",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.955,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.045,
+          "title": "\u7b2c\u5341\u4e94\u5c4a\u4e2d\u65e5\u97e9\u592e\u884c\u884c\u957f\u4f1a\u8bae\u5728\u66fc\u8c37\u4e3e\u884c",
+          "visible_text_chars": 589
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "e52695a5-c272-4ed9-9b86-df38ceebc590",
+      "revision_id": "f8b87982-1e89-471d-879d-0e6c7a33dc02",
+      "seq": 40,
+      "source_id": "pboc_2026101418371517078",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101418371517078/index.html"
+    },
+    "pboc_2026101510063698366": {
+      "blob_sha256": "d6047ae4fbd19be20c5acdec84921530d07be6ef387c50e84a198f4b2e4fd9f1",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.976,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.024,
+          "title": "\u6f58\u529f\u80dc\u884c\u957f\u51fa\u5e2d\u4e2d\u56fd\u4e0e\u6d77\u5408\u4f1a\u7b2c\u56db\u6b21\u592e\u884c\u884c\u957f\u4f1a\u5e76\u4e3e\u884c\u7cfb\u5217\u53cc\u8fb9\u4f1a\u89c1",
+          "visible_text_chars": 965
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "b1fd8e1e-a87f-4d8a-a1bb-a669413697d5",
+      "revision_id": "110594cf-27a3-41e7-a925-6380670c470a",
+      "seq": 41,
+      "source_id": "pboc_2026101510063698366",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101510063698366/index.html"
+    },
+    "pboc_2026101517581023878": {
+      "blob_sha256": "685b87386a87843010e83966c8530500930e82acb662307889f5125989da74f5",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.975,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.025,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u51fa\u5e2d\u4e8c\u5341\u56fd\u96c6\u56e2\u8d22\u957f\u548c\u592e\u884c\u884c\u957f\u4f1a\u8bae",
+          "visible_text_chars": 1133
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "bd86f03d-4cbf-4335-8921-2b16a1e59ecf",
+      "revision_id": "982bd92e-6fea-4a23-846b-fc899062fff8",
+      "seq": 42,
+      "source_id": "pboc_2026101517581023878",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101517581023878/index.html"
+    },
+    "pboc_2026101614165534664": {
+      "blob_sha256": "8912f647bfe3f1a71d6e08b1ea2b987475f7c5ae4ee5037c4f60b0248b517a95",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.98,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.02,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u51fa\u5e2d\u65b0\u5174\u5e02\u573a\u7814\u8ba8\u4f1a",
+          "visible_text_chars": 1151
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "05fab379-8e3a-4ad9-9e67-b4c0dc1f9085",
+      "revision_id": "79a39174-8167-4598-86db-4caabfcecb14",
+      "seq": 43,
+      "source_id": "pboc_2026101614165534664",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101614165534664/index.html"
+    },
+    "pboc_2026101618323611588": {
+      "blob_sha256": "b2fc1361b7834d27bc5fb9c51d07312cea39cfcefb2d8d804108f83653564818",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.983,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.017,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u4f1a\u89c1\u6b27\u76df\u59d4\u5458\u4f1a\u7ecf\u6d4e\u548c\u751f\u4ea7\u529b\u59d4\u5458\u4e1c\u5e03\u7f57\u592b\u65af\u57fa\u65af\u3001\u6b27\u6d32\u4e2d\u592e\u94f6\u884c\u884c\u957f\u62c9\u52a0\u5fb7\u3001\u6b27\u5143\u96c6\u56e2\u4e3b\u5e2d\u76ae\u57c3\u62c9\u5361\u57fa\u65af\u53ca\u6b27\u6d32\u6709\u5173\u56fd\u5bb6\u592e\u884c\u884c\u957f",
+          "visible_text_chars": 1317
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "d57984c1-1ccb-49d4-8a7a-666714811508",
+      "revision_id": "2511e809-7d78-44d6-b552-f1c05259b0df",
+      "seq": 44,
+      "source_id": "pboc_2026101618323611588",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101618323611588/index.html"
+    },
+    "pboc_2026101622061793966": {
+      "blob_sha256": "0544337baa71652fa07dec8e505ec01006aacfd36238ba4d8803ec5ff85a7de4",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.957,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.043,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u4f1a\u89c1\u56fd\u9645\u8d27\u5e01\u57fa\u91d1\u7ec4\u7ec7\u603b\u88c1\u683c\u5965\u5c14\u57fa\u8036\u5a03",
+          "visible_text_chars": 604
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "cddaf72e-6f8b-4f18-a066-3c3d8c7cd60b",
+      "revision_id": "2cc98686-f38e-460b-b1c5-1823fb029d6f",
+      "seq": 45,
+      "source_id": "pboc_2026101622061793966",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101622061793966/index.html"
+    },
+    "pboc_2026101712191431436": {
+      "blob_sha256": "344f3152fd034429ccd9e1b919f1dfd9e24e791dc120bc497916d8eeeb5e12eb",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.974,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.026,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u4f1a\u89c1\u76f8\u5173\u56fd\u5bb6\u592e\u884c\u884c\u957f",
+          "visible_text_chars": 925
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "506da60b-12ca-4e3c-a5e4-78b2c2b61207",
+      "revision_id": "8d94361f-d70d-4463-9c86-668cd52eafc5",
+      "seq": 46,
+      "source_id": "pboc_2026101712191431436",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101712191431436/index.html"
+    },
+    "pboc_2026101715340431532": {
+      "blob_sha256": "987ddc1c2dadeac2d94aed4ce1bad960d8987e27c44c08a42544bdd5342e539a",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.973,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.027,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u884c\u957f\u6f58\u529f\u80dc\u51fa\u5e2d\u7b2c54\u5c4a\u56fd\u9645\u8d27\u5e01\u4e0e\u91d1\u878d\u59d4\u5458\u4f1a\u4f1a\u8bae",
+          "visible_text_chars": 1330
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "11609aaa-caa0-4299-be36-962e259f73f6",
+      "revision_id": "ae7b7a75-bc77-45ee-971c-92c0dfa4e35a",
+      "seq": 47,
+      "source_id": "pboc_2026101715340431532",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101715340431532/index.html"
+    },
+    "pboc_2026101718262172570": {
+      "blob_sha256": "a61626cd3c8f97c9501e7d88b1efeed2ef80cd800d3c1e573810668c01dffad2",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.976,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.024,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u526f\u884c\u957f\u5ba3\u660c\u80fd\u51fa\u5e2d\u5168\u7403\u4e3b\u6743\u503a\u52a1\u5706\u684c\u4f1a\u7b49\u4f1a\u8bae\u5e76\u4f1a\u89c1\u76f8\u5173\u673a\u6784\u8d1f\u8d23\u4eba",
+          "visible_text_chars": 1172
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "09e24057-b0a0-41a3-af24-cc1b65072e00",
+      "revision_id": "3f60d0af-9f11-4ce0-95aa-0b43b11dd7e6",
+      "seq": 48,
+      "source_id": "pboc_2026101718262172570",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101718262172570/index.html"
+    },
+    "pboc_2026101916082228353": {
+      "blob_sha256": "0d99472b3d504f7d074b683f8a5f1304bed89d735853d664604ca9c90c28b471",
+      "complete": true,
+      "family": "pboc_release",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.996,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.004,
+          "title": "\u4e2d\u56fd\u4eba\u6c11\u94f6\u884c\u7b49\u591a\u90e8\u95e8\u5370\u53d1\u300a\u5173\u4e8e\u91d1\u878d\u652f\u6301\u5efa\u8bbe\u5317\u4eac\uff08\u4eac\u6d25\u5180\uff09\u3001\u4e0a\u6d77\uff08\u957f\u4e09\u89d2\uff09\u3001\u7ca4\u6e2f\u6fb3\u5927\u6e7e\u533a\u56fd\u9645\u79d1\u6280\u521b\u65b0\u4e2d\u5fc3\u7684\u6307\u5bfc\u610f\u89c1\u300b",
+          "visible_text_chars": 7430
+        },
+        "kind": "positive",
+        "split": "control",
+        "synthetic": false
+      },
+      "language": "zh",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "9ed0c2e7-f5bf-4336-9d5d-d0909993efb0",
+      "revision_id": "9051c869-708e-4be5-a8f5-0216be796f93",
+      "seq": 49,
+      "source_id": "pboc_2026101916082228353",
+      "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/2026101916082228353/index.html"
+    },
+    "pboc_en_2025080815070711218": {
+      "blob_sha256": "2c04727432b26a6f7ca2bb949a5824fad90c38796e0e69cb3d0cae3a3f977f3c",
+      "complete": true,
+      "family": "pboc_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.017,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.983,
+          "title": "Yi Gang, Governor of the People's Bank of China, met with Ho Iat Seng, the Chief Executive of Macao SAR",
+          "visible_text_chars": 1061
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "3be78cc7-9d34-4c2c-a1f1-1f0f5cbeee6d",
+      "revision_id": "57f2847d-4751-4824-bd42-166dcf54bf62",
+      "seq": 95,
+      "source_id": "pboc_en_2025080815070711218",
+      "url": "https://www.pbc.gov.cn/english/130721/2025080815070711218/index.html"
+    },
+    "pboc_en_2025080815070716580": {
+      "blob_sha256": "c47da97fe1149b2ff4e34f3eceab5fde0ac128110327df8e9dd53edb063cae39",
+      "complete": true,
+      "family": "pboc_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.002,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.998,
+          "title": "FinTech developments, challenges and supervision in China Video Speech at the Singapore FinTech Festival (SFF) 2020",
+          "visible_text_chars": 9002
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "dd030583-3c68-4d4e-b64e-933f9f72c525",
+      "revision_id": "077e827a-29a8-4277-9763-b69a063bf824",
+      "seq": 96,
+      "source_id": "pboc_en_2025080815070716580",
+      "url": "https://www.pbc.gov.cn/english/130721/2025080815070716580/index.html"
+    },
+    "pboc_en_2025080815070718301": {
+      "blob_sha256": "92be780a2b142dd8bdc622c27ddf918da50e31252a11b1af56129b365afb54b3",
+      "complete": true,
+      "family": "pboc_release_en",
+      "label": {
+        "coverage": "collection_only",
+        "expected_class": "valid",
+        "facts": {
+          "cjk_share": 0.015,
+          "cyrillic_share": 0.0,
+          "en_dates_found": 0,
+          "latin_share": 0.985,
+          "title": "Deputy Governor Chen Yulu Attended the 43rd Meeting of the Central Bank Governors' Club of the Central Asia, Black Sea Region and Balkan Countries",
+          "visible_text_chars": 1145
+        },
+        "kind": "positive",
+        "split": "tuning",
+        "synthetic": false
+      },
+      "language": "en",
+      "origin_entity": "People's Bank of China",
+      "receipt_id": "13503280-887a-492f-9863-a6d967f25a7b",
+      "revision_id": "0ea1308c-319c-4b20-b375-7861dc52f261",
+      "seq": 97,
+      "source_id": "pboc_en_2025080815070718301",
+      "url": "https://www.pbc.gov.cn/english/130721/2025080815070718301/index.html"
+    }
+  }
+}

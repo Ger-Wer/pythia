@@ -243,7 +243,7 @@ def _fetch_worker(args: Dict[str, Any]) -> Dict[str, Any]:
             outgoing_headers = {
                 "Host": parsed_curr.netloc,
                 "User-Agent": USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml",
+                "Accept": "text/html, application/xhtml+xml, application/json;q=0.9, */*;q=0.5",
                 "Accept-Encoding": "gzip, deflate",
             }
             remaining = max(0.5, timeout - (time.monotonic() - start_mono))

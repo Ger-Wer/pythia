@@ -1,0 +1,75 @@
+{
+  "bundle_digest": "aa486158ddc90415fc6ddef2b2b83e49980b935a37de0f185d89e14d1253e4de",
+  "dossier": {
+    "as_of_seq": 15,
+    "dossier_version": "pythia-dossier-r3/0.3",
+    "event_descriptor": {
+      "contract_status": "incomplete",
+      "deadline": null,
+      "event_id": "fixture_corpus_r4_feed_context",
+      "provenance": "fixture",
+      "question": "Corpus R4 parent context for FOMC statement lineage.",
+      "rules": null
+    },
+    "extractor_version": "pythia-extractor-r3/0.3",
+    "fact_schema_version": "pythia-fact-r3/1.2",
+    "facts": [],
+    "manifest": {
+      "as_of_seq": 15,
+      "dossier_version": "pythia-dossier-r3/0.3",
+      "extractor_version": "pythia-extractor-r3/0.3",
+      "fact_schema_version": "pythia-fact-r3/1.2",
+      "receipt_summaries": [
+        {
+          "blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+          "complete": true,
+          "error_msg": null,
+          "fetch_completed_at": "2026-10-22T14:38:18.679476Z",
+          "fetch_started_at": "2026-10-22T14:38:18.603680Z",
+          "final_url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+          "http_status": 200,
+          "initial_url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+          "receipt_id": "49fea6a9-6061-4b8a-8da3-9c693fc06af1",
+          "recorded_at": "2026-10-22T14:38:18.729098Z",
+          "revision_id": "3c98f8f3-aad0-4e3c-a911-4657e4aa04cb",
+          "seq": 15,
+          "source_id": "fed_rss_monetary",
+          "status": "ok"
+        }
+      ],
+      "rejected_receipts": [
+        {
+          "reason": "Stored diagnostic status is 'ok' (expected 'valid')",
+          "receipt_id": "49fea6a9-6061-4b8a-8da3-9c693fc06af1",
+          "seq": 15,
+          "source_id": "fed_rss_monetary",
+          "status": "ok"
+        }
+      ],
+      "requested_receipt_ids": [
+        "49fea6a9-6061-4b8a-8da3-9c693fc06af1"
+      ],
+      "total_facts_extracted": 0,
+      "total_rejected": 1,
+      "total_requested": 1,
+      "total_verified": 1
+    },
+    "metadata": {
+      "coverage_limitations": [
+        "Only 3 canonical sources supported in R3.0 (nyfed_effr, fed_monetary_rss, fed_speeches_rss).",
+        "Background and contextual evidence only; does not prove future FOMC decisions or rate targets.",
+        "Articles referenced in RSS feeds are not fetched or crawled in R3.0.",
+        "No probabilities, betting recommendations, or edge estimates provided.",
+        "No resolution text or market rules provided; contract_status is incomplete.",
+        "No event deadline specified in descriptor."
+      ],
+      "dossier_type": "context_only",
+      "evidence_status": "insufficient_direct_evidence",
+      "usable_for_forecast": false
+    },
+    "origin_groups": [],
+    "requested_receipt_ids": [
+      "49fea6a9-6061-4b8a-8da3-9c693fc06af1"
+    ]
+  }
+}

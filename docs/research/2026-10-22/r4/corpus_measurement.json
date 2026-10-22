@@ -1,0 +1,1276 @@
+{
+  "documents": {
+    "cbr_en_mrrf": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_en_mrrf"
+    },
+    "cbr_en_ruonia": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_en_ruonia"
+    },
+    "cbr_impliedcny": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_impliedcny"
+    },
+    "cbr_mkr": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_mkr"
+    },
+    "cbr_mrrf": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_mrrf"
+    },
+    "cbr_press_shell": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_shell",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [
+        "js_shell_unflagged"
+      ],
+      "source_id": "cbr_press_shell"
+    },
+    "cbr_reserves": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_reserves"
+    },
+    "cbr_rss": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_rss"
+    },
+    "cbr_ruonia": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_ruonia"
+    },
+    "cbr_swap": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "cbr_swap"
+    },
+    "ecb_art_in261008": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_in261008"
+    },
+    "ecb_art_in261020": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_in261020"
+    },
+    "ecb_art_mg261008": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_mg261008"
+    },
+    "ecb_art_pr261007": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_pr261007"
+    },
+    "ecb_art_sp261006": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261006"
+    },
+    "ecb_art_sp261013": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261013"
+    },
+    "ecb_art_sp261014": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261014"
+    },
+    "ecb_art_sp261017": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261017"
+    },
+    "ecb_art_sp261019": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261019"
+    },
+    "ecb_art_sp261021": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_art_sp261021"
+    },
+    "ecb_rss_press": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "ecb_rss_press"
+    },
+    "fed_other_bcreg20260929a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_bcreg20260929a"
+    },
+    "fed_other_bcreg20260930a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_bcreg20260930a"
+    },
+    "fed_other_bcreg20261002a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_bcreg20261002a"
+    },
+    "fed_other_enforcement20261008a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_enforcement20261008a"
+    },
+    "fed_other_enforcement20261016a": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_enforcement20261016a"
+    },
+    "fed_other_orders20260925a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_orders20260925a"
+    },
+    "fed_other_orders20261005a": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_orders20261005a"
+    },
+    "fed_other_other20261009a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_other_other20261009a"
+    },
+    "fed_rss_all": {
+      "checks": [
+        "integrity",
+        "rss_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_rss_all"
+    },
+    "fed_rss_monetary": {
+      "checks": [
+        "integrity",
+        "rss_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_rss_monetary"
+    },
+    "fed_rss_speeches": {
+      "checks": [
+        "integrity",
+        "rss_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_rss_speeches"
+    },
+    "fed_speech_barr20260929a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_barr20260929a"
+    },
+    "fed_speech_bowman20260929a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_bowman20260929a"
+    },
+    "fed_speech_bowman20261001a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_bowman20261001a"
+    },
+    "fed_speech_bowman20261006a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_bowman20261006a"
+    },
+    "fed_speech_bowman20261014a": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_bowman20261014a"
+    },
+    "fed_speech_cook20260930a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_cook20260930a"
+    },
+    "fed_speech_jefferson20261001a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_jefferson20261001a"
+    },
+    "fed_speech_waller20260928a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_waller20260928a"
+    },
+    "fed_speech_waller20261001a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_waller20261001a"
+    },
+    "fed_speech_waller20261008a": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_speech_waller20261008a"
+    },
+    "fed_stmt_20200303": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20200303"
+    },
+    "fed_stmt_20210428": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20210428"
+    },
+    "fed_stmt_20210922": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20210922"
+    },
+    "fed_stmt_20211215": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20211215"
+    },
+    "fed_stmt_20220126": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20220126"
+    },
+    "fed_stmt_20220615": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20220615"
+    },
+    "fed_stmt_20220921": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20220921"
+    },
+    "fed_stmt_20221214": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20221214"
+    },
+    "fed_stmt_20230201": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20230201"
+    },
+    "fed_stmt_20230322": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20230322"
+    },
+    "fed_stmt_20230726": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20230726"
+    },
+    "fed_stmt_20231101": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20231101"
+    },
+    "fed_stmt_20231213": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20231213"
+    },
+    "fed_stmt_20240131": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20240131"
+    },
+    "fed_stmt_20240501": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20240501"
+    },
+    "fed_stmt_20240612": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20240612"
+    },
+    "fed_stmt_20240731": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20240731"
+    },
+    "fed_stmt_20240918": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20240918"
+    },
+    "fed_stmt_20241218": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20241218"
+    },
+    "fed_stmt_20250129": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20250129"
+    },
+    "fed_stmt_20250319": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20250319"
+    },
+    "fed_stmt_20250618": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20250618"
+    },
+    "fed_stmt_20250730": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20250730"
+    },
+    "fed_stmt_20251029": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20251029"
+    },
+    "fed_stmt_20251210": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20251210"
+    },
+    "fed_stmt_20260128": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260128"
+    },
+    "fed_stmt_20260318": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260318"
+    },
+    "fed_stmt_20260429": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260429"
+    },
+    "fed_stmt_20260617": {
+      "checks": [
+        "integrity",
+        "lineage_gate"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260617"
+    },
+    "fed_stmt_20260729": {
+      "checks": [
+        "integrity",
+        "statement_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260729"
+    },
+    "fed_stmt_20260916": {
+      "checks": [
+        "integrity",
+        "statement_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fed_stmt_20260916"
+    },
+    "fomc_minutes_20251210": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fomc_minutes_20251210"
+    },
+    "fomc_minutes_20260128": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "fomc_minutes_20260128"
+    },
+    "gdpnow_page": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "gdpnow_page"
+    },
+    "github_anthropic_sdk": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_anthropic_sdk"
+    },
+    "github_deepseek_v3": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_deepseek_v3"
+    },
+    "github_langchain": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_langchain"
+    },
+    "github_llama_cpp": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_llama_cpp"
+    },
+    "github_openai_python": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_openai_python"
+    },
+    "github_transformers": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_transformers"
+    },
+    "github_vllm": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "github_vllm"
+    },
+    "hf_deepseek": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_deepseek"
+    },
+    "hf_meta_llama": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_meta_llama"
+    },
+    "hf_mistral": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_mistral"
+    },
+    "hf_model_deepseek_r1": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_model_deepseek_r1"
+    },
+    "hf_model_deepseek_v32": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_model_deepseek_v32"
+    },
+    "hf_model_qwen3": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_model_qwen3"
+    },
+    "hf_qwen": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "hf_qwen"
+    },
+    "nbs_1965449": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965449"
+    },
+    "nbs_1965465": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965465"
+    },
+    "nbs_1965476": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965476"
+    },
+    "nbs_1965477": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965477"
+    },
+    "nbs_1965512": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965512"
+    },
+    "nbs_1965609": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965609"
+    },
+    "nbs_1965611": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965611"
+    },
+    "nbs_1965612": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965612"
+    },
+    "nbs_1965613": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965613"
+    },
+    "nbs_1965614": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965614"
+    },
+    "nbs_1965615": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965615"
+    },
+    "nbs_1965616": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_1965616"
+    },
+    "nbs_en_1965466": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_en_1965466"
+    },
+    "nbs_en_1965467": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_en_1965467"
+    },
+    "nbs_en_1965499": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_en_1965499"
+    },
+    "nbs_en_1965619": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nbs_en_1965619"
+    },
+    "neg_arena": {
+      "checks": [
+        "blocked_transport"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_arena"
+    },
+    "neg_bls_cpi_page": {
+      "checks": [
+        "blocked_transport"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_bls_cpi_page"
+    },
+    "neg_bls_cpi_rss": {
+      "checks": [
+        "blocked_transport"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_bls_cpi_rss"
+    },
+    "neg_fed_404": {
+      "checks": [
+        "blocked_transport"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_fed_404"
+    },
+    "neg_syn_absurd_number": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection",
+        "oracle_bounds"
+      ],
+      "errors": [],
+      "gaps": [
+        "absurd_number_unflagged"
+      ],
+      "source_id": "neg_syn_absurd_number"
+    },
+    "neg_syn_login_wall": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_syn_login_wall"
+    },
+    "neg_syn_spa_shell": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection",
+        "oracle_shell"
+      ],
+      "errors": [],
+      "gaps": [
+        "js_shell_unflagged"
+      ],
+      "source_id": "neg_syn_spa_shell"
+    },
+    "neg_syn_syndication_a": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_syn_syndication_a"
+    },
+    "neg_syn_syndication_b": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_syn_syndication_b"
+    },
+    "neg_syn_translation_fake": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [
+        "translation_substitution"
+      ],
+      "source_id": "neg_syn_translation_fake"
+    },
+    "neg_syn_truncated_stmt": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_syn_truncated_stmt"
+    },
+    "neg_syn_undated_stmt": {
+      "checks": [
+        "integrity",
+        "statement_profile_rejection"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "neg_syn_undated_stmt"
+    },
+    "nyfed_effr25": {
+      "checks": [
+        "integrity",
+        "effr_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nyfed_effr25"
+    },
+    "nyfed_effr5": {
+      "checks": [
+        "integrity",
+        "effr_extraction"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nyfed_effr5"
+    },
+    "nyfed_sofr": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nyfed_sofr"
+    },
+    "nyfed_sofr25": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "nyfed_sofr25"
+    },
+    "pboc_2026101418371517078": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101418371517078"
+    },
+    "pboc_2026101510063698366": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101510063698366"
+    },
+    "pboc_2026101517581023878": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101517581023878"
+    },
+    "pboc_2026101614165534664": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101614165534664"
+    },
+    "pboc_2026101618323611588": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101618323611588"
+    },
+    "pboc_2026101622061793966": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101622061793966"
+    },
+    "pboc_2026101712191431436": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101712191431436"
+    },
+    "pboc_2026101715340431532": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101715340431532"
+    },
+    "pboc_2026101718262172570": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101718262172570"
+    },
+    "pboc_2026101916082228353": {
+      "checks": [
+        "integrity",
+        "collection_facts",
+        "oracle_language"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_2026101916082228353"
+    },
+    "pboc_en_2025080815070711218": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_en_2025080815070711218"
+    },
+    "pboc_en_2025080815070716580": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_en_2025080815070716580"
+    },
+    "pboc_en_2025080815070718301": {
+      "checks": [
+        "integrity",
+        "collection_facts"
+      ],
+      "errors": [],
+      "gaps": [],
+      "source_id": "pboc_en_2025080815070718301"
+    }
+  },
+  "measure_version": "pythia-corpus-measure-r4/1.0",
+  "splits": {
+    "control": {
+      "clean": 40,
+      "documents": 40,
+      "errors": {},
+      "gaps": {}
+    },
+    "tuning": {
+      "clean": 95,
+      "documents": 95,
+      "errors": {},
+      "gaps": {
+        "absurd_number_unflagged": 1,
+        "js_shell_unflagged": 2,
+        "translation_substitution": 1
+      }
+    }
+  }
+}
