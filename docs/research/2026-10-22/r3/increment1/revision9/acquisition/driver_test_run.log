@@ -1,0 +1,24 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /home/pythia/pythia-paper-channel-20261017/python/venv/bin/python
+rootdir: /home/pythia/pythia-evidence-r31
+collecting ... collected 17 items
+
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_supervisor_kills_hung_worker PASSED [  5%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_set_cookie_isolation_on_redirect PASSED [ 11%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_offsite_redirect_rejected_before_request PASSED [ 17%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_third_redirect_rejected_before_request PASSED [ 23%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_gzip_valid_and_missing_trailer PASSED [ 29%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_deflate_valid_and_missing_trailer PASSED [ 35%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_unsupported_encoding_rejected PASSED [ 41%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_decoded_body_exact_limit_and_overflow PASSED [ 47%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_default_publication_fails_closed_on_existing PASSED [ 52%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_explicit_no_clobber_metadata_only PASSED [ 58%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_killed_audit_truthful_reporting PASSED [ 64%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_outgoing_headers_actual_recording PASSED [ 70%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_url_gate_invalids PASSED [ 76%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_gzip_multi_member_fully_decoded PASSED [ 82%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_gzip_trailing_garbage_rejected PASSED [ 88%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_gzip_multi_member_combined_limit PASSED [ 94%]
+docs/research/2026-10-22/r3/increment1/revision9/acquisition/test_bounded_research_driver.py::test_kill_only_audit_no_vacuous_proofs PASSED [100%]
+
+============================= 17 passed in 10.87s ==============================

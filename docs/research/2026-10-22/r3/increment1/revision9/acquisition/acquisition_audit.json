@@ -1,0 +1,184 @@
+{
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "blob_sha256": "11440dfe75fa9ce0d06dd3be1bc4be10689ac4b99750cf70868b12f232b13a1a",
+      "bytes_stored": 84741,
+      "completed_at_utc": "2026-10-22T13:51:31.153574+00:00",
+      "content_type": "text/html",
+      "deadline_seconds": 20.0,
+      "duration_ms": 224.46,
+      "eof_complete": true,
+      "error_msg": null,
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "hops": [
+        {
+          "cookie_headers_sent": false,
+          "credential_headers_sent": false,
+          "hop_number": 1,
+          "outgoing_header_names": [
+            "Accept",
+            "Accept-Encoding",
+            "Connection",
+            "Host",
+            "User-Agent"
+          ],
+          "request_method": "GET",
+          "request_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+          "response_headers_sanitized": {
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4e8fa2aa8b9fcc9-ZRH",
+            "Connection": "keep-alive",
+            "Content-Encoding": "gzip",
+            "Content-Type": "text/html",
+            "Date": "Thu, 22 Oct 2026 13:51:31 GMT",
+            "Last-Modified": "Wed, 16 Sep 2026 18:00:17 GMT",
+            "Server": "cloudflare",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+            "Transfer-Encoding": "chunked",
+            "X-Frame-Options": "SAMEORIGIN",
+            "set-cookie": "[REDACTED_IGNORED]"
+          },
+          "response_status_code": 200,
+          "set_cookie_action": "ignored_not_stored",
+          "set_cookie_detected": true,
+          "tls_verify": true,
+          "trust_env": false
+        }
+      ],
+      "hops_count": 1,
+      "http_status": 200,
+      "killed": false,
+      "redirect_count": 0,
+      "response_headers_sanitized": {
+        "CF-Cache-Status": "HIT",
+        "CF-Ray": "a4e8fa2aa8b9fcc9-ZRH",
+        "Connection": "keep-alive",
+        "Content-Encoding": "gzip",
+        "Content-Type": "text/html",
+        "Date": "Thu, 22 Oct 2026 13:51:31 GMT",
+        "Last-Modified": "Wed, 16 Sep 2026 18:00:17 GMT",
+        "Server": "cloudflare",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "Transfer-Encoding": "chunked",
+        "X-Frame-Options": "SAMEORIGIN",
+        "set-cookie": "[REDACTED_IGNORED]"
+      },
+      "started_at_utc": "2026-10-22T13:51:30.929136+00:00",
+      "target_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "transport_outcome": "success",
+      "worker_pid": 2858418
+    },
+    {
+      "attempt_number": 2,
+      "blob_sha256": "3048b8b787b2df598d496eb0e661136b2fef9f035f62eca50d74e8cdd99ba0b5",
+      "bytes_stored": 83318,
+      "completed_at_utc": "2026-10-22T13:51:31.513324+00:00",
+      "content_type": "text/html",
+      "deadline_seconds": 20.0,
+      "duration_ms": 210.424,
+      "eof_complete": true,
+      "error_msg": null,
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "hops": [
+        {
+          "cookie_headers_sent": false,
+          "credential_headers_sent": false,
+          "hop_number": 1,
+          "outgoing_header_names": [
+            "Accept",
+            "Accept-Encoding",
+            "Connection",
+            "Host",
+            "User-Agent"
+          ],
+          "request_method": "GET",
+          "request_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+          "response_headers_sanitized": {
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4e8fa2cffdaef76-ZRH",
+            "Connection": "keep-alive",
+            "Content-Encoding": "gzip",
+            "Content-Type": "text/html",
+            "Date": "Thu, 22 Oct 2026 13:51:31 GMT",
+            "Last-Modified": "Wed, 29 Jul 2026 18:00:15 GMT",
+            "Server": "cloudflare",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+            "Transfer-Encoding": "chunked",
+            "X-Frame-Options": "SAMEORIGIN",
+            "set-cookie": "[REDACTED_IGNORED]"
+          },
+          "response_status_code": 200,
+          "set_cookie_action": "ignored_not_stored",
+          "set_cookie_detected": true,
+          "tls_verify": true,
+          "trust_env": false
+        }
+      ],
+      "hops_count": 1,
+      "http_status": 200,
+      "killed": false,
+      "redirect_count": 0,
+      "response_headers_sanitized": {
+        "CF-Cache-Status": "HIT",
+        "CF-Ray": "a4e8fa2cffdaef76-ZRH",
+        "Connection": "keep-alive",
+        "Content-Encoding": "gzip",
+        "Content-Type": "text/html",
+        "Date": "Thu, 22 Oct 2026 13:51:31 GMT",
+        "Last-Modified": "Wed, 29 Jul 2026 18:00:15 GMT",
+        "Server": "cloudflare",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "Transfer-Encoding": "chunked",
+        "X-Frame-Options": "SAMEORIGIN",
+        "set-cookie": "[REDACTED_IGNORED]"
+      },
+      "started_at_utc": "2026-10-22T13:51:31.302919+00:00",
+      "target_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "transport_outcome": "success",
+      "worker_pid": 2858419
+    }
+  ],
+  "audit_utc": "2026-10-22T13:51:31.545198+00:00",
+  "audit_version": "pythia-acquisition-audit-r319/1.0",
+  "driver_version": "pythia-bounded-research-driver-r319/1.0",
+  "execution_summary": {
+    "killed_workers_count": 0,
+    "known_hops_executed": 2,
+    "run_completed_at_utc": "2026-10-22T13:51:31.545198+00:00",
+    "run_started_at_utc": "2026-10-22T13:51:30.813355+00:00",
+    "successful_targets": 2,
+    "total_attempts_made": 2,
+    "total_duration_ms": 731.859,
+    "total_hops_executed": 2,
+    "total_targets": 2
+  },
+  "fresh_transport_verdict": "VERIFIED_BOUNDED_RESEARCH",
+  "proven_conditions": {
+    "body_limit_enforced": true,
+    "cookie_isolation_on_each_hop": true,
+    "discrete_attempt_counters_recorded": true,
+    "discrete_eof_verified": true,
+    "https_enforced": true,
+    "no_clobber_verified": true,
+    "process_supervisor_active": true,
+    "tls_verified": true
+  },
+  "run_id": "run-20261022-135130-2858417",
+  "supervisor_configuration": {
+    "allowed_domains": [
+      "federalreserve.gov",
+      "www.federalreserve.gov"
+    ],
+    "https_only": true,
+    "max_attempts_per_url": 2,
+    "max_decoded_bytes": 2097152,
+    "max_redirects_per_attempt": 2,
+    "max_total_attempts": 4,
+    "no_clobber_enforced": true,
+    "supervisor_budget_seconds": 100.0,
+    "tls_verify": true,
+    "trust_env": false,
+    "worker_timeout_seconds": 20.0
+  }
+}

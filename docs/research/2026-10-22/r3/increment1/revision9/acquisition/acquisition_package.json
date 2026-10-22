@@ -1,0 +1,100 @@
+{
+  "audit_sha256": "5ac242215c4ac34d2ad80378eb62bc9a3663dd9d011da04d8385df1233baa9ba",
+  "driver_version": "pythia-bounded-research-driver-r319/1.0",
+  "fixtures": [
+    {
+      "bundle_digest": "a5e650b7191fae4cd2bef0ffc62a15b2c9b960248dc81e1873e063bcb9c0d3cf",
+      "bundle_file": "statement_bundle_a5e650b7191fae4cd2bef0ffc62a15b2c9b960248dc81e1873e063bcb9c0d3cf.json",
+      "collected_at": "2026-10-22T13:51:31.182766+00:00",
+      "comparison_with_prior_revision8": {
+        "all_display_texts_and_offsets_equal": true,
+        "core_statement_paragraphs_raw_and_display_equal": true,
+        "fresh_revision9_raw_bytes": 84741,
+        "fresh_revision9_raw_sha256": "11440dfe75fa9ce0d06dd3be1bc4be10689ac4b99750cf70868b12f232b13a1a",
+        "markup_difference_cause": "Cloudflare edge Zaraz script nonce in <head>, token params at footer, and email-protection tokens (/cdn-cgi/l/email-protection#...) in share-link and ancillary media paragraph inside #article rotate per HTTP response. Core substantive statement paragraphs (0-3) and all display texts are 100% identical.",
+        "prior_revision8_raw_bytes": 84741,
+        "prior_revision8_raw_sha256": "e3308825cc5285fe31df36d5f0abff5b96275758ceb038b3658ba6c6198cf314",
+        "sha_matches": false,
+        "size_delta_bytes": 0
+      },
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "fixture_key": "monetary20260916a",
+      "manifest_file": "manifest_monetary20260916a.json",
+      "manifest_sha256": "e9fb6176f53cfabc1d1c4768c9eab46a8f723fd0fe0b6987519ec80122602c43",
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-b7cdc057cc6ec28d",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[3]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-09-16T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 16 Sep 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "preview_file": "statement_preview_monetary20260916a.md",
+      "preview_note_file": "statement_preview_monetary20260916a_note.md",
+      "raw_bytes_stored": 84741,
+      "raw_file": "raw_monetary20260916a.html",
+      "raw_sha256": "11440dfe75fa9ce0d06dd3be1bc4be10689ac4b99750cf70868b12f232b13a1a",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm"
+    },
+    {
+      "bundle_digest": "207279edad56df99967461e4bcc31e929a0a2f0847109f40ffdfaf8f2f19838a",
+      "bundle_file": "statement_bundle_207279edad56df99967461e4bcc31e929a0a2f0847109f40ffdfaf8f2f19838a.json",
+      "collected_at": "2026-10-22T13:51:31.542345+00:00",
+      "comparison_with_prior_revision8": {
+        "all_display_texts_and_offsets_equal": true,
+        "core_statement_paragraphs_raw_and_display_equal": true,
+        "fresh_revision9_raw_bytes": 83318,
+        "fresh_revision9_raw_sha256": "3048b8b787b2df598d496eb0e661136b2fef9f035f62eca50d74e8cdd99ba0b5",
+        "markup_difference_cause": "Cloudflare edge Zaraz script nonce in <head>, token params at footer, and email-protection tokens (/cdn-cgi/l/email-protection#...) in share-link and ancillary media paragraph inside #article rotate per HTTP response. Core substantive statement paragraphs (0-4) and all display texts are 100% identical.",
+        "prior_revision8_raw_bytes": 83318,
+        "prior_revision8_raw_sha256": "4561cbc921a36cbc61fdd90118d7c703cf73866e73f5781d1c4bb31057770195",
+        "sha_matches": false,
+        "size_delta_bytes": 0
+      },
+      "final_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "fixture_key": "monetary20260729a",
+      "manifest_file": "manifest_monetary20260729a.json",
+      "manifest_sha256": "f5056096ba276b5a6889e1ced6fb4eb2ab62c9f92a037bb98c62e793e3dbfbfa",
+      "parent_feed_reference": {
+        "archive_name": "live-r2-revision3",
+        "feed_blob_sha256": "69b638039ee490f01aea90ac4623d67f9041273322daa48a262c50fed94ca2b1",
+        "feed_fact_id": "fact-23bc4c0fc0243b9e",
+        "feed_item_locator": {
+          "path": "/rss/channel/item[7]",
+          "type": "xml_xpath"
+        },
+        "feed_published_at": "2026-07-29T18:00:00+00:00",
+        "feed_raw_pub_date": "Wed, 29 Jul 2026 18:00:00 GMT",
+        "parent_bundle_as_of_seq": 8,
+        "parent_bundle_digest": "cfa3f1f595092ba236949974a66710c5962d5b9c9cf42515dba21d58f98a3cde",
+        "receipt_id": "39bf5ee5-5918-489f-b9e1-dfcfcfbce96b",
+        "revision_id": "26b40558-1014-47f2-9b10-d7b8007a07d0",
+        "seq": 2
+      },
+      "preview_file": "statement_preview_monetary20260729a.md",
+      "preview_note_file": "statement_preview_monetary20260729a_note.md",
+      "raw_bytes_stored": 83318,
+      "raw_file": "raw_monetary20260729a.html",
+      "raw_sha256": "3048b8b787b2df598d496eb0e661136b2fef9f035f62eca50d74e8cdd99ba0b5",
+      "source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm"
+    }
+  ],
+  "fresh_transport_status": "VERIFIED_BOUNDED_RESEARCH",
+  "generated_at_utc": "2026-10-22T13:51:31.545198+00:00",
+  "historical_acquisition_status_note": "Fresh transport verification applies to this bounded re-acquisition run with proven compressed EOF. Historical acquisition from 2026-10-19 remains honestly declared PARTIAL.",
+  "known_hops": 2,
+  "package_version": "pythia-acquisition-package-r319/1.0",
+  "prior_audit_reference": "docs/research/2026-10-21/r3/increment1/revision8/acquisition/acquisition_audit.json",
+  "prior_fixture_acquisition_status": "PARTIAL",
+  "run_id": "run-20261022-135130-2858417",
+  "total_attempts": 2,
+  "total_hops": 2
+}
