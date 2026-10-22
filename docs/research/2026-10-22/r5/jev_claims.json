@@ -1,0 +1,562 @@
+[
+ {
+  "id": "fed_stmt_20200303:support",
+  "source": "fed_stmt_20200303",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its March 3, 2020 statement, the FOMC announced a target range for the federal funds rate of 1 to 1-1/4 percent.",
+  "numbers": [
+   "1",
+   "1-1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20200303:contradiction",
+  "source": "fed_stmt_20200303",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its March 3, 2020 statement, the FOMC announced a target range for the federal funds rate of 1-1/2 to 1-3/4 percent.",
+  "numbers": [
+   "1-1/2",
+   "1-3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20200303:insufficient",
+  "source": "fed_stmt_20200303",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its March 3, 2020 statement, the FOMC published a median projection of 2.4 percent for PCE inflation in 2021.",
+  "numbers": [
+   "2.4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20200303:context",
+  "source": "fed_stmt_20200303",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 3 2020, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20211215:support",
+  "source": "fed_stmt_20211215",
+  "split": "control",
+  "expected": "support",
+  "text": "In its December 15, 2021 statement, the FOMC announced a target range for the federal funds rate of 0 to 1/4 percent.",
+  "numbers": [
+   "0",
+   "1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20211215:contradiction",
+  "source": "fed_stmt_20211215",
+  "split": "control",
+  "expected": "contradiction",
+  "text": "In its December 15, 2021 statement, the FOMC announced a target range for the federal funds rate of 1/2 to 3/4 percent.",
+  "numbers": [
+   "1/2",
+   "3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20211215:insufficient",
+  "source": "fed_stmt_20211215",
+  "split": "control",
+  "expected": "insufficient",
+  "text": "In its December 15, 2021 statement, the FOMC published a median projection of 1.4 percent for PCE inflation in 2022.",
+  "numbers": [
+   "1.4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20211215:context",
+  "source": "fed_stmt_20211215",
+  "split": "control",
+  "expected": "context_only",
+  "text": "In a public speech in 15 2021, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20220615:support",
+  "source": "fed_stmt_20220615",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its June 15, 2022 statement, the FOMC announced a target range for the federal funds rate of 1-1/2 to 1-3/4 percent.",
+  "numbers": [
+   "1-1/2",
+   "1-3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220615:contradiction",
+  "source": "fed_stmt_20220615",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its June 15, 2022 statement, the FOMC announced a target range for the federal funds rate of 2 to 2-1/4 percent.",
+  "numbers": [
+   "2",
+   "2-1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220615:insufficient",
+  "source": "fed_stmt_20220615",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its June 15, 2022 statement, the FOMC published a median projection of 2.9 percent for PCE inflation in 2023.",
+  "numbers": [
+   "2.9"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220615:context",
+  "source": "fed_stmt_20220615",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 15 2022, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20220921:support",
+  "source": "fed_stmt_20220921",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its September 21, 2022 statement, the FOMC announced a target range for the federal funds rate of 3 to 3-1/4 percent.",
+  "numbers": [
+   "3",
+   "3-1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220921:contradiction",
+  "source": "fed_stmt_20220921",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its September 21, 2022 statement, the FOMC announced a target range for the federal funds rate of 3-1/2 to 3-3/4 percent.",
+  "numbers": [
+   "3-1/2",
+   "3-3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220921:insufficient",
+  "source": "fed_stmt_20220921",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its September 21, 2022 statement, the FOMC published a median projection of 4.3 percent for PCE inflation in 2023.",
+  "numbers": [
+   "4.3"
+  ]
+ },
+ {
+  "id": "fed_stmt_20220921:context",
+  "source": "fed_stmt_20220921",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 21 2022, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20230201:support",
+  "source": "fed_stmt_20230201",
+  "split": "control",
+  "expected": "support",
+  "text": "In its February 1, 2023 statement, the FOMC announced a target range for the federal funds rate of 4-1/2 to 4-3/4 percent.",
+  "numbers": [
+   "4-1/2",
+   "4-3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230201:contradiction",
+  "source": "fed_stmt_20230201",
+  "split": "control",
+  "expected": "contradiction",
+  "text": "In its February 1, 2023 statement, the FOMC announced a target range for the federal funds rate of 5 to 5-1/4 percent.",
+  "numbers": [
+   "5",
+   "5-1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230201:insufficient",
+  "source": "fed_stmt_20230201",
+  "split": "control",
+  "expected": "insufficient",
+  "text": "In its February 1, 2023 statement, the FOMC published a median projection of 5.8 percent for PCE inflation in 2024.",
+  "numbers": [
+   "5.8"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230201:context",
+  "source": "fed_stmt_20230201",
+  "split": "control",
+  "expected": "context_only",
+  "text": "In a public speech in 1 2023, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20230726:support",
+  "source": "fed_stmt_20230726",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its July 26, 2023 statement, the FOMC announced a target range for the federal funds rate of 5-1/4 to 5-1/2 percent.",
+  "numbers": [
+   "5-1/4",
+   "5-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230726:contradiction",
+  "source": "fed_stmt_20230726",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its July 26, 2023 statement, the FOMC announced a target range for the federal funds rate of 5-3/4 to 6 percent.",
+  "numbers": [
+   "5-3/4",
+   "6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230726:insufficient",
+  "source": "fed_stmt_20230726",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its July 26, 2023 statement, the FOMC published a median projection of 6.6 percent for PCE inflation in 2024.",
+  "numbers": [
+   "6.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20230726:context",
+  "source": "fed_stmt_20230726",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 26 2023, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20231213:support",
+  "source": "fed_stmt_20231213",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its December 13, 2023 statement, the FOMC announced a target range for the federal funds rate of 5-1/4 to 5-1/2 percent.",
+  "numbers": [
+   "5-1/4",
+   "5-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20231213:contradiction",
+  "source": "fed_stmt_20231213",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its December 13, 2023 statement, the FOMC announced a target range for the federal funds rate of 5-3/4 to 6 percent.",
+  "numbers": [
+   "5-3/4",
+   "6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20231213:insufficient",
+  "source": "fed_stmt_20231213",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its December 13, 2023 statement, the FOMC published a median projection of 6.6 percent for PCE inflation in 2024.",
+  "numbers": [
+   "6.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20231213:context",
+  "source": "fed_stmt_20231213",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 13 2023, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20240501:support",
+  "source": "fed_stmt_20240501",
+  "split": "control",
+  "expected": "support",
+  "text": "In its May 1, 2024 statement, the FOMC announced a target range for the federal funds rate of 5-1/4 to 5-1/2 percent.",
+  "numbers": [
+   "5-1/4",
+   "5-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240501:contradiction",
+  "source": "fed_stmt_20240501",
+  "split": "control",
+  "expected": "contradiction",
+  "text": "In its May 1, 2024 statement, the FOMC announced a target range for the federal funds rate of 5-3/4 to 6 percent.",
+  "numbers": [
+   "5-3/4",
+   "6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240501:insufficient",
+  "source": "fed_stmt_20240501",
+  "split": "control",
+  "expected": "insufficient",
+  "text": "In its May 1, 2024 statement, the FOMC published a median projection of 6.6 percent for PCE inflation in 2025.",
+  "numbers": [
+   "6.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240501:context",
+  "source": "fed_stmt_20240501",
+  "split": "control",
+  "expected": "context_only",
+  "text": "In a public speech in 1 2024, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20240918:support",
+  "source": "fed_stmt_20240918",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its September 18, 2024 statement, the FOMC announced a target range for the federal funds rate of 4-3/4 to 5 percent.",
+  "numbers": [
+   "4-3/4",
+   "5"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240918:contradiction",
+  "source": "fed_stmt_20240918",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its September 18, 2024 statement, the FOMC announced a target range for the federal funds rate of 5-1/4 to 5-1/2 percent.",
+  "numbers": [
+   "5-1/4",
+   "5-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240918:insufficient",
+  "source": "fed_stmt_20240918",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its September 18, 2024 statement, the FOMC published a median projection of 6.1 percent for PCE inflation in 2025.",
+  "numbers": [
+   "6.1"
+  ]
+ },
+ {
+  "id": "fed_stmt_20240918:context",
+  "source": "fed_stmt_20240918",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 18 2024, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20241218:support",
+  "source": "fed_stmt_20241218",
+  "split": "control",
+  "expected": "support",
+  "text": "In its December 18, 2024 statement, the FOMC announced a target range for the federal funds rate of 4-1/4 to 4-1/2 percent.",
+  "numbers": [
+   "4-1/4",
+   "4-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20241218:contradiction",
+  "source": "fed_stmt_20241218",
+  "split": "control",
+  "expected": "contradiction",
+  "text": "In its December 18, 2024 statement, the FOMC announced a target range for the federal funds rate of 4-3/4 to 5 percent.",
+  "numbers": [
+   "4-3/4",
+   "5"
+  ]
+ },
+ {
+  "id": "fed_stmt_20241218:insufficient",
+  "source": "fed_stmt_20241218",
+  "split": "control",
+  "expected": "insufficient",
+  "text": "In its December 18, 2024 statement, the FOMC published a median projection of 5.6 percent for PCE inflation in 2025.",
+  "numbers": [
+   "5.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20241218:context",
+  "source": "fed_stmt_20241218",
+  "split": "control",
+  "expected": "context_only",
+  "text": "In a public speech in 18 2024, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20250319:support",
+  "source": "fed_stmt_20250319",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its March 19, 2025 statement, the FOMC announced a target range for the federal funds rate of 4-1/4 to 4-1/2 percent.",
+  "numbers": [
+   "4-1/4",
+   "4-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250319:contradiction",
+  "source": "fed_stmt_20250319",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its March 19, 2025 statement, the FOMC announced a target range for the federal funds rate of 4-3/4 to 5 percent.",
+  "numbers": [
+   "4-3/4",
+   "5"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250319:insufficient",
+  "source": "fed_stmt_20250319",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its March 19, 2025 statement, the FOMC published a median projection of 5.6 percent for PCE inflation in 2026.",
+  "numbers": [
+   "5.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250319:context",
+  "source": "fed_stmt_20250319",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 19 2025, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20250618:support",
+  "source": "fed_stmt_20250618",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its June 18, 2025 statement, the FOMC announced a target range for the federal funds rate of 4-1/4 to 4-1/2 percent.",
+  "numbers": [
+   "4-1/4",
+   "4-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250618:contradiction",
+  "source": "fed_stmt_20250618",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its June 18, 2025 statement, the FOMC announced a target range for the federal funds rate of 4-3/4 to 5 percent.",
+  "numbers": [
+   "4-3/4",
+   "5"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250618:insufficient",
+  "source": "fed_stmt_20250618",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its June 18, 2025 statement, the FOMC published a median projection of 5.6 percent for PCE inflation in 2026.",
+  "numbers": [
+   "5.6"
+  ]
+ },
+ {
+  "id": "fed_stmt_20250618:context",
+  "source": "fed_stmt_20250618",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 18 2025, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20260729:support",
+  "source": "fed_stmt_20260729",
+  "split": "tuning",
+  "expected": "support",
+  "text": "In its July 29, 2026 statement, the FOMC announced a target range for the federal funds rate of 3-1/2 to 3-3/4 percent.",
+  "numbers": [
+   "3-1/2",
+   "3-3/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260729:contradiction",
+  "source": "fed_stmt_20260729",
+  "split": "tuning",
+  "expected": "contradiction",
+  "text": "In its July 29, 2026 statement, the FOMC announced a target range for the federal funds rate of 4 to 4-1/4 percent.",
+  "numbers": [
+   "4",
+   "4-1/4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260729:insufficient",
+  "source": "fed_stmt_20260729",
+  "split": "tuning",
+  "expected": "insufficient",
+  "text": "In its July 29, 2026 statement, the FOMC published a median projection of 4.8 percent for PCE inflation in 2027.",
+  "numbers": [
+   "4.8"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260729:context",
+  "source": "fed_stmt_20260729",
+  "split": "tuning",
+  "expected": "context_only",
+  "text": "In a public speech in 29 2026, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ },
+ {
+  "id": "fed_stmt_20260916:support",
+  "source": "fed_stmt_20260916",
+  "split": "control",
+  "expected": "support",
+  "text": "In its September 16, 2026 statement, the FOMC announced a target range for the federal funds rate of 3-3/4 to 4 percent.",
+  "numbers": [
+   "3-3/4",
+   "4"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260916:contradiction",
+  "source": "fed_stmt_20260916",
+  "split": "control",
+  "expected": "contradiction",
+  "text": "In its September 16, 2026 statement, the FOMC announced a target range for the federal funds rate of 4-1/4 to 4-1/2 percent.",
+  "numbers": [
+   "4-1/4",
+   "4-1/2"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260916:insufficient",
+  "source": "fed_stmt_20260916",
+  "split": "control",
+  "expected": "insufficient",
+  "text": "In its September 16, 2026 statement, the FOMC published a median projection of 5.1 percent for PCE inflation in 2027.",
+  "numbers": [
+   "5.1"
+  ]
+ },
+ {
+  "id": "fed_stmt_20260916:context",
+  "source": "fed_stmt_20260916",
+  "split": "control",
+  "expected": "context_only",
+  "text": "In a public speech in 16 2026, a Federal Reserve governor described the labor market as having cooled notably since the previous meeting.",
+  "numbers": []
+ }
+]

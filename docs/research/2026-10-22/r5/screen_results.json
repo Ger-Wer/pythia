@@ -1,0 +1,938 @@
+{
+ "gate": "layerA",
+ "by_split": {
+  "tuning": {
+   "docs": 95,
+   "false_rejects": [],
+   "missed": [],
+   "caught": 8,
+   "out_of_scope": 2,
+   "ok": 85
+  },
+  "control": {
+   "docs": 40,
+   "false_rejects": [],
+   "missed": [],
+   "caught": 3,
+   "out_of_scope": 0,
+   "ok": 37
+  }
+ },
+ "results": {
+  "cbr_en_mrrf": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "2e0721e021a5f28044c06e42fc12344cf498a7a13e7f4dafbc62d33bab286a15",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_en_ruonia": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "a3b9c4af47888df6e71aece449e05a6aece8b0db6f0e01b122db1d63d0ba22a7",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_impliedcny": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "shell_suspect",
+     "severity": "review",
+     "detail": "no article paragraph and no data table; only boilerplate-like prose blocks"
+    }
+   ],
+   "fingerprint": "3cbe687d6d22803e0d6b15c997e115bc25fd5dd09059eb5dc8a8f101f5df3366",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_mkr": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "f94812d118c960872ec9a299593c83909795ae3c1e866c04281aab1eb19ab5de",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_mrrf": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "bc817489b4761a31e323ea3e69b3ae5af0475944ed5a21bc161a11edb9e54cb3",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_press_shell": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "shell_suspect",
+     "severity": "review",
+     "detail": "no article paragraph and no data table; only boilerplate-like prose blocks"
+    }
+   ],
+   "fingerprint": "b0a3c37aa5014d0fdad5bb58aea56fa4c6312be56e8fb436db1d18052bdf5001",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_reserves": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "46acf29ad497c022fe501fe47cc974c23e44e3fdd9dc0b3089f9376600689c16",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_rss": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "b1a83cf7858f61c8469c66542ba61880219c7a03c265dabab0443cb8a621c269",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_ruonia": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "2ef539079a302f90cb5913b88de8c49551c06935ae820605471c5bcdeb125c85",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "cbr_swap": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "2af2ac2e10e7fb150db257f4853e5e95f04deafc489302e09682bb607e335c02",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_in261008": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c90ed88496d788a1a4d4220156e981fbdc5b2fe858dad159dbae95dc7f189c79",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_in261020": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "edf0a16de97621edfd07c2bfbd229d37758cacff910f4d4d5d3603beb1d02855",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_mg261008": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "f6885a822572eb240b0350f5bbcca6c5dab1ca080b8719e3bd66b29cd239bec1",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_pr261007": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "1af33b915d74df6f757f95700ad8e76a9cec57d297b5031ce8a91c66d62ba72c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261006": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "3125feda159b698b15d0014be6b2a0f2a5f5fbe245d72e905a9007c435e6e746",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261013": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "d20451e3097ac1e4f6d5520747e2127f393e0016bc276e9c5a4c4ef430040b16",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261014": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "8f828154b5df3dfe6fa5542f7fdf7e9dfcfd10776850a5feb229e4ac2add499c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261017": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "6cd1388622ff675e2755c0449f7ebc0cb3cc4037fe961a4a4129addc1c775c6d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261019": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c81c869a9ac314204dd3ab595eadeba0360785d45cca5cf99e37a43c6a2876ae",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_art_sp261021": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "bf5d4f4c102af9011d68c6d40de1ba83864f2e583f83cbe125a8d46361910e37",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "ecb_rss_press": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "ccfd1d785dae539504aaee58cacf9f741bac4b349e1954ce4c6bdc10e6ec6164",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_bcreg20260929a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "506c199dfaa288288e071176e996f311ef9c74e68bf217c3fe9d7259c7541b55",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_bcreg20260930a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "d5fb64dae4b36b9d829ff9cb8a4c2149bab3bd3d6d11aa75e7de7bf32fa7fccf",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_bcreg20261002a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "5c1b566b0c714c288d8dd63e807f3f8acd6d5c2b1c451ae86b1f23334868e1c6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_enforcement20261008a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "cc39491b2c1c2ca4eb5891f0a60ae78630d6ffdd01c7abbf1d96afc6f85e8807",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_enforcement20261016a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c8936b419f3a85d40c7ac1e99cfccbc6187b2a4dcda0be6a2bf391a5976f54a2",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_orders20260925a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "9ac7594e5e294cec10718c9a568ccbc9eeef1186a8a5f06049cd33d656423326",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_orders20261005a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "8c7cccd893f5dc24454e210802f18079cf4e1dc4c6d095b9546237fe07c63c47",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_other_other20261009a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "de0a7c1544217776853c8163400b4597660e6b12644aab3654a95c56fc7210db",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_rss_all": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "2d870e568571495a277eb0b3b275d56c6d1297cf3ba5b6100778f0798db48b2d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_rss_monetary": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "091a51a6abdae85a3e2991f7e38f94ff4bb9219525a62b2a67e3b90e9f582fa9",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_rss_speeches": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "332e2898ceb3c6ca002bddf9a0d96f53e58a2899ec1df9c5955cc966360c030b",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_barr20260929a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "4c6385fdeb7f48464226b61a288e1da1a3663053e272aea2cc027fa13aa6f435",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_bowman20260929a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "1a6343095f19d965495d9e21ffba7608f2a223c84462a774f333d33f05c1d9c0",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_bowman20261001a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "7074cf023ae21e3bdbdda9675eda69cdd21a927a0f676dbe3ae0a325af3a9192",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_bowman20261006a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "64be4669c87fabe9c2e5b1696649a255830bfa31a1b31e71caa64e98b46f0664",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_bowman20261014a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "075dc3c19c351017fbcd5202974944f723609d79ac20c214972d3c2aed661b4c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_cook20260930a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "d5ebad08d8e8ed7a5fd6032826447c5bc5bfcd7c16d5ce20acf8e6cab7f558cd",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_jefferson20261001a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "2563d6f04ed8545a7e3507f457f10f38bf7a112e0dfca9e6ae34acf83c26af65",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_waller20260928a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "d32f2ada5166a08ed048f59fc3332e0ab1dac83defc47fde47d8e83c9e65b847",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_waller20261001a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "9ef9f541ce09e96f3f8583e5e5a102f8ff7f3b200a7485d423b18b91a450bd60",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_speech_waller20261008a": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "cdf78414c5ffa7160cea4711d3f0f34a4969a2c969e5cd0cd495fb426a01292f",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20200303": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e3a39fbc7e526dfc3183d36167de944ea5da3cce246684ae53d03d97c5a404a8",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20210428": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c94b3e865b7ba8df1fde913695a88fb31a445c83b3271359c94862f7ad86e907",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20210922": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "fc49531917566c28aefd502a29df93036099476f576daf49f24f81048be4ba73",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20211215": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "34608f8c801934f7bdb9909b9e93332c358b98c184762856ee57fda3707faab3",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20220126": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "3ca5c1430141d219ad129f5b1bef617cd9f684a04cdc4d4e209b63643a315294",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20220615": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e9ce1977e348f2613645ede647736d949d054ca84c090350f637e42d87b1e104",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20220921": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "bc770c69b73a70bf91d0e3fb257b5827cb12968a201302ac5602eae38c7479e3",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20221214": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e4ea3f290dca5775c9a7b87b023221fc0a3fe629325e10091e42dc6728c1791e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20230201": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "5774d447a68b1f57762ef901fd90592cacba72889eb3f4056cc39275ef6836c8",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20230322": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "ff347edeff1db87d518d15463532b9455ae47406d7f0b613f014ad9287378e22",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20230726": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "11ae3efbb3d1c90fe64c18635495528727e14cf2d8b29aed60d25c8cd9e4b3ed",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20231101": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "59ab0efbdeb8e3a243f1445e98e74b2307e7a4a9ddaecd1edaed3e449e13c6ed",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20231213": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "dbeb2ce34b3209789df404440e9588f2e4fb2811b97f21f01b8cd9aa4e50bada",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20240131": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "12a648b894fd4b7eb5071ee81d24c3aa761f5875a166bee528a51945396f6c21",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20240501": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "cbbf79c39973ccf0936b0508643d5fed4043324d13849f8e17b1a905baf9f5c2",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20240612": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "91c07b8877eb599c25b41ba9770d12d1dde9cfda07751e807b039340fe9c71ec",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20240731": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "fb5c518de53c929cf35bca672d6f288f848456f91313500f32be09faf70b73de",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20240918": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "35f10a39f0ddd728c3d4f126909abc939a6078a4248935de909a45542e97a261",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20241218": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "4b043d1ffa0468338e8d79ac889b858d8556d240d897dc65eb06619681550bd9",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20250129": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e9bddc30b951cf971215d2b863e04a111b6544e65989816f89e3542cfbed402d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20250319": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "1528d6f74b8c41401cc2bd145ee7b90be5d35f36d35d70bc4865f368e90b1540",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20250618": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "9ef0a7b3838198b25d1d4d486a603025e3473cd9ce1957bf304ed4337219a80d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20250730": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "015608f1fa5184ee90624da1135e8882fcc48263e27105a1c92d23031d33f5e1",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20251029": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "a7ddc64653d33b639d6ec26097663b202280f07952dd7cf5c0fed2bbf91e17cc",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20251210": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "5bd37a7afaa0014e43d3b47605726071a4b8bab04463ea6281959985addab311",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260128": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "79a25aee8cf2cb44042bab7850087529875f9a07b794ba58cdc29ff1f26f9859",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260318": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "4c03964788ea98afa9ff6d8a77a5376582846a121e280895b10c920e734e74b6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260429": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "631a996e83fb803b65a856cde45ace1d7affb1aaa6074560224e9b5683f4fc59",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260617": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "faa0ea7d8aa3eaa09b206920a48a9c08720d81e1281ac2c797f74580b17ea1dc",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260729": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "dc448c3ec94d0b6f83f8e6c0b8d491e0211ed9cb280240bdab9dcc29a81b70e5",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fed_stmt_20260916": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "713a0723904783feddaf98579b75e2b3bfd35280696e8de85a09fde6c000b4fa",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fomc_minutes_20251210": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "dfe4c695305376f40f23c36ed429ef3dd230071fecc62e7018fe670939ede8ce",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "fomc_minutes_20260128": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "0f959b6aa70f14b8cb2189cdb075d8907774d0d13352ce9f18aed8c7addfde67",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "gdpnow_page": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "73e957bcca11a95b1faa3272dfcbe05a24daa2c624b6c40052703a404a378a2e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_anthropic_sdk": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "0c2e58a46ceb6d3ccd84f629ded922191fec0fb7dda6c123c5d1395542a312b0",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_deepseek_v3": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "174c697ea734870f16c19c0507bfdd4277da13dca72cf45650fdea4e90efb06b",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_langchain": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "095bfccd487dea383d0721ec637356521b296e9f793415a25dd4bbd048304769",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_llama_cpp": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "3aafdeb10950dd0e884b520bdc23e2ce1d8aed12d783e21efb42ff98b9e1594c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_openai_python": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "ddeef07c3593019bd334c1ab2f8f8f33859d32432304427bbd303cc14dea0a1e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_transformers": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "83e37674b85fb90289330f550e005a3acede1de0593985573f3244ede937e94e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "github_vllm": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "34497f21b8895c83162a604a53827cd6eef72eac296df4dce596485607ca62d9",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_deepseek": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e8b534ca6c5399e0a975541f87cb7d380e0b6f43aec340235a3c94fce71ab56d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_meta_llama": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "57ea536e72a7b69f65d0c2ebc50d1cc7d9909b7dc82e2739daf4d5c8c8f499e8",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_mistral": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c0781027760a15734b718a42911843578e94dc5da5c653439d89fd3337910ae6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_model_deepseek_r1": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "32c43fb8227d4001bf5b3e452bea59eaa8733ccddb546a8950493bfd44575513",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_model_deepseek_v32": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "94e51355d202d472a2357fb1b24e7495e4637355611d2b738cd7d5a0db5450cd",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_model_qwen3": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c089fce4b748e04993c20f297274900b13bccface0e8ec7ced513bdd332d7b1c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "hf_qwen": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "d35892bcc37763eb618294b310b3479fdb8597399f90dca7912e1d2dcbc4fbee",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965449": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "798d3733a80860b3b632b30605f806bc008072a3631a8e37c52856fc365d7727",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965465": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "implausible_numbers",
+     "severity": "review",
+     "detail": "percent values above plausible bound: ['994%', '995%', '994%']"
+    }
+   ],
+   "fingerprint": "c777f4573a5f345138e021ca2093886262664502b96eadacb8d2ff6e40f96bc6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965476": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "5b8c6e6fa933a074a4c642523bde4831c6424e1ce10edc1c3c73b09fe09aef3c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965477": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "b8f0e6c0edf84986d2a9c0aad0820ed090596a908f41d6d86e263e039448432e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965512": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "9fabb7194602578faff49a3a646814790908466ac46cf193ebc99bf93e9d4820",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965609": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "67eeb522018d3e79a2569f233500df8464d0366c083c096e4dc2bf3c5998f278",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965611": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "985c561508ac3ef454f8897fc528d01ba7469aa8f17f1f436f50d72ead679437",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965612": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "648c0110f5a522dd7cfbacf3647bfb41b553691d2028965085c92934c9f65e1e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965613": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "f6ebf524559eb4afacf3e5ae5f7dba775f6c0a87322e607e351e67b84b554a7b",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965614": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "e82c5c6ca604eba0bdf1c419f7732964b6725ce3092ef0fcb30d02c8acecd942",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965615": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "0d934921b337f6fd1a437b202f36d25f782a5ebb8cef0a2d1aa94a934a0a0080",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_1965616": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "70439cdbd84c718b6cdf6320a34fd450610bd02304f4465df73c542b80434d4e",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_en_1965466": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "256cc14654637289252965dfe43f9e5e0290ffeaac53233fc9af3899c95fb038",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_en_1965467": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "implausible_numbers",
+     "severity": "review",
+     "detail": "percent values above plausible bound: ['994%', '995%']"
+    }
+   ],
+   "fingerprint": "494d68b18dc38eabf94dbe6eb7e21ee369dc667bf74b679972ba316003e62714",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_en_1965499": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "56ea4589ac8fd7de56ff4211976e61765572d196de9f957e2d6882eec8dcae81",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nbs_en_1965619": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "aa6bf0de2eede8ff5cd75c685c43ea9cd86caf28fefa7eeb5bf3cd2599d3dd8a",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_arena": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "no_body",
+     "severity": "hard",
+     "detail": "no captured body (blocked or failed transport)"
+    }
+   ],
+   "fingerprint": null,
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_bls_cpi_page": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "no_body",
+     "severity": "hard",
+     "detail": "no captured body (blocked or failed transport)"
+    }
+   ],
+   "fingerprint": null,
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_bls_cpi_rss": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "no_body",
+     "severity": "hard",
+     "detail": "no captured body (blocked or failed transport)"
+    }
+   ],
+   "fingerprint": null,
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_fed_404": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "no_body",
+     "severity": "hard",
+     "detail": "no captured body (blocked or failed transport)"
+    }
+   ],
+   "fingerprint": null,
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_absurd_number": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "implausible_numbers",
+     "severity": "review",
+     "detail": "percent values above plausible bound: ['450 percent', '320 percent']"
+    },
+    {
+     "rule_id": "duplicate_origin",
+     "severity": "review",
+     "detail": "same normalized-text fingerprint as an earlier document"
+    }
+   ],
+   "fingerprint": "075dc3c19c351017fbcd5202974944f723609d79ac20c214972d3c2aed661b4c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_login_wall": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "blocked_or_challenge",
+     "severity": "hard",
+     "detail": "challenge/login marker in visible text"
+    },
+    {
+     "rule_id": "unverified_shell",
+     "severity": "hard",
+     "detail": "no paragraph >= 200 chars; total visible 27 chars"
+    }
+   ],
+   "fingerprint": "27c29d494dcf6a45cb08b92670dfdde09985444243e45c3c114583cd656b5293",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_spa_shell": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "unverified_shell",
+     "severity": "hard",
+     "detail": "no paragraph >= 200 chars; total visible 11 chars"
+    }
+   ],
+   "fingerprint": "926a368bb1aedc7d797ae17367c87c98dc7fd49f8e70f457c00b79d0498477d3",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_syndication_a": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "duplicate_origin",
+     "severity": "review",
+     "detail": "same normalized-text fingerprint as an earlier document"
+    }
+   ],
+   "fingerprint": "35f10a39f0ddd728c3d4f126909abc939a6078a4248935de909a45542e97a261",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_syndication_b": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "duplicate_origin",
+     "severity": "review",
+     "detail": "same normalized-text fingerprint as an earlier document"
+    }
+   ],
+   "fingerprint": "35f10a39f0ddd728c3d4f126909abc939a6078a4248935de909a45542e97a261",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_translation_fake": {
+   "passed": false,
+   "findings": [
+    {
+     "rule_id": "language_mismatch",
+     "severity": "hard",
+     "detail": "declared zh but cjk share is 0.00"
+    },
+    {
+     "rule_id": "duplicate_origin",
+     "severity": "review",
+     "detail": "same normalized-text fingerprint as an earlier document"
+    }
+   ],
+   "fingerprint": "256cc14654637289252965dfe43f9e5e0290ffeaac53233fc9af3899c95fb038",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_truncated_stmt": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "a6862715074169d74e692ad796100954382892a80cc8227936dea01d07e4ed1d",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "neg_syn_undated_stmt": {
+   "passed": true,
+   "findings": [
+    {
+     "rule_id": "duplicate_origin",
+     "severity": "review",
+     "detail": "same normalized-text fingerprint as an earlier document"
+    }
+   ],
+   "fingerprint": "35f10a39f0ddd728c3d4f126909abc939a6078a4248935de909a45542e97a261",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nyfed_effr25": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "a278c3fc9b7605ba6900801d242a0310bc726704e874df909eac970978c02871",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nyfed_effr5": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "98e44d63c252982919db264d31f80d1996db0cd2f0fd59fc28cb29c3c462f0c6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nyfed_sofr": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "0857c6b75a0ead6bd868f8d5a01813faa222c2a92e8277d824848d4062d59faf",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "nyfed_sofr25": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "9c1806b2350babe6fb6dee9efde70b27a39ded67ef445b42fef074965ec07b2b",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101418371517078": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "a317f1ddc59122821e011b99a612dd6fa0809aabf214d81ac6b802f3b5348fc6",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101510063698366": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "1d3ef5cd7e47a54dff5309779da9fe5b02938e50cc5d8785f1386a8f14a30976",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101517581023878": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "368df3392de17514bc2071b50f0b604b1916d15693b915da5b4d1e937415e72f",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101614165534664": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "8e224116bdcde93654b8c2efcd5710de98b2d20e996b6e0128d3d87159ca1f78",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101618323611588": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "70e67ef99abc87cb8eb9eb3a173b5e49a93699f2c11068bb86f9ee23153c19b1",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101622061793966": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "6be25e4792938e0378a6278c802203d71e5b17eb6791e56bcce9ce0acb4a90ca",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101712191431436": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "cb995a2bf762783802fd3f31db308a14312ed2947791d9f71e75c9675d51548c",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101715340431532": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "35603aa542a870ddb47c062ef6f741510b877c1c97960cac7990bd5acf7d4296",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101718262172570": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "59d739394ee64a00034a6a5aa20e61a4402c22c15b23bd6824a56a98d4290e8b",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_2026101916082228353": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "c37891a0aa9f86868336ed81d002a60299efe322978cf10738cb0b9604fdc450",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_en_2025080815070711218": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "501deba6dbb25496781b602ee85ada7f6e55c2b1b3a3561c4d4ef893dbdd48cd",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_en_2025080815070716580": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "5b601281496e363cb5a4ccbf7ba267f5b94928e0b79707c0947afd43e2113a6f",
+   "gate_version": "pythia-jev-gate/1.0"
+  },
+  "pboc_en_2025080815070718301": {
+   "passed": true,
+   "findings": [],
+   "fingerprint": "98d1a2087110287be26ad14e97e6b366782d347f9a84077d197042a7fff8a9c4",
+   "gate_version": "pythia-jev-gate/1.0"
+  }
+ }
+}
