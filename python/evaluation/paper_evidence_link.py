@@ -313,7 +313,7 @@ def main(argv=None):
     chain_cmd.add_argument("--state-dir", type=Path, required=True)
     chain_cmd.add_argument("--forecast-id", type=int, required=True)
     args = parser.parse_args(argv)
-    manifest = load_manifest(args.manifest)
+    manifest = load_manifest(getattr(args, "manifest", None))
     if args.command == "link":
         counts = link_all(args.state_dir, manifest)
         report = record_checks(args.state_dir)

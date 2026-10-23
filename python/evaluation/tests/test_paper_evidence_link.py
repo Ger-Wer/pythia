@@ -155,6 +155,28 @@ class EvidenceLinkTests(unittest.TestCase):
             db.execute("DELETE FROM forecast_links")
             db.close()
 
+    def test_chain_cli(self):
+        from python.evaluation.paper_evidence_link import main
+        import io
+        from contextlib import redirect_stdout
+        fid = self.forecast()
+        self.buy(fid)
+        self.close_state()
+        link_all(self.state, MANIFEST, now=3000)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rc = main(["chain", "--state-dir", str(self.state),
+                       "--forecast-id", str(fid)])
+        self.assertEqual(rc, 0)
+        chain = json.loads(out.getvalue())
+        self.assertEqual(chain["forecast_id"], fid)
+        self.assertEqual(chain["execution"]["kind"], "fill")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rc = main(["chain", "--state-dir", str(self.state),
+                       "--forecast-id", "999"])
+        self.assertEqual(rc, 1)
+
     def test_dry_run_reproducible_and_clean(self):
         fid = self.forecast()
         self.buy(fid)
