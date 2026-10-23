@@ -1,0 +1,105 @@
+{
+  "scores": [
+    {
+      "event_id": "fomc-2026-09-16",
+      "horizon": "T-7d",
+      "actual": "+25",
+      "audit_violations": [],
+      "model": {
+        "brier": 0.255102,
+        "log_loss": 0.441833
+      },
+      "baseline": {
+        "source": "tracker snapshot macro_20260909_0800.json",
+        "brier": 0.416378,
+        "log_loss": 0.635988
+      }
+    },
+    {
+      "event_id": "fomc-2026-09-16",
+      "horizon": "T-3d",
+      "actual": "+25",
+      "audit_violations": [],
+      "model": {
+        "brier": 0.012347,
+        "log_loss": 0.08183
+      },
+      "baseline": {
+        "source": "tracker snapshot macro_20260913_0800.json",
+        "brier": 0.099113,
+        "log_loss": 0.274944
+      }
+    },
+    {
+      "event_id": "fomc-2026-09-16",
+      "horizon": "T-1d",
+      "actual": "+25",
+      "audit_violations": [],
+      "model": {
+        "brier": 0.002551,
+        "log_loss": 0.036368
+      },
+      "baseline": {
+        "source": "tracker snapshot macro_20260915_0800.json",
+        "brier": 0.035065,
+        "log_loss": 0.157392
+      }
+    }
+  ],
+  "references": [
+    {
+      "horizon": "T-7d",
+      "incumbent_binary": {
+        "distribution": {
+          "le_-50": 0.0,
+          "-25": 0.0,
+          "0": 0.3571428571428328,
+          "+25": 0.6428571428571672,
+          "ge_+50": 0.0
+        },
+        "brier": 0.255102,
+        "log_loss": 0.441833
+      },
+      "naive_hold": {
+        "brier": 2.0,
+        "log_loss": 34.538776
+      }
+    },
+    {
+      "horizon": "T-3d",
+      "incumbent_binary": {
+        "distribution": {
+          "le_-50": 0.0,
+          "-25": 0.0,
+          "0": 0.0785714285714132,
+          "+25": 0.9214285714285868,
+          "ge_+50": 0.0
+        },
+        "brier": 0.012347,
+        "log_loss": 0.08183
+      },
+      "naive_hold": {
+        "brier": 2.0,
+        "log_loss": 34.538776
+      }
+    },
+    {
+      "horizon": "T-1d",
+      "incumbent_binary": {
+        "distribution": {
+          "le_-50": 0.0,
+          "-25": 0.0,
+          "0": 0.03571428571430957,
+          "+25": 0.9642857142856904,
+          "ge_+50": 0.0
+        },
+        "brier": 0.002551,
+        "log_loss": 0.036368
+      },
+      "naive_hold": {
+        "brier": 2.0,
+        "log_loss": 34.538776
+      }
+    }
+  ]
+}

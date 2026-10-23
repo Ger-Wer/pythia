@@ -1,0 +1,125 @@
+[
+  {
+    "schema": "pythia-forecast/1",
+    "model_version": "pythia-probability/1.0",
+    "usable_for_forecast": false,
+    "event_id": "fomc-2026-09-16",
+    "question": "FOMC rate decision at the 2026-09-16 meeting (change in bp)",
+    "meeting_date": "2026-09-16",
+    "horizon": "T-7d",
+    "horizon_date": "2026-09-09",
+    "forecast_ts": "2026-09-09T08:00:00Z",
+    "inputs": {
+      "rate_before_pct": 3.625,
+      "meeting_month_close": 96.3,
+      "close_date": "2026-09-09",
+      "next_month_close_diagnostic": 96.21
+    },
+    "diagnostics": {
+      "rate_before_pct": 3.625,
+      "rate_after_pct": 3.785714,
+      "expected_move_bp": 16.071,
+      "meeting_month_close": 96.3,
+      "close_date": "2026-09-09"
+    },
+    "distribution": {
+      "le_-50": 0.0,
+      "-25": 0.0,
+      "0": 0.3571428571428328,
+      "+25": 0.6428571428571672,
+      "ge_+50": 0.0
+    },
+    "baseline": {
+      "source": "tracker snapshot macro_20260909_0800.json",
+      "distribution": {
+        "le_-50": 0.009804,
+        "-25": 0.009804,
+        "0": 0.441176,
+        "+25": 0.529412,
+        "ge_+50": 0.009804
+      }
+    }
+  },
+  {
+    "schema": "pythia-forecast/1",
+    "model_version": "pythia-probability/1.0",
+    "usable_for_forecast": false,
+    "event_id": "fomc-2026-09-16",
+    "question": "FOMC rate decision at the 2026-09-16 meeting (change in bp)",
+    "meeting_date": "2026-09-16",
+    "horizon": "T-3d",
+    "horizon_date": "2026-09-13",
+    "forecast_ts": "2026-09-13T08:00:00Z",
+    "inputs": {
+      "rate_before_pct": 3.625,
+      "meeting_month_close": 96.2675,
+      "close_date": "2026-09-11",
+      "next_month_close_diagnostic": 96.14
+    },
+    "diagnostics": {
+      "rate_before_pct": 3.625,
+      "rate_after_pct": 3.855357,
+      "expected_move_bp": 23.036,
+      "meeting_month_close": 96.2675,
+      "close_date": "2026-09-11"
+    },
+    "distribution": {
+      "le_-50": 0.0,
+      "-25": 0.0,
+      "0": 0.0785714285714133,
+      "+25": 0.9214285714285867,
+      "ge_+50": 0.0
+    },
+    "baseline": {
+      "source": "tracker snapshot macro_20260913_0800.json",
+      "distribution": {
+        "le_-50": 0.009615,
+        "-25": 0.009615,
+        "0": 0.201923,
+        "+25": 0.759615,
+        "ge_+50": 0.019231
+      }
+    }
+  },
+  {
+    "schema": "pythia-forecast/1",
+    "model_version": "pythia-probability/1.0",
+    "usable_for_forecast": false,
+    "event_id": "fomc-2026-09-16",
+    "question": "FOMC rate decision at the 2026-09-16 meeting (change in bp)",
+    "meeting_date": "2026-09-16",
+    "horizon": "T-1d",
+    "horizon_date": "2026-09-15",
+    "forecast_ts": "2026-09-15T08:00:00Z",
+    "inputs": {
+      "rate_before_pct": 3.625,
+      "meeting_month_close": 96.2625,
+      "close_date": "2026-09-15",
+      "next_month_close_diagnostic": 96.125
+    },
+    "diagnostics": {
+      "rate_before_pct": 3.625,
+      "rate_after_pct": 3.866071,
+      "expected_move_bp": 24.107,
+      "meeting_month_close": 96.2625,
+      "close_date": "2026-09-15"
+    },
+    "distribution": {
+      "le_-50": 0.0,
+      "-25": 0.0,
+      "0": 0.03571428571430957,
+      "+25": 0.9642857142856904,
+      "ge_+50": 0.0
+    },
+    "baseline": {
+      "source": "tracker snapshot macro_20260915_0800.json",
+      "distribution": {
+        "le_-50": 0.009709,
+        "-25": 0.009709,
+        "0": 0.116505,
+        "+25": 0.854369,
+        "ge_+50": 0.009709
+      }
+    }
+  }
+]
