@@ -1,0 +1,11 @@
+{
+  "_about": "R7 evidence manifest for the FOMC meeting 2026-10-28. Assembled by the operator from accepted Evidence-line artifacts; the linker only reads it. The referenced statement bundle is the R3.1 research bundle of the previous meeting's statement (2026-09-16, monetary20260916a); its own research_metadata marks it research_sample_only_not_runtime_collected, so links made with this manifest demonstrate provenance mechanics, not production evidence. claim_ids is empty: the R3.1 bundle carries paragraphs, not claim ids. jev_verdict_ref is null: no per-statement JEV verdict exists. snapshot_origins is empty until the R6 live snapshots for this meeting exist (T-3d 2026-10-25, T-1d 2026-10-27).",
+  "meetings": {
+    "2026-10-28": {
+      "dossier_ref": "statement-bundle:c5d4fa8c368fbcc0d97fb383f51ba2901f2744cbe6e91ea812d6e7a276277da7",
+      "claim_ids": [],
+      "jev_verdict_ref": null,
+      "snapshot_origins": []
+    }
+  }
+}
