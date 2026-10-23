@@ -30,6 +30,19 @@ case "${1:-scheduler}" in
     cd /app
     python3 -m python.evaluation.paper_cycle --send
     ;;
+  paper-link)
+    if [ "${PYTHIA_PAPER_ENABLED:-0}" != "1" ]; then
+      echo "Paper link disabled; no evidence links written"
+      exit 0
+    fi
+    cd /app
+    manifest="${PYTHIA_PAPER_MANIFEST:-/app/python/evaluation/data/evidence_manifest.json}"
+    if [ -f "$manifest" ]; then
+      python3 -m python.evaluation.paper_evidence_link link --state-dir /app/python/evaluation/data/paper --manifest "$manifest"
+    else
+      python3 -m python.evaluation.paper_evidence_link link --state-dir /app/python/evaluation/data/paper
+    fi
+    ;;
   shell)
     exec /bin/bash
     ;;
