@@ -4,12 +4,15 @@ Layer A (screen_document): deterministic document screen implementing the
 data-contract section 4 quality rules (challenge pages, JS shells, language
 mismatch, implausible numbers, duplicate origin). No model, no network.
 
-Layer B (verify_claim): narrow claim verification by a judge model behind an
-injected transport. Verdicts: support / contradiction / insufficient /
-context_only. The reply must satisfy a strict JSON schema; every number in
-the claim must be checked against a cited fragment. Any schema violation is
-converted into an abstention (insufficient + schema_valid=False) — never
-into support. A JEV verdict is not an event probability.
+Layer B (verify_claim_jev): narrow claim verification by the real TypeSafe
+JEV judge (System One, model pinned in JEV_CONFIG) behind an injected
+transport. One batched call per claim: a Choice verdict (support /
+contradiction / insufficient / context_only) plus a Noul support check.
+Code enforces the R0 admission rules around it: strict answer schema,
+the owner escalation rule (confidence < 0.75 or Noul in the undecided
+band abstains), and a deterministic number check (numbers are verified
+by code, not by the judge). Any violation becomes an abstention — never
+a support. A JEV verdict is not an event probability.
 
 Frozen version: JEV_GATE_VERSION and JEV_CONFIG are stamped into every
 result. usable_for_forecast stays false everywhere by design.
@@ -27,13 +30,21 @@ from bs4 import XMLParsedAsHTMLWarning
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-JEV_GATE_VERSION = "pythia-jev-gate/1.0"
+JEV_GATE_VERSION = "pythia-jev-gate/2.0"
 JEV_CONFIG = {
     "shell_min_paragraph_chars": 200,
     "shell_max_total_chars": 3000,
     "language_min_share": 0.25,
     "max_plausible_percent": 300.0,
-    "judge_temperature": 0,
+    # Layer B judge: the real TypeSafe JEV (System One), version pinned as
+    # in the R0 research batch. Escalation rule from the HermesTrader house
+    # rules / R0: confidence below the floor, or a Noul inside the undecided
+    # band, abstains instead of deciding.
+    "judge_provider": "typesafe",
+    "judge_endpoint": "https://api.typesafe.ai/v1/systemone",
+    "judge_model": "jev-1.13.0",
+    "confidence_floor": 0.75,
+    "noul_undecided": (0.40, 0.60),
 }
 
 _CHALLENGE_MARKERS = (
@@ -236,34 +247,17 @@ def screen_document(
 
 
 # --------------------------------------------------------------------------
-# Layer B — claim verification with a strict schema
+# Layer B — claim verification by the TypeSafe JEV judge
 # --------------------------------------------------------------------------
 
 VERDICTS = ("support", "contradiction", "insufficient", "context_only")
 
-JUDGE_SYSTEM = (
-    "You are a strict evidence verifier inside a forecasting research system. "
-    "You judge ONLY from the evidence fragments provided. You never use outside knowledge. "
-    "Definitions: 'support' = the fragments directly establish the claim as written, including its numbers. "
-    "'contradiction' = the fragments directly establish that the claim as written is false (including a different number). "
-    "'insufficient' = the fragments do not contain the information needed to decide the claim. "
-    "'context_only' = the fragments are on the claim's topic and give background, but neither establish nor refute the specific assertion "
-    "(for example the claim attributes words to a different document or speaker). "
-    "Check every number in the claim against the fragments: copy numbers verbatim. "
-    "Reply with ONLY a JSON object, no markdown fences, with exactly these keys: "
-    "verdict (one of support|contradiction|insufficient|context_only), "
-    "cited_fragments (array of fragment indices you relied on), "
-    "numbers_checked (array with ONE object per number in the claim: {claim_value, evidence_value, match} — "
-    "claim_value is exactly that one number from the claim, e.g. \"4-3/4\"; evidence_value is the corresponding single number copied from a cited fragment, or null when the number is absent from the fragments; "
-    "match is true exactly when the two numbers are the same value), "
-    "reason (one short sentence)."
-)
-
-
-def build_judge_prompt(claim_text: str, fragments: list[str]) -> tuple[str, str]:
-    frag_block = "\n".join(f"[{i}] {frag}" for i, frag in enumerate(fragments))
-    user = f"CLAIM:\n{claim_text}\n\nEVIDENCE FRAGMENTS:\n{frag_block}\n\nReturn the JSON verdict now."
-    return JUDGE_SYSTEM, user
+JEV_VERDICT_CRITERIA = {
+    "support": "The evidence directly establishes the claim as written, including its numbers.",
+    "contradiction": "The evidence directly establishes that the claim as written is false, including stating a different number.",
+    "insufficient": "The evidence does not contain the information needed to decide the claim.",
+    "context_only": "The evidence is on the claim's topic and gives background, but neither establishes nor refutes the specific assertion (for example, the claim concerns a different document or speaker).",
+}
 
 
 def _norm_num(value: str | None) -> str | None:
@@ -292,8 +286,9 @@ def _fragment_numbers(fragment: str) -> set[str]:
 class ClaimVerdict:
     verdict: str
     schema_valid: bool
-    cited_fragments: list[int] = field(default_factory=list)
-    numbers_checked: list[dict] = field(default_factory=list)
+    confidence: float | None = None
+    noul: float | None = None
+    escalated: bool = False
     reason: str = ""
     model: str | None = None
     usage: dict | None = None
@@ -303,8 +298,9 @@ class ClaimVerdict:
         return {
             "verdict": self.verdict,
             "schema_valid": self.schema_valid,
-            "cited_fragments": self.cited_fragments,
-            "numbers_checked": self.numbers_checked,
+            "confidence": self.confidence,
+            "noul": self.noul,
+            "escalated": self.escalated,
             "reason": self.reason,
             "model": self.model,
             "usage": self.usage,
@@ -316,102 +312,98 @@ def _abstain(why: str) -> ClaimVerdict:
     return ClaimVerdict(verdict="insufficient", schema_valid=False, reason=f"schema_invalid: {why}")
 
 
-def parse_and_validate(reply_text: str, claim_numbers: list[str], fragments: list[str]) -> ClaimVerdict:
-    """Validate a judge reply against the strict schema and the fragments.
+def build_jev_questions(claim_text: str) -> dict:
+    """The frozen per-claim JEV batch: one Choice verdict + one Noul check."""
+    return {
+        "verdict": {
+            "type": "choice",
+            "instructions": f"Judge ONLY from the evidence text. Claim: {claim_text}",
+            "criteria": JEV_VERDICT_CRITERIA,
+        },
+        "supported": {
+            "type": "noul",
+            "instructions": f"The following claim is directly supported by the evidence text, including its numbers. Claim: {claim_text}",
+        },
+    }
 
-    Any violation becomes an abstention. 'support' additionally requires
-    every claim number to be checked with match=true against a cited
-    fragment.
+
+def _finite01(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    out = float(value)
+    if out != out or out in (float("inf"), float("-inf")) or not (0.0 <= out <= 1.0):
+        return None
+    return out
+
+
+def validate_jev_answers(answers, claim_numbers: list[str], fragments: list[str]) -> ClaimVerdict:
+    """Apply the R0 admission rules to one JEV batch response.
+
+    Schema: both answers present and well-typed; Choice in the verdict enum;
+    confidence and Noul finite in [0, 1]. Escalation: confidence below the
+    floor, or the verdict and the Noul disagreeing across the undecided
+    band, abstains. Numbers: code-verified — a support verdict requires
+    every claim number to occur in the evidence fragments.
     """
-    text = reply_text.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-z]*\n?|```$", "", text).strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end <= start:
-        return _abstain("no JSON object in reply")
-    try:
-        obj = json.loads(text[start : end + 1])
-    except json.JSONDecodeError as exc:
-        return _abstain(f"JSON parse error: {exc}")
-    if not isinstance(obj, dict):
-        return _abstain("reply is not a JSON object")
-    verdict = obj.get("verdict")
-    if verdict not in VERDICTS:
-        return _abstain(f"verdict not in enum: {verdict!r}")
-    cited = obj.get("cited_fragments")
-    if not isinstance(cited, list) or any(not isinstance(i, int) or i < 0 or i >= len(fragments) for i in cited):
-        return _abstain("cited_fragments invalid")
-    if verdict != "insufficient" and not cited:
-        return _abstain("non-abstaining verdict cites no fragment")
-    checked = obj.get("numbers_checked")
-    if not isinstance(checked, list):
-        return _abstain("numbers_checked missing")
-    cited_numbers: set[str] = set()
-    for i in cited:
-        cited_numbers |= _fragment_numbers(fragments[i])
-
-    def _tokens(value) -> set[str]:
-        if value is None:
-            return set()
-        return {_norm_num(tok) for tok in _NUMBER_TOKEN_RE.findall(_hyphen_norm(str(value)))}
-
-    covered: dict[str, bool] = {}
-    for item in checked:
-        if not isinstance(item, dict) or "claim_value" not in item or "match" not in item:
-            return _abstain("numbers_checked item malformed")
-        claim_tokens = _tokens(item["claim_value"])
-        if not claim_tokens:
-            claim_tokens = {_norm_num(item["claim_value"]) or str(item["claim_value"])}
-        ev = item.get("evidence_value")
-        ev_tokens = _tokens(ev)
-        if ev is not None and not ev_tokens <= cited_numbers:
-            return _abstain(f"evidence_value {ev!r} not found in cited fragments")
-        # Per-token truth is computed here, not taken from the judge: a claim
-        # token matches when it appears among the evidence entry's tokens
-        # (an evidence value may be a whole phrase, e.g. a range). The
-        # judge's own match flag must agree with "all claim tokens found".
-        expected_match = ev is not None and all(tok in ev_tokens for tok in claim_tokens)
-        if bool(item["match"]) != expected_match:
-            bad = _abstain(
-                f"match flag inconsistent with values: claim_value={item['claim_value']!r} "
-                f"evidence_value={ev!r} judge_match={item['match']} computed={expected_match}"
-            )
-            bad.numbers_checked = checked
-            return bad
-        for tok in claim_tokens:
-            covered[tok] = ev is not None and tok in ev_tokens
-    for num in claim_numbers:
-        if (_norm_num(num) or num) not in covered:
-            return _abstain(f"claim number {num!r} was not checked")
-    if verdict == "support":
-        for num in claim_numbers:
-            if not covered[_norm_num(num) or num]:
-                return _abstain("support verdict with an unmatched claim number")
-    reason = obj.get("reason")
-    if not isinstance(reason, str) or not reason.strip():
-        return _abstain("reason missing")
-    return ClaimVerdict(
-        verdict=verdict,
-        schema_valid=True,
-        cited_fragments=cited,
-        numbers_checked=checked,
-        reason=reason.strip()[:400],
-    )
+    if not isinstance(answers, dict):
+        return _abstain("answers is not an object")
+    verdict_a = answers.get("verdict")
+    noul_a = answers.get("supported")
+    if not isinstance(verdict_a, dict) or not isinstance(noul_a, dict):
+        return _abstain("missing verdict or supported answer")
+    choice = verdict_a.get("choice")
+    if choice not in VERDICTS:
+        return _abstain(f"choice not in enum: {choice!r}")
+    confidence = _finite01(verdict_a.get("confidence"))
+    if confidence is None:
+        return _abstain("confidence missing, non-finite, or out of [0,1]")
+    noul = _finite01(noul_a.get("noul"))
+    if noul is None:
+        return _abstain("noul missing, non-finite, or out of [0,1]")
+    floor = JEV_CONFIG["confidence_floor"]
+    band_lo, band_hi = JEV_CONFIG["noul_undecided"]
+    v = ClaimVerdict(verdict=choice, schema_valid=True, confidence=confidence, noul=noul)
+    if confidence < floor:
+        v.verdict = "insufficient"
+        v.escalated = True
+        v.reason = f"escalated: choice confidence {confidence} below floor {floor}"
+        return v
+    if choice == "support" and noul < band_hi:
+        v.verdict = "insufficient"
+        v.escalated = True
+        v.reason = f"escalated: support choice but noul {noul} not above the undecided band"
+        return v
+    if choice == "contradiction" and noul > band_lo:
+        v.verdict = "insufficient"
+        v.escalated = True
+        v.reason = f"escalated: contradiction choice but noul {noul} not below the undecided band"
+        return v
+    if choice == "support" and claim_numbers:
+        evidence_numbers: set[str] = set()
+        for frag in fragments:
+            evidence_numbers |= _fragment_numbers(frag)
+        missing = [n for n in claim_numbers if (_norm_num(n) or n) not in evidence_numbers]
+        if missing:
+            v.verdict = "insufficient"
+            v.escalated = True
+            v.reason = f"code number check: claim numbers absent from evidence: {missing}"
+            return v
+    v.reason = f"jev choice={choice} confidence={confidence} noul={noul}"
+    return v
 
 
-def verify_claim(claim_text: str, claim_numbers: list[str], fragments: list[str], judge_fn) -> ClaimVerdict:
-    """Run one claim through the judge transport and validate the reply.
+def verify_claim_jev(claim_text: str, claim_numbers: list[str], fragments: list[str], jev_judge_fn) -> ClaimVerdict:
+    """Run one claim through the JEV transport and the admission rules.
 
-    judge_fn(system, user) -> (reply_text, usage_dict | None, model_id).
+    jev_judge_fn(state, questions) -> (answers_dict, usage_dict | None, model_id).
     Transport exceptions become abstentions, never crashes.
     """
-    system, user = build_judge_prompt(claim_text, fragments)
+    state = "\n".join(f"[{i}] {frag}" for i, frag in enumerate(fragments))
     try:
-        reply, usage, model = judge_fn(system, user)
-    except Exception as exc:  # transport failure = abstain
-        v = _abstain(f"transport error: {type(exc).__name__}")
-        return v
-    v = parse_and_validate(reply, claim_numbers, fragments)
+        answers, usage, model = jev_judge_fn(state, build_jev_questions(claim_text))
+    except Exception as exc:  # noqa: BLE001 - transport failure = abstain
+        return _abstain(f"transport error: {type(exc).__name__}")
+    v = validate_jev_answers(answers, claim_numbers, fragments)
     v.usage = usage
     v.model = model
     return v

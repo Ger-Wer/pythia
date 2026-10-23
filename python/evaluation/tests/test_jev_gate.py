@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 
 from python.evaluation.jev_gate import (
-    parse_and_validate,
     screen_document,
-    verify_claim,
+    validate_jev_answers,
+    verify_claim_jev,
 )
 
 LONG_P = "The Committee decided to maintain the target range for the federal funds rate at 3-1/2 to 3-3/4 percent. " * 3
@@ -105,125 +105,72 @@ def test_screen_no_body() -> None:
     assert not r.passed and "no_body" in r.rule_ids()
 
 
-# ---------------- Layer B ----------------
+# ---------------- Layer B (TypeSafe JEV protocol) ----------------
 
 
-def test_valid_support() -> None:
-    v = parse_and_validate(_reply(), CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "support"
+def _answers(choice="support", confidence=1.0, noul=0.98):
+    return {
+        "verdict": {"type": "choice", "choice": choice, "confidence": confidence},
+        "supported": {"type": "noul", "noul": noul},
+    }
 
 
-def test_fenced_reply_parses() -> None:
-    v = parse_and_validate("```json\n" + _reply() + "\n```", CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "support"
+def test_jev_support_valid() -> None:
+    v = validate_jev_answers(_answers(), CLAIM_NUMBERS, FRAGMENTS)
+    assert v.schema_valid and v.verdict == "support" and not v.escalated
 
 
-def test_support_with_unmatched_number_abstains() -> None:
-    bad = _reply(numbers_checked=[
-        {"claim_value": "4-3/4", "evidence_value": "4-3/4", "match": True},
-        {"claim_value": "5", "evidence_value": None, "match": False},
-    ])
-    v = parse_and_validate(bad, CLAIM_NUMBERS, FRAGMENTS)
-    assert not v.schema_valid and v.verdict == "insufficient"
-
-
-def test_evidence_number_not_in_fragment_abstains() -> None:
-    bad = _reply(numbers_checked=[
-        {"claim_value": "4-3/4", "evidence_value": "9-1/2", "match": False},
-        {"claim_value": "5", "evidence_value": "5", "match": True},
-    ], verdict="contradiction")
-    v = parse_and_validate(bad, CLAIM_NUMBERS, FRAGMENTS)
-    assert not v.schema_valid
-
-
-def test_valid_contradiction() -> None:
-    reply = _reply(
-        verdict="contradiction",
-        numbers_checked=[
-            {"claim_value": "5-1/4", "evidence_value": "4-3/4", "match": False},
-            {"claim_value": "5-1/2", "evidence_value": "5", "match": False},
-        ],
-    )
-    v = parse_and_validate(reply, ["5-1/4", "5-1/2"], FRAGMENTS)
+def test_jev_contradiction_valid() -> None:
+    v = validate_jev_answers(_answers(choice="contradiction", noul=0.01), CLAIM_NUMBERS, FRAGMENTS)
     assert v.schema_valid and v.verdict == "contradiction"
 
 
-def test_bad_verdict_enum_abstains() -> None:
-    v = parse_and_validate(_reply(verdict="probably_true"), CLAIM_NUMBERS, FRAGMENTS)
-    assert not v.schema_valid and v.verdict == "insufficient"
+def test_jev_low_confidence_escalates() -> None:
+    v = validate_jev_answers(_answers(confidence=0.6), CLAIM_NUMBERS, FRAGMENTS)
+    assert v.schema_valid and v.escalated and v.verdict == "insufficient"
 
 
-def test_insufficient_without_citations_is_valid() -> None:
-    reply = _reply(verdict="insufficient", cited_fragments=[], numbers_checked=[
-        {"claim_value": "4-3/4", "evidence_value": None, "match": False},
-        {"claim_value": "5", "evidence_value": None, "match": False},
-    ])
-    v = parse_and_validate(reply, CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "insufficient"
+def test_jev_support_with_undecided_noul_escalates() -> None:
+    v = validate_jev_answers(_answers(noul=0.5), CLAIM_NUMBERS, FRAGMENTS)
+    assert v.escalated and v.verdict == "insufficient"
 
 
-def test_missing_claim_number_check_abstains() -> None:
-    reply = _reply(numbers_checked=[{"claim_value": "4-3/4", "evidence_value": "4-3/4", "match": True}])
-    v = parse_and_validate(reply, CLAIM_NUMBERS, FRAGMENTS)
-    assert not v.schema_valid
+def test_jev_contradiction_with_high_noul_escalates() -> None:
+    v = validate_jev_answers(_answers(choice="contradiction", noul=0.9), CLAIM_NUMBERS, FRAGMENTS)
+    assert v.escalated and v.verdict == "insufficient"
 
 
-def test_transport_error_abstains() -> None:
-    def boom(system: str, user: str):
+def test_jev_support_blocked_by_code_number_check() -> None:
+    v = validate_jev_answers(_answers(), ["9-1/2", "9-3/4"], FRAGMENTS)
+    assert v.escalated and v.verdict == "insufficient"
+    assert "code number check" in v.reason
+
+
+def test_jev_unicode_hyphen_numbers_pass_code_check() -> None:
+    frags = ["The Committee decided to lower the target range to 1 to 1\u20111/4 percent."]
+    v = validate_jev_answers(_answers(noul=0.97), ["1", "1-1/4"], frags)
+    assert v.schema_valid and v.verdict == "support"
+
+
+def test_jev_bad_schema_abstains() -> None:
+    assert not validate_jev_answers({"verdict": {"choice": "maybe", "confidence": 1.0}, "supported": {"noul": 0.9}}, CLAIM_NUMBERS, FRAGMENTS).schema_valid
+    assert not validate_jev_answers({"supported": {"noul": 0.9}}, CLAIM_NUMBERS, FRAGMENTS).schema_valid
+    assert not validate_jev_answers(_answers(confidence=1.5), CLAIM_NUMBERS, FRAGMENTS).schema_valid
+    assert not validate_jev_answers(_answers(noul=float("nan")), CLAIM_NUMBERS, FRAGMENTS).schema_valid
+
+
+def test_jev_transport_error_abstains() -> None:
+    def boom(state: str, questions: dict):
         raise RuntimeError("network down")
 
-    v = verify_claim("claim", CLAIM_NUMBERS, FRAGMENTS, boom)
+    v = verify_claim_jev("claim", CLAIM_NUMBERS, FRAGMENTS, boom)
     assert not v.schema_valid and v.verdict == "insufficient"
 
 
-def test_verify_claim_happy_path() -> None:
-    def judge(system: str, user: str):
-        assert "support" in system
-        return _reply(), {"prompt_tokens": 10, "completion_tokens": 5}, "fake/model"
+def test_jev_verify_happy_path() -> None:
+    def judge(state: str, questions: dict):
+        assert "verdict" in questions and "supported" in questions
+        return _answers(), {"input_tokens": 100, "output_tokens": 20}, "jev-1.13.0"
 
-    v = verify_claim("claim", CLAIM_NUMBERS, FRAGMENTS, judge)
-    assert v.schema_valid and v.verdict == "support" and v.model == "fake/model"
-
-
-def test_grouped_number_entry_is_valid() -> None:
-    reply = _reply(numbers_checked=[
-        {"claim_value": "4-3/4 to 5 percent", "evidence_value": "4-3/4 to 5 percent", "match": True},
-    ])
-    v = parse_and_validate(reply, CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "support"
-
-
-def test_trailing_zero_decimal_matches() -> None:
-    reply = _reply(
-        verdict="insufficient",
-        cited_fragments=[0],
-        numbers_checked=[
-            {"claim_value": "2.4", "evidence_value": None, "match": False},
-            {"claim_value": "5", "evidence_value": "5.0", "match": True},
-        ],
-    )
-    # '5' vs evidence '5.0' canonicalize equal; claim number '2.4' checked as absent
-    reply2 = _reply(numbers_checked=[
-        {"claim_value": "4-3/4", "evidence_value": "4-3/4", "match": True},
-        {"claim_value": "5", "evidence_value": "5.0", "match": True},
-    ])
-    v = parse_and_validate(reply2, CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "support"
-
-
-def test_single_number_with_range_phrase_evidence() -> None:
-    reply = _reply(numbers_checked=[
-        {"claim_value": "4-3/4", "evidence_value": "4-3/4 to 5 percent", "match": True},
-        {"claim_value": "5", "evidence_value": "4-3/4 to 5 percent", "match": True},
-    ])
-    v = parse_and_validate(reply, CLAIM_NUMBERS, FRAGMENTS)
-    assert v.schema_valid and v.verdict == "support"
-
-
-def test_unicode_hyphen_range_matches() -> None:
-    frags = ["The Committee decided to lower the target range for the federal funds rate to 1 to 1\u20111/4 percent."]
-    reply = _reply(numbers_checked=[
-        {"claim_value": "1 to 1-1/4 percent", "evidence_value": "1 to 1\u20111/4 percent", "match": True},
-    ])
-    v = parse_and_validate(reply, ["1", "1-1/4"], frags)
-    assert v.schema_valid and v.verdict == "support"
+    v = verify_claim_jev("claim", CLAIM_NUMBERS, FRAGMENTS, judge)
+    assert v.schema_valid and v.verdict == "support" and v.model == "jev-1.13.0"
