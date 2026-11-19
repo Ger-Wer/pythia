@@ -1,278 +1,287 @@
-# Pythia v2 — Strategy, Audit & Roadmap
+# Pythia v2 — стратегия, аудит и дорожная карта
 
-**Status:** ACTIVE — Stage 1 running, Stage 2 legal path confirmed (OÜ)
-**Date:** 2026-07-05
-**Author:** Engineering review session
-**Supersedes direction of:** `docs/ORACLE_PUBLIC_CHANNEL.md`, `docs/ARCHITECTURE.md` (Pythia Capital LLM-signal channel)
+**Статус:** ACTIVE — этап 1 работает, юридический путь этапа 2 подтверждён (OÜ)
+**Дата:** 2026-07-05
+**Автор:** сессия инженерного ревью
+**Заменяет направление:** `docs/ORACLE_PUBLIC_CHANNEL.md`, `docs/ARCHITECTURE.md` (LLM-сигнальный канал Pythia Capital)
 
-> This document is the canonical record of the decision to pivot Pythia from a broad
-> LLM-driven Polymarket "signal channel" to a narrow, quantitatively-grounded
-> macro/economic forecasting tracker with a verifiable on-chain record. It captures the
-> code audit that triggered the rethink, the market analysis, the data-feasibility study,
-> the Estonia jurisdiction due diligence, and a staged go/no-go roadmap.
+> Этот документ — каноническая запись решения о развороте Pythia от широкого
+> LLM-канала сигналов Polymarket к узкому, количественно обоснованному
+> трекеру макроэкономических прогнозов с проверяемым ончейн-рекордом. В нём —
+> аудит кода, запустивший переосмысление, анализ рынка, исследование доступности
+> данных, due diligence эстонской юрисдикции и поэтапная дорожная карта go/no-go.
 >
-> **Nothing here is implemented yet.** The current production code (Pythia Capital oracle
-> channel) is unchanged and still running on `amper`. See "Disposition of current code".
+> **Здесь ничего ещё не реализовано.** Текущий продакшн-код (оракул-канал Pythia Capital)
+> не менялся и продолжает работать на `amper`. См. «Судьба текущего кода».
 
 ---
 
 ## 0. TL;DR
 
-- The current product (AI-generated daily Polymarket "desk calls" to a Telegram channel,
-  monetized via ads) is **technically fixable but strategically weak**: no real edge,
-  broken track-record reporting, saturated/commoditized niche, and the most natural
-  the most natural audience is geoblocked by Polymarket.
-- A **viable** version exists, but it is a **different, narrower product**: a
-  quantitatively-grounded tracker for **macro/economic markets** (FOMC rates, GDP, CPI)
-  whose edge comes from arbitraging the gap between **professional nowcast models /
-  fed funds futures** and Polymarket prices, with a **public, on-chain-verifiable track
-  record** as the moat.
-- Everything hinges on **one unanswered question: is there an edge?** This cannot be
-  proven on history alone (too few markets). The plan is staged so the cheap experiments
-  answer the existential question before any capital or audience spend.
-- **Decision rule:** proceed stage-by-stage; each stage is a gate. If Stage 0 shows
-  Polymarket is efficient relative to fed funds futures on FOMC markets, **stop honestly**.
+- Текущий продукт (сгенерированные ИИ ежедневные «звонки» по Polymarket в Telegram-канал,
+  монетизация через рекламу) **технически чиним, но стратегически слаб**: нет реального
+  преимущества, сломанная отчётность по трек-рекорду, насыщенная/коммодитизированная ниша,
+  а самая естественная аудитория заблокирована геоблоком Polymarket.
+- **Жизнеспособная** версия существует, но это **другой, более узкий продукт**:
+  количественно обоснованный трекер **макро/экономических рынков** (ставки FOMC, ВВП, CPI),
+  чьё преимущество — в арбитраже разрыва между **профессиональными наукаст-моделями /
+  фьючерсами на ставку ФРС** и ценами Polymarket, с **публичным ончейн-проверяемым
+  трек-рекордом** как рвом.
+- Всё упирается в **один неотвеченный вопрос: есть ли преимущество?** На одной истории это
+  не доказать (слишком мало рынков). План поэтапный: дешёвые эксперименты отвечают на
+  экзистенциальный вопрос до любых трат капитала или аудитории.
+- **Правило решения:** идти поэтапно; каждый этап — гейт. Если этап 0 покажет, что
+  Polymarket эффективен относительно фьючерсов на ставку ФРС на рынках FOMC, — **честно
+  остановиться**.
 
 ---
 
-## 1. Why this document exists — the audit that triggered the rethink
+## 1. Зачем этот документ — аудит, запустивший переосмысление
 
-An independent expert audit (`pythia_audit_report_v2.md`) was reviewed against the **actual
-code at commit `1d144e7`** (local = GitHub = `amper`, all synced) and against the **live
-production database**. Method: raw-byte verification of source lines, `py_compile`,
-and running the actual SQL against the real schemas (`sql/migrations/0011`, `0012`) and the
-production DB on `amper`.
+Независимый экспертный аудит (`pythia_audit_report_v2.md`) сверен с **фактическим
+кодом на коммите `1d144e7`** (локально = GitHub = `amper`, всё синхронизировано) и с **живой
+продакшн-базой**. Метод: побайтовая сверка строк исходников, `py_compile` и прогон
+реального SQL на реальных схемах (`sql/migrations/0011`, `0012`) и продакшн-БД на `amper`.
 
-### 1.1 Quality of the expert audit: mixed (~5/10)
+### 1.1 Качество экспертного аудита: смешанное (~5/10)
 
-Of the expert's 6 "critical" findings:
-- **2 are factually wrong** — the mechanism the expert says is "missing" is already
-  implemented (dedup of same-day publications in `oracle_publisher.py:573-617`; retry/backoff
-  in `send_to_channel` `oracle_publisher.py:460-477`).
-- **2 are overstated in severity** (confidence-filter readability `oracle_publisher.py:141`;
-  streak function `oracle_score_updater.py:360-369` is actually correct on all tested cases).
-- **2 are real** (atomicity of `close_portfolio_position`; `mark_to_market` KeyError).
+Из 6 «критических» находок эксперта:
+- **2 фактически неверны** — механизм, который эксперт называет «отсутствующим», уже
+  реализован (дедупликация публикаций в пределах дня в `oracle_publisher.py:573-617`;
+  retry/backoff в `send_to_channel` `oracle_publisher.py:460-477`).
+- **2 завышены по тяжести** (читаемость confidence-фильтра `oracle_publisher.py:141`;
+  функция стрика `oracle_score_updater.py:360-369` на всех тестовых кейсах корректна).
+- **2 реальны** (атомарность `close_portfolio_position`; KeyError в `mark_to_market`).
 
-The expert evidently did **not run the code or check it against the DB schema**, which is
-why several "criticals" describe already-implemented behavior, and why the two worst real
-bugs were missed entirely.
+Эксперт, очевидно, **не запускал код и не сверял его со схемой БД** — поэтому несколько
+«критикалов» описывают уже реализованное поведение, а два худших реальных бага пропущены
+полностью.
 
-### 1.2 Real blockers the expert MISSED (verified on production)
+### 1.2 Реальные блокеры, которые эксперт ПРОПУСТИЛ (проверено на продакшне)
 
-- **#A — `edit_telegram_post()` crashes on non-existent columns.** It `SELECT`s
-  `market_prob, reasoning, key_risk`, but the real columns are `polymarket_prob`,
-  `oracle_reasoning`, `oracle_key_risk`. Verified on the live DB:
-  `Error: no such column: market_prob`. **Every post-resolution channel edit fails** — the
-  audience never sees WIN/LOSS outcomes.
-- **#B — cancelled markets (`outcome = -1`) crash the whole score-update run.**
-  `get_market_outcome` can return `-1`; `update_prophecy_result` then writes
-  `actual_outcome = -1`, violating `CHECK(actual_outcome IN (0,1))` →
-  `IntegrityError`. The loop has no try/except, so one cancelled market **blocks all
-  remaining pending prophecies** in that run.
-- **AUM accounting is corrupted** (verified live): `current_aum=1060.20` while
-  `cash=1102.48`, `positions_value=0.0`, with 0 open positions. The invariant
-  `current_aum = cash + positions_value` is broken; the pinned channel message shows a
-  wrong AUM.
-- **`oracle_metrics` is empty on production** (`accuracy_* = NULL`, `total_prophecies = 0`)
-  despite 35 prophecies — the metrics/track-record path has never succeeded in practice.
-- **Cross-day duplicate publishing**: dedup only blocks within the same UTC day, so the same
-  market is re-published daily (observed: market `540819` published 11× over 3 days).
-- **Config drift**: prod `ORACLE_MIN_EDGE=0.08` vs docs `0.12`; channel content is
-  joke markets ("Jesus before GTA VI"), not "reasoned trades".
+- **#A — `edit_telegram_post()` падает на несуществующих колонках.** Он делает `SELECT`
+  колонок `market_prob, reasoning, key_risk`, а реальные колонки — `polymarket_prob`,
+  `oracle_reasoning`, `oracle_key_risk`. Проверено на живой БД:
+  `Error: no such column: market_prob`. **Каждое редактирование поста после разрешения
+  падает** — аудитория никогда не видит исходы WIN/LOSS.
+- **#B — отменённые рынки (`outcome = -1`) роняют весь прогон обновления счёта.**
+  `get_market_outcome` может вернуть `-1`; `update_prophecy_result` затем пишет
+  `actual_outcome = -1`, нарушая `CHECK(actual_outcome IN (0,1))` → `IntegrityError`.
+  В цикле нет try/except, поэтому один отменённый рынок **блокирует все оставшиеся
+  висящие прогнозы** в этом прогоне.
+- **Учёт AUM повреждён** (проверено вживую): `current_aum=1060.20` при `cash=1102.48`,
+  `positions_value=0.0` и 0 открытых позиций. Инвариант `current_aum = cash +
+  positions_value` нарушен; закреплённое сообщение канала показывает неверный AUM.
+- **`oracle_metrics` пуст на продакшне** (`accuracy_* = NULL`, `total_prophecies = 0`)
+  при 35 прогнозах — путь метрик/трек-рекорда на практике ни разу не отработал успешно.
+- **Междневная дублирующая публикация**: дедупликация блокирует только в пределах одних
+  суток UTC, поэтому один и тот же рынок перепубликуется ежедневно (наблюдалось: рынок
+  `540819` опубликован 11 раз за 3 дня).
+- **Дрейф конфига**: на проде `ORACLE_MIN_EDGE=0.08` против `0.12` в доках; контент канала —
+  шуточные рынки («Иисус раньше GTA VI»), а не «обоснованные сделки».
 
-### 1.3 Verdict from the audit
+### 1.3 Вердикт по итогам аудита
 
-The pipeline *mechanically* works but does **not** deliver the stated goal — "potentially
-well-reasoned, successful trades with a provable record". The single systemic root cause is
-**code ↔ schema ↔ config drift**, with **zero tests** that run SQL against the live schema
-(a schema-aware pytest would have caught #A and #B instantly).
+Конвейер *механически* работает, но **не** даёт заявленную цель — «потенциально хорошо
+обоснованные, успешные сделки с доказуемым рекордом». Единственная системная первопричина —
+**дрейф код ↔ схема ↔ конфиг** при **нуле тестов**, гоняющих SQL на живой схеме
+(схемо-осознанный pytest поймал бы #A и #B мгновенно).
 
-**Crucial conclusion:** fixing these bugs makes the product *work*, not *win*. The bugs are
-in code we intend to retire. Therefore we do **not** invest in fixing the current oracle
-publisher; we redesign the core. See "Disposition of current code".
+**Ключевой вывод:** починка этих багов сделает продукт *рабочим*, а не *выигрывающим*.
+Баги — в коде, который мы собираемся вывести из эксплуатации. Поэтому в починку текущего
+оракул-паблишера **не** инвестируем; перепроектируем ядро. См. «Судьба текущего кода».
 
 ---
 
-## 2. Market analysis — is such a channel even a good business?
+## 2. Анализ рынка — а вообще хороший ли это бизнес, такой канал?
 
-Sourced web research (competitors, demand, mechanics, monetization, regulation) produced a
-clear picture for the **original** product idea (broad signal channel + ad revenue,
-geoblocked audience):
+Заказанное веб-исследование (конкуренты, спрос, механика, монетизация, регулирование) дало
+чёткую картину для **исходной** идеи продукта (широкий сигнальный канал + доход с рекламы,
+геоблоченная аудитория):
 
-| Factor | Finding |
+| Фактор | Вывод |
 |---|---|
-| Market exists & growing | ✅ Prediction markets ~$63.5B notional 2025 (~4× 2024); Polymarket+Kalshi ≈ 97.5% |
-| Audience demand | ⚠️ Real but smaller than headline — ~200–480k active traders, weak retention, volume partly wash/airdrop-driven |
-| Competition | 🔴 Saturated & commoditized — dozens of free/open-source bots (PolyWatch, PolyAlpha, PolyMate, …), multiple "best-of" lists |
-| Geoblocked audience fit | 🔴 Polymarket geoblocks multiple countries — the natural audience cannot legally bet |
-| Onboarding friction | 🔴 Wallet + USDC + Polygon, or KYC — large subscriber→bettor drop-off |
-| Ad monetization | ⚠️ Viable; finance is the top Telegram niche (€15–20 CPM CIS) but needs scale (≈5–10k+ engaged subs) |
-| Polymarket affiliate | ⚠️ Gated ($10k volume for 30%/180d; else $10 CPA) and excludes geoblocked CIS users |
-| Regulatory wind | 🔴 Turning against paid prediction-market promotion (CFTC influencer probe; SEBI Telegram bans; RU Telegram pressure) |
+| Рынок существует и растёт | ✅ Рынки предсказаний ~$63.5B номинального объёма в 2025 (~4× к 2024); Polymarket+Kalshi ≈ 97.5% |
+| Спрос аудитории | ⚠️ Реальный, но меньше заголовков — ~200–480k активных трейдеров, слабое удержание, объёмы частично wash/airdrop |
+| Конкуренция | 🔴 Насыщение и коммодитизация — десятки бесплатных/опенсорсных ботов (PolyWatch, PolyAlpha, PolyMate, …), множественные списки «лучших» |
+| Соответствие геоблоченной аудитории | 🔴 Polymarket геоблочит ряд стран — естественная аудитория не может легально ставить |
+| Трение онбординга | 🔴 Кошелёк + USDC + Polygon, или KYC — большой отвал подписчик→игрок |
+| Монетизация рекламой | ⚠️ Жизнеспособна; финансы — топовая ниша Telegram (€15–20 CPM СНГ), но нужен масштаб (≈5–10k+ вовлечённых подписчиков) |
+| Аффилиат Polymarket | ⚠️ С гейтом ($10k объёма за 30%/180д; иначе $10 CPA), исключает геоблоченных пользователей СНГ |
+| Регуляторный ветер | 🔴 Против платного продвижения рынков предсказаний (расследование CFTC по инфлюенсерам; баны Telegram от SEBI; давление на Telegram в RU) |
 
-**Business conclusion:** the macro story ("prediction markets are booming") is **misleading
-as a thesis for a signal channel**. Product is commoditized, the best audience for us is
-geoblocked, onboarding craters conversion, affiliate terms exclude that audience, and
-regulation is tightening. A defensible version must: (a) target a **supported** geography,
-(b) lead with a **real, on-chain-verifiable edge** in a **growing** category
-(economics/macro, not politics), (c) monetize via **ads, not Polymarket conversions**.
+**Бизнес-вывод:** макро-история («рынки предсказаний бурно растут») **вводит в заблуждение
+как тезис для сигнального канала**. Продукт коммодитизирован, лучшая для нас аудитория
+геоблочена, онбординг роняет конверсию, условия аффилиата эту аудиторию исключают,
+регулирование ужесточается. Защищённая версия должна: (a) целиться в **поддерживаемую**
+географию, (b) идти с **реальным ончейн-проверяемым преимуществом** в **растущей**
+категории (экономика/макро, не политика), (c) монетизироваться через **рекламу, а не
+конверсии Polymarket**.
 
 ---
 
-## 3. The pivot — Pythia v2 product definition
+## 3. Разворот — определение продукта Pythia v2
 
-| Dimension | v1 (current) | v2 (proposed) |
+| Измерение | v1 (текущий) | v2 (предлагаемый) |
 |---|---|---|
-| Niche | Broad / all markets (often joke markets) | **Macro/economic, numeric resolution** (FOMC, GDP, CPI, jobs) |
-| Edge source | LLM paraphrasing search results | **Quantitative nowcast-vs-price gap** (fed funds futures, Fed nowcasts) |
-| Cadence | 5 posts/day | Few, high-quality posts (event-driven) |
-| Track record | Virtual, broken/empty metrics | **Real on-chain wallet** (strongest moat), deterministic, verifiable |
-| Audience geo | Geoblocked regions | English, Polymarket-supported geos; likely X/Twitter-first |
-| Monetization | Ads (but no trust base) | Ads **on top of** a proven public record |
+| Ниша | Широкая / все рынки (часто шуточные) | **Макро/экономика, числовое разрешение** (FOMC, ВВП, CPI, занятость) |
+| Источник преимущества | LLM-пересказ поисковой выдачи | **Количественный разрыв наукаст–цена** (фьючерсы на ставку ФРС, наукасты ФРС) |
+| Каденс | 5 постов/день | Мало, качественные посты (по событиям) |
+| Трек-рекорд | Виртуальный, сломанные/пустые метрики | **Реальный ончейн-кошелёк** (сильнейший ров), детерминированный, проверяемый |
+| Гео аудитории | Геоблоченные регионы | Англоязычные, гео с поддержкой Polymarket; вероятно X/Twitter в первую очередь |
+| Монетизация | Реклама (но без базы доверия) | Реклама **поверх** доказанного публичного рекорда |
 
-**Why this can have an edge where v1 cannot:** Polymarket's price is already an aggregate of
-informed bets; an LLM paraphrase of Google cannot systematically beat it. But in
-**numeric-resolution macro markets**, professional nowcast models (Atlanta Fed GDPNow,
-Cleveland Fed inflation nowcast) and **fed funds futures** (ZQ) encode information that many
-Polymarket participants do not price precisely. The edge is **arbitraging that gap**, not
-"having opinions". This is achievable by one engineer because the heavy analytics already
-exist (Fed banks publish them); we build a thin arbitrage/comparison layer.
+**Почему здесь может быть преимущество, а в v1 нет:** цена Polymarket — уже агрегат
+информированных ставок; LLM-пересказ Google не может систематически её обыгрывать. Но на
+**макро-рынках с числовым разрешением** профессиональные наукаст-модели (Atlanta Fed GDPNow,
+инфляционный наукаст Cleveland Fed) и **фьючерсы на ставку ФРС** (ZQ) кодируют информацию,
+которую многие участники Polymarket не прайсят точно. Преимущество — в **арбитраже этого
+разрыва**, а не в «наличии мнений». Это по силам одному инженеру, потому что тяжёлая
+аналитика уже существует (её публикуют федеральные резервные банки); мы строим тонкий слой
+арбитража/сравнения.
 
-**Honest constraint:** there are **few** such markets (dozens per series, not 50–150), so the
-product is **narrow and slow** — good for a credible track record, bad for "farming degens by
-volume". This trade-off is accepted deliberately.
+**Честное ограничение:** таких рынков **мало** (десятки на серию, не 50–150), поэтому
+продукт **узкий и медленный** — хорошо для достоверного трек-рекорда, плохо для «фарма
+дегенов объёмом». Этот компромисс принят осознанно.
 
 ---
 
-## 4. Data feasibility — can we backtest the edge without look-ahead bias?
+## 4. Доступность данных — можно ли бэктестить преимущество без заглядывания в будущее?
 
-To validate edge **before** risking money we must backtest on already-resolved markets. The
-critical risk is look-ahead bias (using a model value that wasn't known at the time).
+Чтобы валидировать преимущество **до** риска деньгами, нужен бэктест на уже разрешённых
+рынках. Критический риск — look-ahead bias (использование значения модели, которое на тот
+момент ещё не было известно).
 
-| Data need | Availability | Source |
+| Потребность в данных | Доступность | Источник |
 |---|---|---|
-| Polymarket resolved-market catalog | ✅ | Gamma API (`gamma-api.polymarket.com`) |
-| Polymarket historical prices | ✅ | CLOB `prices-history` (pass **YES asset id**, not conditionId) + Dune/Goldsky cross-check |
-| Actual release values + dates | ✅ | FRED / **ALFRED** (vintage), BLS, BEA |
-| **GDP point-in-time nowcast** | ✅ best-in-class | Atlanta Fed **GDPNow** vintage spreadsheet (`TrackingArchives`) |
-| **Rate-decision point-in-time** | ✅ by construction | **ZQ fed funds futures** history (inherently point-in-time) + published FedWatch formula |
-| **CPI point-in-time nowcast** | ⚠️ weakest link | Cleveland Fed nowcast has **no bulk vintage download** → scrape chart JSON or capture forward |
-| NY Fed Staff Nowcast | ❌ | Suspended since Sept 2021 — do not rely on it |
-| Market count / statistical power | 🔴 | Dozens per series → **suggestive, not conclusive**; live paper-track is the real proof |
+| Каталог разрешённых рынков Polymarket | ✅ | Gamma API (`gamma-api.polymarket.com`) |
+| Исторические цены Polymarket | ✅ | CLOB `prices-history` (передавать **YES asset id**, не conditionId) + кросс-чек Dune/Goldsky |
+| Фактические значения релизов + даты | ✅ | FRED / **ALFRED** (винтажи), BLS, BEA |
+| **Точечный во времени наукаст ВВП** | ✅ лучший в классе | винтажная таблица Atlanta Fed **GDPNow** (`TrackingArchives`) |
+| **Точечное во времени решение по ставке** | ✅ по построению | история **фьючерсов ZQ на ставку ФРС** (изначально point-in-time) + опубликованная формула FedWatch |
+| **Точечный во времени наукаст CPI** | ⚠️ самое слабое звено | у наукаста Cleveland Fed **нет массового скачивания винтажей** → парсить JSON графиков или захватывать вперёд |
+| NY Fed Staff Nowcast | ❌ | Приостановлен с сен 2021 — не полагаться |
+| Число рынков / статмощность | 🔴 | Десятки на серию → **намекает, но не доказывает**; живое бумажное трекирование — настоящее доказательство |
 
-**Single biggest obstacle:** vintage CPI nowcast data. **Mitigation:** start where both sides
-are point-in-time clean.
+**Главное препятствие:** винтажные данные наукаста CPI. **Митигация:** начать там, где обе
+стороны изначально point-in-time чистые.
 
-**Cleanest starting subset = FOMC / rate-decision markets:**
-1. Nowcast side = **ZQ fed funds futures** — inherently point-in-time, zero vintage exposure,
-   deterministic FedWatch probability formula (published).
-2. Market side = Polymarket per-meeting rate markets — best inventory, prices retrievable.
-3. Resolution = unambiguous public fact, no revisions.
-4. Measure: ZQ-implied P(cut) vs Polymarket P(cut) at T-minus {1,3,7} days → is Polymarket
-   mispriced relative to futures, and in a systematic direction?
+**Чистейшее стартовое подмножество = рынки FOMC / решений по ставке:**
+1. Сторона наукаста = **фьючерсы ZQ на ставку ФРС** — изначально point-in-time, нулевая
+   винтажная экспозиция, детерминированная опубликованная формула вероятностей FedWatch.
+2. Сторона рынка = рынки Polymarket на отдельные заседания по ставке — лучший инвентарь,
+   цены извлекаемы.
+3. Разрешение = однозначный публичный факт, без ревизий.
+4. Метрика: имплицитная из ZQ P(cut) против P(cut) Polymarket за T-минус {1,3,7} дней →
+   неверно ли оценён Polymarket относительно фьючерсов, и систематично ли в одну сторону?
 
-Then extend to **GDP** (GDPNow vintage ready-made), **CPI last** (vintage-scraping cost).
+Затем расширить на **ВВП** (винтаж GDPNow готов), **CPI последним** (стоимость
+винтаж-скрапинга).
 
 ---
 
-## 5. Jurisdiction due diligence — Estonia (NOT legal advice)
+## 5. Due diligence юрисдикции — Эстония (НЕ юридическая консультация)
 
-Potential Estonian residency/partnership for legal Polymarket access and a real on-chain
-wallet. **This is research, not legal/tax advice — obtain an Estonian gambling+tax opinion
-before funding anything.** Estonia's Gambling Act was materially tightened effective
-**2026-01-01**.
+Потенциальное эстонское резидентство/партнёрство для легального доступа к Polymarket и
+реального ончейн-кошелька. **Это исследование, а не юридическая/налоговая консультация —
+получи эстонское заключение по гэмблингу+налогам до финансирования чего-либо.** Закон
+Эстонии об азартных играх был существенно ужесточён с **2026-01-01**.
 
-| Question | Finding | Confidence |
+| Вопрос | Вывод | Уверенность |
 |---|---|---|
-| Is Estonia geoblocked by Polymarket? | **No** — absent from the 33-country list (unlike FR/DE/BE/PL) | High (2 secondary sources; **verify on Polymarket's own page**) |
-| Access without VPN/ToS breach? | **Yes**, with genuine Estonian residency/IP | High |
-| Is *player* use clearly legal? | **Unclear / untested** — likely viewed as unlicensed gambling; 2026 amendments pulled **crypto into the "bet" definition**; player liability not established | **Low — needs counsel** |
-| MiCA / financial-instrument issue? | Probably not the operative lens; gambling law is | Medium |
-| Personal tax friction | **High** — 22% on **gross** gains, **no loss offset** for non-MiCA platforms, per-transaction; Polymarket unlikely MiCA-registered | High (EMTA primary) |
-| OÜ 0% retained-earnings benefit | Applies to **tax timing** only; does **not** cure any licensing issue | Med-High |
+| Эстония геоблочена Polymarket? | **Нет** — отсутствует в списке из 33 стран (в отличие от FR/DE/BE/PL) | Высокая (2 вторичных источника; **проверить на собственной странице Polymarket**) |
+| Доступ без VPN/нарушения ToS? | **Да**, при подлинном эстонском резидентстве/IP | Высокая |
+| Использование *игроком* однозначно легально? | **Неясно / не проверено** — вероятно, расценивается как нелицензированный гэмблинг; поправки 2026 года втянули **крипту в определение «ставки»**; ответственность игрока не установлена | **Низкая — нужен юрист** |
+| Проблема MiCA / финансового инструмента? | Вероятно, не рабочая оптика; работает закон об азартных играх | Средняя |
+| Налоговое трение физлица | **Высокое** — 22% на **валовую** прибыль, **без зачёта убытков** для не-MiCA платформ, посделочно; Polymarket вряд ли зарегистрирован по MiCA | Высокая (первичен EMTA) |
+| Выгода OÜ 0% на нераспределённую | Работает только на **тайминг налога**; лицензионную проблему **не** лечит | Выше средней |
 
-**Implication:** Estonia is a **workable access jurisdiction** (no geoblock), but the
-**tax model must be designed with an Estonian advisor** — gross-gain taxation without loss
-offset is brutal for active trading. The narrow macro niche (few, deliberate trades) mitigates
-this. Two must-dos before capital: (1) confirm Estonia's absence on Polymarket's own
-geo-restrictions page; (2) written counsel opinion on player liability post-2026 and on
-gambling-winnings-vs-crypto-gains tax treatment.
-
----
-
-## 6. Roadmap — staged go/no-go
-
-Each stage is a **gate**. Do not proceed without passing the prior one.
-
-### Stage 0 — Backtest feasibility & edge signal (1–2 weeks, cheap)
-- Build a minimal backtest engine in this repo (new code, not a fix of the old publisher).
-- Subset: **FOMC / rate markets**, ZQ futures vs Polymarket price at T-minus {1,3,7} days.
-- Output: does Polymarket deviate from futures-implied probabilities systematically?
-- **Gate:** if Polymarket is efficient relative to ZQ → **STOP honestly**. If a stable
-  mispricing exists → hypothesis lives, continue.
-- ⚠️ Backtest is **hypothesis filter, not capital green-light** (N too small for p<0.01).
-
-### Stage 1 — Live paper track (2–3 months)
-- Model publishes forecasts on **future** FOMC/economic events, deterministically, with
-  pre-resolution timestamps. Accumulate honest Brier on fresh, bias-free data.
-- **Gate:** model beats market Brier on live events → continue. Else stop/iterate.
-
-### Stage 2 — Real on-chain wallet (only after Stage 1 passes)
-- Resolve Estonia legal/tax structure with counsel first.
-- Fund a real Polymarket wallet (supported geo) with small capital; bot trades its own
-  signals. Public wallet address = unfakeable track record.
-
-### Stage 3 — Audience & ads (only on top of a proven public record)
-- English content, Polymarket-supported geos, likely X/Twitter-first.
-- Monetize via finance-niche advertising once volume + trust exist.
+**Следствие:** Эстония — **рабочая юрисдикция доступа** (геоблока нет), но **налоговую
+модель проектировать с эстонским советником** — налог на валовую прибыль без зачёта убытков
+разорителен для активной торговли. Узкая макро-ниша (мало осознанных сделок) это смягчает.
+Два must-do до капитала: (1) подтвердить отсутствие Эстонии на собственной странице
+гео-ограничений Polymarket; (2) письменное заключение юриста об ответственности игрока после
+2026 года и о налоговой вилке выигрыши-гэмблинг vs криптодоход.
 
 ---
 
-## 7. Disposition of current code
+## 6. Дорожная карта — поэтапный go/no-go
 
-- **Do NOT fix** the v1 oracle publisher bugs (#A/#B/AUM/dedup). That code implements the
-  LLM-paraphrase approach we are retiring; fixing it polishes what we discard.
-- The TypeScript projection pipeline (`src/`: sector_selector → research_runner → naked_r1 →
-  ensemble → synthesis) is **removed from the probability-source role**. An LLM may remain only
-  as a **post-text generator**, never as the probability source.
-- Production v1 (oracle channel on `amper`) stays running untouched for now; no destructive
-  Docker/DB ops on `amper`. Decommissioning happens only on explicit instruction, after v2
-  has a working track record.
-- New v2 code (backtest engine first) lives in this repo (`~/Desktop/Pythia`), under Git, so
-  any engineer who clones the project finds it alongside this document.
+Каждый этап — **гейт**. Без прохождения предыдущего дальше не идти.
+
+### Этап 0 — Проверка бэктеста и сигнала преимущества (1–2 недели, дёшево)
+- Собрать минимальный бэктест-движок в этом репо (новый код, не починка старого паблишера).
+- Подмножество: **рынки FOMC / ставок**, фьючерсы ZQ против цены Polymarket за T-минус {1,3,7} дней.
+- Выход: отклоняется ли Polymarket от фьючерс-имплицитных вероятностей систематично?
+- **Гейт:** если Polymarket эффективен относительно ZQ → **честно СТОП**. Если есть
+  стабильное неверное ценообразование → гипотеза жива, продолжаем.
+- ⚠️ Бэктест — **фильтр гипотез, а не зелёный свет капиталу** (N слишком мал для p<0.01).
+
+### Этап 1 — Живое бумажное трекирование (2–3 месяца)
+- Модель публикует прогнозы на **будущие** события FOMC/экономики, детерминированно,
+  с метками времени до разрешения. Копим честный Brier на свежих, свободных от bias данных.
+- **Гейт:** модель бьёт рыночный Brier на живых событиях → продолжаем. Иначе стоп/итерация.
+
+### Этап 2 — Реальный ончейн-кошелёк (только после прохождения этапа 1)
+- Сначала закрыть эстонскую юридически-налоговую структуру с юристом.
+- Профинансировать реальный кошелёк Polymarket (поддерживаемое гео) небольшим капиталом;
+  бот торгует собственные сигналы. Публичный адрес кошелька = неподделываемый трек-рекорд.
+
+### Этап 3 — Аудитория и реклама (только поверх доказанного публичного рекорда)
+- Англоязычный контент, гео с поддержкой Polymarket, вероятно X/Twitter в первую очередь.
+- Монетизация через рекламу финансовой ниши, когда есть объём + доверие.
 
 ---
 
-## 8. Open questions / must-resolve before capital
+## 7. Судьба текущего кода
 
-1. Estonia: written legal opinion on player liability (post-2026 Gambling Act) + tax fork
-   (gambling winnings vs crypto property gains).
-2. Confirm Estonia absent on Polymarket's own geo-restrictions page (primary source).
-3. Stage 0 result: is there a systematic Polymarket↔ZQ gap on FOMC markets?
-4. CPI vintage-nowcast capture strategy (scrape vs forward-capture) — only relevant if Stage 0
-   passes and we extend beyond FOMC/GDP.
+- **НЕ чинить** баги v1 оракул-паблишера (#A/#B/AUM/дедуп). Этот код реализует
+  LLM-пересказный подход, который мы выводим из эксплуатации; его починка полирует то,
+  что выбрасываем.
+- TypeScript-пайплайн проекций (`src/`: sector_selector → research_runner → naked_r1 →
+  ensemble → synthesis) **снят с роли источника вероятностей**. LLM может остаться только
+  как **генератор пост-текста**, никогда как источник вероятностей.
+- Продакшн v1 (оракул-канал на `amper`) пока работает нетронутым; никаких деструктивных
+  Docker/DB-операций на `amper`. Вывод из эксплуатации — только по явному указанию, после
+  того как у v2 будет рабочий трек-рекорд.
+- Новый код v2 (сначала бэктест-движок) живёт в этом репо (`~/Desktop/Pythia`), под Git,
+  чтобы любой инженер, клонировавший проект, нашёл его рядом с этим документом.
 
 ---
 
-## 9. References
+## 8. Открытые вопросы / must-resolve до капитала
 
-- Code audit basis: commit `1d144e7`; live DB on `amper:/home/pythia/pythia/data/pythia.db`.
-- Expert audit reviewed: `pythia_audit_report_v2.md` (external).
-- Data sources: Atlanta Fed GDPNow (`atlantafed.org/cqer/research/gdpnow`); Cleveland Fed
-  inflation nowcasting (`clevelandfed.org`); CME FedWatch methodology
+1. Эстония: письменное юридическое заключение об ответственности игрока (Закон об азартных
+   играх после 2026) + налоговая вилка (выигрыши в азартных играх vs имущественный доход
+   от крипты).
+2. Подтвердить отсутствие Эстонии на собственной странице гео-ограничений Polymarket
+   (первичный источник).
+3. Результат этапа 0: есть ли систематичный разрыв Polymarket↔ZQ на рынках FOMC?
+4. Стратегия захвата винтаж-наукаста CPI (скрапинг vs захват вперёд) — актуально только
+   если этап 0 пройден и расширяемся за FOMC/ВВП.
+
+---
+
+## 9. Источники
+
+- База аудита кода: коммит `1d144e7`; живая БД на `amper:/home/pythia/pythia/data/pythia.db`.
+- Рассмотренный экспертный аудит: `pythia_audit_report_v2.md` (внешний).
+- Источники данных: Atlanta Fed GDPNow (`atlantafed.org/cqer/research/gdpnow`); инфляционный
+  наукастинг Cleveland Fed (`clevelandfed.org`); методология CME FedWatch
   (`cmegroup.com/articles/2023/understanding-the-cme-group-fedwatch-tool-methodology.html`)
-  + CME DataMine for ZQ history; FRED/ALFRED (`fred.stlouisfed.org/docs/api/fred/`,
+  + CME DataMine для истории ZQ; FRED/ALFRED (`fred.stlouisfed.org/docs/api/fred/`,
   `alfred.stlouisfed.org`); BLS (`bls.gov/developers`); BEA (`apps.bea.gov/api`);
   Polymarket Gamma/CLOB (`gamma-api.polymarket.com`, `clob.polymarket.com/prices-history`).
-- Jurisdiction: EMTA crypto-asset taxation; NJORD on 2026 Gambling Act amendments;
-  Polymarket restricted-country list (verify on Polymarket's own geo-restrictions page).
+- Юрисдикция: налогообложение криптоактивов EMTA; NJORD о поправках к Закону об азартных
+  играх 2026; список ограниченных стран Polymarket (проверить на собственной странице
+  гео-ограничений Polymarket).
 
 ---
 
-**Status:** ACTIVE — Stage 1 running (since 2026-07-05), v1 decommissioned.
-2026-08-04 addendum: the Stage 1 hypothesis test is now `python/evaluation/edge_diff.py`
-(ZQ-implied cut/hike/hold probabilities vs Kalshi meeting bucket prices, commit `9f1af85`).
-The earlier volatility/drift-only verdict in `analyze_snapshots.py` was a false gate and has
-been replaced; drift/volatility signals are informational only. Stage 2 remains blocked until
-the edge-diff divergence is confirmed persistent (~30 more days) — see
-`project/SESSION_20260804_pythia_edge_diff_verdict.md` in MemPalace.
+**Статус:** ACTIVE — этап 1 работает (с 2026-07-05), v1 выведен из эксплуатации.
+Дополнение от 2026-08-04: тест гипотезы этапа 1 — теперь `python/evaluation/edge_diff.py`
+(имплицитные из ZQ вероятности снижения/повышения/удержания против цен корзин заседаний
+Kalshi, коммит `9f1af85`). Ранее волатильностно-дрейфовый вердикт в `analyze_snapshots.py`
+был ложным гейтом и заменён; сигналы дрейфа/волатильности — только информационные. Этап 2
+остаётся заблокированным, пока дивергенция edge-diff не подтвердится как устойчивая (~ещё
+30 дней) — см. `project/SESSION_20260804_pythia_edge_diff_verdict.md` в MemPalace.

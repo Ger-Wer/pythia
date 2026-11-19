@@ -1,96 +1,97 @@
 # Pythia v2
 
-A narrow, quantitatively-grounded tracker for **macro/economic prediction markets**
-(FOMC rate decisions, GDP, CPI) on Polymarket. The edge hypothesis: the gap between
-professional nowcasts / fed funds futures (ZQ) and Polymarket prices is systematically
-tradeable. The moat is a public, on-chain-verifiable track record.
+Узкий, количественно обоснованный трекер **макро/экономических рынков предсказаний**
+(решения FOMC по ставкам, ВВП, CPI) на Polymarket. Гипотеза преимущества: разрыв между
+профессиональными наукастами / фьючерсами на ставку ФРС (ZQ) и ценами Polymarket
+систематически торгуем. Ров — публичный, ончейн-проверяемый послужной список.
 
-> **Canonical strategy & roadmap:** [`docs/PYTHIA_V2_STRATEGY.md`](docs/PYTHIA_V2_STRATEGY.md) — read first.
+> **Каноническая стратегия и дорожная карта:** [`docs/PYTHIA_V2_STRATEGY.md`](docs/PYTHIA_V2_STRATEGY.md) — читать в первую очередь.
 
-## Status
+## Статус
 
-Staged go/no-go (each stage is a gate):
+Поэтапный go/no-go (каждый этап — гейт):
 
-| Stage | What | Status |
+| Этап | Что | Статус |
 |---|---|---|
-| 0 | Backtest FOMC/ZQ edge | ✅ done — `python/evaluation/run_backtest.py` |
-| 1 | Live paper track (daily snapshots + weekly edge analysis) | 🔄 running — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` (v1, deprecated) + `edge_diff_v2.py` (**authoritative** since 2026-09-16: per-meeting ZQ contract with CME day-weighting; v1 cut leg saturated 68/68, measures structural mismatch) |
-| 2 | Real on-chain wallet via OÜ (legal path confirmed) | 🟡 ready — 2-3 weeks setup |
-| 3 | Audience & ads on top of a proven record | ⏸ pending |
+| 0 | Бэктест преимущества FOMC/ZQ | ✅ готов — `python/evaluation/run_backtest.py` |
+| 1 | Живой бумажный трек (ежедневные снапшоты + еженедельный анализ преимущества) | 🔄 работает — `live_tracker.py`, `analyze_snapshots.py`, `edge_diff.py` (v1, deprecated) + `edge_diff_v2.py` (**авторитетный** с 2026-09-16: ZQ-контракт на каждое заседание с дневным взвешиванием CME; у v1 cut leg насыщен 68/68, измеряет структурное несоответствие) |
+| 2 | Реальный ончейн-кошелёк через OÜ (юридический путь подтверждён) | 🟡 готов — настройка 2–3 недели |
+| 3 | Аудитория и реклама поверх доказанного рекорда | ⏸ в ожидании |
 
-## What's in this repo
+## Что в этом репо
 
 ```
 python/evaluation/
-├── live_tracker.py        # daily snapshot: Polymarket + Kalshi + FRED + ZQ futures
-├── analyze_snapshots.py   # weekly analysis: edge-diff v2 verdict (authoritative) + v1 (deprecated, informational) + drift/volatility
-├── edge_diff.py           # v1 test: front-month ZQ vs Kalshi (DEPRECATED 2026-09-16: cut leg saturates 68/68)
-├── edge_diff_v2.py        # v2 test: per-meeting ZQ contract vs Kalshi (authoritative; Sep-2026 verdict SYSTEMATIC_DIVERGENCE, n=49)
-├── edge_diff_diag.py      # Step-A diagnostic: saturation + front-month roll analysis behind the v1 verdict
-├── zq_contracts.py        # per-month ZQ contracts (Yahoo .CBT, free): symbols, CME day-weighted rate extraction, fixture loader + live fetch
-├── fedwatch.py            # ZQ futures → implied probabilities + get_live_implied_rate()
-├── gdpnow.py              # Atlanta Fed GDPNow RSS parser (feedparser)
-├── cpi_nowcast.py         # Cleveland Fed CPI/PCE nowcast JSON parser
-├── zq_futures.py          # Yahoo Finance ZQ=F + Barchart fallback
-├── fetch_polymarket.py    # Polymarket Gamma API (keyword + slug fallback for FOMC)
-├── fetch_kalshi.py        # Kalshi KXFEDDECISION meeting-specific FOMC markets
-├── run_backtest.py        # Stage 0 backtest on resolved markets
-├── healthcheck.py         # daily health check: snapshot freshness, FRED baselines, market count
-├── tests/                 # pytest suite: 37 tests (edge_diff, edge_diff_v2, zq_contracts, gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
-│   └── fixtures/          # committed test fixtures (yahoo_zq.json, kalshi_markets.json, zq_monthly_sep2026.json, ...)
-└── data/                  # runtime caches (gitignored)
-docs/PYTHIA_V2_STRATEGY.md # canonical strategy, audit, jurisdiction DD, roadmap
+├── live_tracker.py        # ежедневный снапшот: Polymarket + Kalshi + FRED + фьючерсы ZQ
+├── analyze_snapshots.py   # еженедельный анализ: вердикт edge-diff v2 (авторитетный) + v1 (deprecated, информационный) + дрейф/волатильность
+├── edge_diff.py           # тест v1: ближний ZQ против Kalshi (DEPRECATED 2026-09-16: cut leg насыщается 68/68)
+├── edge_diff_v2.py        # тест v2: ZQ-контракт на каждое заседание против Kalshi (авторитетный; вердикт за сен-2026 SYSTEMATIC_DIVERGENCE, n=49)
+├── edge_diff_diag.py      # диагностика шага A: насыщение + анализ ролла ближнего месяца, лежащие в основе вердикта v1
+├── zq_contracts.py        # помесячные ZQ-контракты (Yahoo .CBT, бесплатно): символы, извлечение ставки с дневным взвешиванием CME, загрузчик фикстур + живой фетч
+├── fedwatch.py            # фьючерсы ZQ → имплицитные вероятности + get_live_implied_rate()
+├── gdpnow.py              # парсер RSS Atlanta Fed GDPNow (feedparser)
+├── cpi_nowcast.py         # парсер JSON наукаста CPI/PCE Cleveland Fed
+├── zq_futures.py          # Yahoo Finance ZQ=F + запасной вариант Barchart
+├── fetch_polymarket.py    # Polymarket Gamma API (поиск по ключевому слову + запасной вариант по слагу для FOMC)
+├── fetch_kalshi.py        # рынки FOMC Kalshi KXFEDDECISION с привязкой к заседаниям
+├── run_backtest.py        # бэктест этапа 0 на разрешённых рынках
+├── healthcheck.py         # ежедневная проверка здоровья: свежесть снапшотов, бейзлайны FRED, число рынков
+├── tests/                 # pytest-сьют: 37 тестов (edge_diff, edge_diff_v2, zq_contracts, gdpnow, cpi_nowcast, zq_futures, fetch_kalshi)
+│   └── fixtures/          # закоммиченные тестовые фикстуры (yahoo_zq.json, kalshi_markets.json, zq_monthly_sep2026.json, ...)
+└── data/                  # рантайм-кэши (в gitignore)
+docs/PYTHIA_V2_STRATEGY.md # каноническая стратегия, аудит, due diligence юрисдикции, дорожная карта
 ```
 
-### Data sources (current snapshot: ~132 markets)
+### Источники данных (текущий срез: ~132 рынка)
 
-| Bucket | Source | Type | Count |
+| Корзина | Источник | Тип | Кол-во |
 |---|---|---|---|
-| `fomc` | Polymarket Gamma (keyword search) | cumulative/general ("Will X cuts happen in 2026?") | ~24 |
-| `gdp` | Polymarket Gamma (keyword search) | GDP / recession | ~43 |
-| `kalshi_fomc` | **Kalshi KXFEDDECISION** | **meeting-specific binary strikes** ("Fed Hike 0bps at July 2026?") | ~65 |
+| `fomc` | Polymarket Gamma (поиск по ключевому слову) | накопительные/общие («Случится ли X снижений в 2026?») | ~24 |
+| `gdp` | Polymarket Gamma (поиск по ключевому слову) | ВВП / рецессия | ~43 |
+| `kalshi_fomc` | **Kalshi KXFEDDECISION** | **бинарные страйки с привязкой к заседаниям** («ФРС повысит на 0 б.п. на заседании в июле 2026?») | ~65 |
 
-Kalshi is the meeting-specific source that satisfies the corpus gate (Polymarket only offers
-cumulative "Will X cuts happen in 2026?" markets, not per-meeting markets). The real Stage 1
-hypothesis test is `edge_diff.py` (commit `9f1af85`): it compares ZQ-implied cut/hike/hold
-probabilities against Kalshi bucket prices of the nearest upcoming FOMC meeting, day by day.
-Per-market drift/volatility signals in the weekly report are informational only.
+Kalshi — источник с привязкой к заседаниям, который закрывает гейт корпуса (Polymarket предлагает
+только накопительные рынки «Случится ли X снижений в 2026?», а не рынки на каждое заседание). Реальный
+тест гипотезы этапа 1 — `edge_diff.py` (коммит `9f1af85`): он сравнивает имплицитные вероятности
+снижения/повышения/удержания из ZQ с ценами корзин Kalshi ближайшего предстоящего заседания FOMC,
+день за днём. Сигналы дрейфа/волатильности по отдельным рынкам в еженедельном отчёте — только
+информационные.
 
-Runtime dependencies: `requests`, `feedparser`, `beautifulsoup4`.
-Dev dependencies: `pytest>=8.0` (see `python/requirements-dev.txt`).
+Зависимости рантайма: `requests`, `feedparser`, `beautifulsoup4`.
+Зависимости для разработки: `pytest>=8.0` (см. `python/requirements-dev.txt`).
 
-## Security
+## Безопасность
 
-- Container runs as **non-root user** (`pythia`, UID 1002)
-- **Read-only filesystem** with tmpfs `/tmp`
-- `.env` protected: `chmod 600`, owned by `pythia:pythia`
-- Resource limits: `mem_limit: 512m`, `cpus: 0.5`, `pids_limit: 128`
-- OWASP Secure Coding Practices audit passed (commit `21a86c1`)
+- Контейнер работает от **непривилегированного пользователя** (`pythia`, UID 1002)
+- **Файловая система только для чтения** с tmpfs `/tmp`
+- `.env` защищён: `chmod 600`, владелец `pythia:pythia`
+- Лимиты ресурсов: `mem_limit: 512m`, `cpus: 0.5`, `pids_limit: 128`
+- Аудит по OWASP Secure Coding Practices пройден (коммит `21a86c1`)
 
-## Legal (Stage 2)
+## Юридика (этап 2)
 
-Trading via **Estonian OÜ** is the confirmed legal path (legal opinion obtained 2026-07-05):
-- 0% corporate tax on undistributed profit; losses are deductible
-- Individual trading = 22% gross-gain tax without loss offset — **not viable**
-- Red lines: no third-party funds, no affiliate links
-- Details: `docs/ESTONIA_LEGAL_OPINION.md`
+Торговля через **эстонское OÜ** — подтверждённый юридический путь (юридическое заключение получено 2026-07-05):
+- 0% налога на нераспределённую прибыль; убытки вычитаемы
+- Торговля как физлицо = 22% налога на валовую прибыль без зачёта убытков — **нежизнеспособно**
+- Красные линии: никаких чужих денег, никаких аффилиатных ссылок
+- Детали: `docs/ESTONIA_LEGAL_OPINION.md`
 
-## Run locally
+## Запуск локально
 
 ```bash
 pip install -r python/requirements.txt
-export FRED_API_KEY=...        # optional but recommended; get one free from FRED
+export FRED_API_KEY=...        # опционально, но рекомендуется; бесплатно на FRED
 python3 python/evaluation/live_tracker.py
 ```
 
-Run tests:
+Запуск тестов:
 
 ```bash
 pip install -r python/requirements-dev.txt
 pytest python/evaluation/tests/ -v
 ```
 
-## Run in Docker (production, on `amper`)
+## Запуск в Docker (продакшн, на `amper`)
 
 ```bash
 docker compose build
@@ -98,16 +99,16 @@ docker compose up -d
 docker compose logs -f pythia-v2
 ```
 
-One container (`pythia-v2`) runs `supercronic`, which fires:
-- `0 8 * * *`  — daily snapshot (FOMC + GDP + CPI + ZQ futures)
-- `0 9 * * 0`  — weekly edge analysis (Sundays 09:00 UTC)
-- `0 20 * * *` — daily health check (snapshot freshness, FRED baselines, market count)
+Один контейнер (`pythia-v2`) запускает `supercronic`, который срабатывает:
+- `0 8 * * *`  — ежедневный снапшот (FOMC + ВВП + CPI + фьючерсы ZQ)
+- `0 9 * * 0`  — еженедельный анализ преимущества (воскресенья 09:00 UTC)
+- `0 20 * * *` — ежедневная проверка здоровья (свежесть снапшотов, бейзлайны FRED, число рынков)
 
-Snapshots land in `python/evaluation/snapshots/`, reports in `python/evaluation/reports/`.
-Both are bind-mounted volumes, so state survives container rebuilds.
+Снапшоты складываются в `python/evaluation/snapshots/`, отчёты — в `python/evaluation/reports/`.
+Оба — bind-mounted тома, так что состояние переживает пересборку контейнера.
 
-## v1 decommission
+## Вывод v1 из эксплуатации
 
-The previous Pythia Capital oracle channel (LLM-driven Polymarket "desk calls" to
-Telegram) was retired on 2026-07-04. Its code is preserved on the `archive/v1-final`
-git branch. Do not revive it — see the strategy doc for why.
+Предыдущий канал-оракул Pythia Capital (LLM-«звонки» по рынкам Polymarket в Telegram)
+выведен из эксплуатации 2026-07-04. Его код сохранён в git-ветке `archive/v1-final`.
+Не возрождать — почему, см. в документе стратегии.
